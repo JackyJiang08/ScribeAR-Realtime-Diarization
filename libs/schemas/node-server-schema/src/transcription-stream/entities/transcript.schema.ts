@@ -5,13 +5,21 @@ import { type Static, Type } from 'typebox';
  * the words as separate tokens so callers can render at word granularity.
  * `starts` / `ends` are aligned with `text` and carry seconds-from-stream-start
  * timestamps when the provider supplies them; `null` means the provider does
- * not emit per-token timing.
+ * not emit per-token timing. `speakers` is aligned with `text` and carries
+ * per-token speaker labels when the provider runs diarization; `null` (or a
+ * null entry) means no speaker attribution is available.
  */
 export const TRANSCRIPT_FRAGMENT_SCHEMA = Type.Object(
   {
     text: Type.Array(Type.String()),
     starts: Type.Union([Type.Array(Type.Number()), Type.Null()]),
     ends: Type.Union([Type.Array(Type.Number()), Type.Null()]),
+    speakers: Type.Optional(
+      Type.Union([
+        Type.Array(Type.Union([Type.String(), Type.Null()])),
+        Type.Null(),
+      ]),
+    ),
   },
   { $id: 'TranscriptFragment' },
 );

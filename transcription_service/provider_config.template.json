@@ -15,6 +15,16 @@
             "worker_ids": [0],
             "tags": ["silero_vad"],
             "context_config": {}
+        },
+        {
+            "context_uid": "pyannote-diarization",
+            "worker_ids": [0],
+            "tags": ["pyannote_diarization"],
+            "context_config": {
+                "model": "pyannote/speaker-diarization-community-1",
+                "device": "cpu",
+                "token_env_var": "HUGGINGFACE_ACCESS_TOKEN"
+            }
         }
     ],
     "providers": {
@@ -32,7 +42,9 @@
                 "silero_context_tag": "silero_vad",
                 "job_period_ms": 5000,
                 "max_buffer_len_sec": 30,
-                "local_agree_dim": 2
+                "local_agree_dim": 2,
+                "diarization_detector": false,
+                "diarization_context_tag": "pyannote_diarization"
             }
         }
     }

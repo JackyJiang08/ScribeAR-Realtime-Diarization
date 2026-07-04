@@ -17,6 +17,7 @@ class TranscriptionSegment:
     text: str
     start: float
     end: float
+    speaker: str | None = None
 
 
 SENTENCE_ENDS = (".", "?", "!")
@@ -47,11 +48,17 @@ def _segments_to_sequence(segments: list[TranscriptionSegment]):
     text: list[str] = []
     starts: list[float] = []
     ends: list[float] = []
+    speakers: list[str | None] = []
     for s in segments:
         text.append(s.text)
         starts.append(s.start)
         ends.append(s.end)
-    return TranscriptionSequence(text, starts, ends)
+        speakers.append(s.speaker)
+    # Omit the speakers array entirely when no segment carries a speaker,
+    # so transcripts are unchanged for deployments without diarization
+    if all(speaker is None for speaker in speakers):
+        return TranscriptionSequence(text, starts, ends)
+    return TranscriptionSequence(text, starts, ends, speakers)
 
 
 class LocalAgree:

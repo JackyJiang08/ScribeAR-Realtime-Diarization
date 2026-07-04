@@ -4,10 +4,10 @@ install_uv:
 	@command -v uv >/dev/null 2>&1 || pip install uv
 
 install_dev: install_uv
-	uv sync --extra dev --extra faster-whisper --extra silero-vad
+	uv sync --extra dev --extra faster-whisper --extra silero-vad --extra pyannote-diarization
 
 install_dev_cpu: install_uv
-	uv sync --extra dev --extra faster-whisper --extra silero-vad-cpu
+	uv sync --extra dev --extra faster-whisper --extra silero-vad-cpu --extra pyannote-diarization
 
 install: install_uv
 	uv sync

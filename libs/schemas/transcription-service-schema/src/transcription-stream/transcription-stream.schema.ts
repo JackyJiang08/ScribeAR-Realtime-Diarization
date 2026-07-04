@@ -41,6 +41,12 @@ const TRANSCRIPTION_STREAM_SCHEMA = {
         text: Type.Array(Type.String()),
         starts: Type.Union([Type.Array(Type.Number()), Type.Null()]),
         ends: Type.Union([Type.Array(Type.Number()), Type.Null()]),
+        speakers: Type.Optional(
+          Type.Union([
+            Type.Array(Type.Union([Type.String(), Type.Null()])),
+            Type.Null(),
+          ]),
+        ),
       }),
       Type.Null(),
     ]),
@@ -49,6 +55,12 @@ const TRANSCRIPTION_STREAM_SCHEMA = {
         text: Type.Array(Type.String()),
         starts: Type.Union([Type.Array(Type.Number()), Type.Null()]),
         ends: Type.Union([Type.Array(Type.Number()), Type.Null()]),
+        speakers: Type.Optional(
+          Type.Union([
+            Type.Array(Type.Union([Type.String(), Type.Null()])),
+            Type.Null(),
+          ]),
+        ),
       }),
       Type.Null(),
     ]),

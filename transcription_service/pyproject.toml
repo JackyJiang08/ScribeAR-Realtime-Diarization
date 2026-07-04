@@ -68,6 +68,9 @@ silero-vad = ["torch==2.9.1", "torchaudio==2.9.1"]
 # install them with `uv sync --extra silero-vad-cpu`
 # uv resolves torch/torchaudio from the pytorch-cpu index (see [tool.uv.sources])
 silero-vad-cpu = ["torch==2.9.1", "torchaudio==2.9.1"]
+# Optional dependencies used by pyannote speaker diarization
+# Install them with `uv sync --extra pyannote-diarization`
+pyannote-diarization = ["pyannote.audio>=4.0,<5.0"]
 
 [tool.uv]
 package = true

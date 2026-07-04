@@ -9,8 +9,15 @@ from src.shared.utils.audio_decoder import AudioDecoder, TargetFormat
 from src.shared.utils.local_agree import LocalAgree, TranscriptionSegment
 from src.shared.utils.np_circular_buffer import NPCircularBuffer
 from src.shared.utils.silence_filter import RMSSilenceDetection
+from src.shared.utils.speaker_reconciler import (
+    SpeakerReconciler,
+    SpeakerSegment,
+)
 from src.shared.utils.worker_pool import JobInterface
 from src.transcription_contexts.faster_whisper_context import WhisperModel
+from src.transcription_contexts.pyannote_diarization_context import (
+    PyannoteDiarizationModelType,
+)
 from src.transcription_contexts.silero_vad_context import SileroVadModelType
 from src.transcription_provider_interface import (
     TranscriptionClientError,
@@ -22,15 +29,14 @@ from .whisper_streaming_config import WhisperStreamingProviderConfig
 
 SAMPLE_RATE = 16000
 NUM_CHANNELS = 1
+JobContexts = (
+    tuple[WhisperModel, SileroVadModelType]
+    | tuple[WhisperModel, SileroVadModelType, PyannoteDiarizationModelType]
+)
 
 
 class WhisperStreamingProviderJob(
-    JobInterface[
-        tuple[WhisperModel, SileroVadModelType],
-        bytes,
-        TranscriptionResult,
-        None,
-    ]
+    JobInterface[JobContexts, bytes, TranscriptionResult, None]
 ):
     """
     WorkerPool job definition for WhisperStreamingProvider
@@ -65,6 +71,12 @@ class WhisperStreamingProviderJob(
         self._vad_neg_threshold = config.vad_neg_threshold
         if self._vad_neg_threshold is not None:
             self._vad_neg_threshold = float(self._vad_neg_threshold)
+
+        # Speaker diarization config
+        self._enable_diarization = config.diarization_detector
+        self._diarization_min_speakers = config.diarization_min_speakers
+        self._diarization_max_speakers = config.diarization_max_speakers
+        self._speaker_reconciler = SpeakerReconciler()
 
     def _decode_audio(self, batch: list[bytes]):
         """
@@ -112,10 +124,119 @@ class WhisperStreamingProviderJob(
 
         return ranges
 
+    def _detect_speaker_ranges(
+        self,
+        buffer_samples: np.ndarray,
+        diarization_context: PyannoteDiarizationModelType | None,
+        log: Logger,
+    ) -> list[SpeakerSegment]:
+        """
+        Diarize the audio buffer and convert to session-relative, stable
+        speaker segments.
+
+        Diarization failures are logged and treated as "no speaker info" so
+        transcription keeps flowing without speaker labels.
+        """
+        if not self._enable_diarization or diarization_context is None:
+            return []
+
+        try:
+            ranges = diarization_context.diarize(
+                buffer_samples,
+                SAMPLE_RATE,
+                min_speakers=self._diarization_min_speakers,
+                max_speakers=self._diarization_max_speakers,
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            log.warning(f"Diarization failed: {e}", exc_info=e)
+            return []
+
+        offset_sec = self._buffer_offset_samples / SAMPLE_RATE
+        session_relative = [
+            SpeakerSegment(
+                start=offset_sec + segment.start,
+                end=offset_sec + segment.end,
+                speaker=segment.speaker,
+            )
+            for segment in ranges
+        ]
+        return self._speaker_reconciler.reconcile(session_relative)
+
+    def _assign_speaker(
+        self,
+        word_start: float,
+        word_end: float,
+        speaker_ranges: list[SpeakerSegment],
+    ) -> str | None:
+        """
+        Assign the speaker whose range has the largest overlap with the word
+        """
+        best_speaker = None
+        best_overlap = 0.0
+        for speaker_range in speaker_ranges:
+            overlap = min(word_end, speaker_range.end) - max(
+                word_start, speaker_range.start
+            )
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_speaker = speaker_range.speaker
+        return best_speaker
+
+    def _transcribe_range(
+        self,
+        whisper: WhisperModel,
+        audio_chunk: np.ndarray,
+        offset_sec: float,
+        speaker_ranges: list[SpeakerSegment],
+    ) -> list[TranscriptionSegment]:
+        """
+        Transcribe one speech range into word-level TranscriptionSegments
+
+        Args:
+            whisper         - Whisper model context instance
+            audio_chunk     - Contiguous float32 samples of the speech range
+            offset_sec      - Session-relative start time of audio_chunk
+            speaker_ranges  - Session-relative speaker segments for labeling
+
+        Returns:
+            List of TranscriptionSegments
+        """
+        parts, _ = whisper.transcribe(
+            audio_chunk,
+            initial_prompt=self._last_finalized,
+            word_timestamps=True,
+            vad_filter=False,
+            hallucination_silence_threshold=self._silence_threshold,
+            language="en",
+            multilingual=False,
+        )
+
+        transcription: list[TranscriptionSegment] = []
+        for part in parts:
+            if getattr(part, "words", None) is None:
+                raise RuntimeError(
+                    "Expected whisper transcription to have word timestamps"
+                )
+            for word in part.words:
+                word_start = offset_sec + word.start
+                word_end = offset_sec + word.end
+                transcription.append(
+                    TranscriptionSegment(
+                        word.word,
+                        word_start,
+                        word_end,
+                        self._assign_speaker(
+                            word_start, word_end, speaker_ranges
+                        ),
+                    )
+                )
+        return transcription
+
     def _transcribe_audio(
         self,
         whisper: WhisperModel,
         vad_context: SileroVadModelType,
+        diarization_context: PyannoteDiarizationModelType | None,
         log: Logger,
     ):
         """
@@ -134,6 +255,9 @@ class WhisperStreamingProviderJob(
             return []
 
         ranges = self._detect_speech_ranges(buffer_samples, vad_context, log)
+        speaker_ranges = self._detect_speaker_ranges(
+            buffer_samples, diarization_context, log
+        )
         transcription: list = []
 
         for start_sample, end_sample in ranges:
@@ -146,34 +270,16 @@ class WhisperStreamingProviderJob(
                 continue
             audio_chunk = np.ascontiguousarray(audio_chunk, dtype=np.float32)
 
-            parts, _ = whisper.transcribe(
-                audio_chunk,
-                initial_prompt=self._last_finalized,
-                word_timestamps=True,
-                vad_filter=False,
-                hallucination_silence_threshold=self._silence_threshold,
-                language="en",
-                multilingual=False,
-            )
-
             # Compensation for buffer offset to that word timestamps are correct
             offset_sec = (
                 self._buffer_offset_samples + start_sample
             ) / SAMPLE_RATE
 
-            for part in parts:
-                if getattr(part, "words", None) is None:
-                    raise RuntimeError(
-                        "Expected whisper transcription to have word timestamps"
-                    )
-                for word in part.words:
-                    transcription.append(
-                        TranscriptionSegment(
-                            word.word,
-                            offset_sec + word.start,
-                            offset_sec + word.end,
-                        )
-                    )
+            transcription.extend(
+                self._transcribe_range(
+                    whisper, audio_chunk, offset_sec, speaker_ranges
+                )
+            )
         return transcription
 
     def _append_sequence(
@@ -191,14 +297,15 @@ class WhisperStreamingProviderJob(
             a.starts.extend(b.starts)
         if a.ends is not None and b.ends is not None:
             a.ends.extend(b.ends)
+        if a.speakers is not None and b.speakers is not None:
+            a.speakers.extend(b.speakers)
 
     def process_batch(
-        self,
-        log: Logger,
-        contexts: tuple[WhisperModel, SileroVadModelType],
-        batch: list[bytes],
+        self, log: Logger, contexts: JobContexts, batch: list[bytes]
     ) -> TranscriptionResult:
-        whisper_model, vad_context = contexts
+        whisper_model = contexts[0]
+        vad_context = contexts[1]
+        diarization_context = contexts[2] if len(contexts) > 2 else None
 
         self._decode_audio(batch)
 
@@ -220,7 +327,9 @@ class WhisperStreamingProviderJob(
 
         # Transcribe the audio currently in the buffer
         log.debug("Last finalized: " + self._last_finalized)
-        segments = self._transcribe_audio(whisper_model, vad_context, log)
+        segments = self._transcribe_audio(
+            whisper_model, vad_context, diarization_context, log
+        )
         if len(segments) == 0:
             log.info("No words transcribed in buffer.")
 

@@ -52,11 +52,18 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             self._log = logger
             self._provider = provider
 
+            context_tags = (
+                self._provider.config.whisper_context_tag,
+                self._provider.config.silero_context_tag,
+            )
+            if self._provider.config.diarization_detector:
+                context_tags = (
+                    *context_tags,
+                    self._provider.config.diarization_context_tag,
+                )
+
             self._job = provider.worker_pool.register_job(
-                (
-                    self._provider.config.whisper_context_tag,
-                    self._provider.config.silero_context_tag,
-                ),
+                context_tags,
                 self._provider.config.job_period_ms,
                 WhisperStreamingProviderJob(self._provider.config),
             )

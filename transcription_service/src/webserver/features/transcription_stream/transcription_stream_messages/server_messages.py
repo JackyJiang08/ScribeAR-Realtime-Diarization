@@ -26,6 +26,7 @@ class TranscriptSequence:
     text: list[str]
     starts: list[float] | None = None
     ends: list[float] | None = None
+    speakers: list[str | None] | None = None
 
 
 @dataclass
