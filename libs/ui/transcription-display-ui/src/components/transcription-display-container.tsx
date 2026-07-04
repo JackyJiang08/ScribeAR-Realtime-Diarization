@@ -3,11 +3,13 @@ import { memo, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import type { SxProps, Theme } from '@mui/material/styles';
+import { type SxProps, type Theme, useTheme } from '@mui/material/styles';
 
-import type {
-  ActiveSection,
-  TranscriptionSection,
+import {
+  type ActiveSection,
+  type TranscriptionSection,
+  type TranscriptionSequence,
+  wordsToSpeakerRuns,
 } from '@scribear/transcription-content-store';
 
 import { useTranscriptionDisplayHeight } from '#src/contexts/transcription-display-height-context.js';
@@ -15,6 +17,7 @@ import { useAutoScroll } from '#src/hooks/use-auto-scroll.js';
 import { useContainerHeight } from '#src/hooks/use-container-height.js';
 
 import { JumpToBottomButton } from './jump-to-bottom-button.js';
+import { SpeakerRunsText } from './speaker-runs-text.js';
 
 /**
  * Props for the internal {@link CommittedSections} component.
@@ -24,20 +27,92 @@ interface CommittedSectionsProps {
   sections: TranscriptionSection[];
   // MUI sx styles applied to each section's Typography element.
   textStyle: SxProps<Theme>;
+  // Background color transcription is rendered on, for readable speaker labels.
+  backgroundColor: string;
 }
 
 // Memoized so active section transcription updates don't update the full committed history.
 const CommittedSections = memo(
-  ({ sections, textStyle }: CommittedSectionsProps) => (
+  ({ sections, textStyle, backgroundColor }: CommittedSectionsProps) => (
     <>
       {sections.map((section) => (
         <Typography key={section.id} color="transcriptionColor" sx={textStyle}>
-          {section.text}
+          <SpeakerRunsText
+            // Sections persisted before speaker support carry no runs.
+            runs={section.runs ?? [{ speaker: null, text: section.text }]}
+            previousSpeaker={null}
+            backgroundColor={backgroundColor}
+          />
         </Typography>
       ))}
     </>
   ),
 );
+
+/**
+ * Props for the internal {@link ActiveSequenceText} component.
+ */
+interface ActiveSequenceTextProps {
+  // The finalized sequence to render inside the active section.
+  sequence: TranscriptionSequence;
+  // Last attributed speaker before this sequence, for label suppression.
+  previousSpeaker: string | null;
+  // Background color transcription is rendered on, for readable speaker labels.
+  backgroundColor: string;
+}
+
+// Memoized so appending sequences to the active section never re-renders
+// existing ones; sequences are immutable once appended.
+const ActiveSequenceText = memo(
+  ({ sequence, previousSpeaker, backgroundColor }: ActiveSequenceTextProps) => {
+    const runs = useMemo(
+      () => wordsToSpeakerRuns(sequence.text, sequence.speakers),
+      [sequence],
+    );
+    return (
+      <SpeakerRunsText
+        runs={runs}
+        previousSpeaker={previousSpeaker}
+        backgroundColor={backgroundColor}
+      />
+    );
+  },
+);
+
+/**
+ * Last attributed (non-null) speaker in a sequence, or `fallback` when the
+ * sequence has no speaker attribution at all.
+ */
+const lastAttributedSpeaker = (
+  sequence: TranscriptionSequence,
+  fallback: string | null,
+): string | null => {
+  const speakers = sequence.speakers ?? [];
+  for (let i = speakers.length - 1; i >= 0; i -= 1) {
+    const speaker = speakers[i];
+    if (speaker !== null && speaker !== undefined) return speaker;
+  }
+  return fallback;
+};
+
+/**
+ * Pairs each active-section sequence with the speaker attributed just before
+ * it, so each sequence renderer can suppress labels for continuing speakers.
+ */
+const buildActiveSequenceItems = (
+  sequences: TranscriptionSequence[],
+): { sequence: TranscriptionSequence; previousSpeaker: string | null }[] => {
+  const items: {
+    sequence: TranscriptionSequence;
+    previousSpeaker: string | null;
+  }[] = [];
+  let previousSpeaker: string | null = null;
+  for (const sequence of sequences) {
+    items.push({ sequence, previousSpeaker });
+    previousSpeaker = lastAttributedSpeaker(sequence, previousSpeaker);
+  }
+  return items;
+};
 
 /**
  * Bounded display preferences resolved against the current container height.
@@ -85,6 +160,7 @@ export const TranscriptionDisplayContainer = ({
   const { containerHeightPx, setContainerHeightPx } =
     useTranscriptionDisplayHeight();
   const containerRef = useContainerHeight(setContainerHeightPx);
+  const backgroundColor = useTheme().palette.background.default;
 
   const { verticalPositionPx, numDisplayLines } =
     getBoundedDisplayPreferences(containerHeightPx);
@@ -113,6 +189,11 @@ export const TranscriptionDisplayContainer = ({
     [wordSpacingEm, fontSizePx, lineHeightPx],
   );
 
+  const activeSequenceItems = useMemo(
+    () => buildActiveSequenceItems(activeSection.sequences),
+    [activeSection.sequences],
+  );
+
   return (
     <Box sx={{ height: '100dvh', width: '100%', p: 2 }}>
       <Box ref={containerRef} sx={{ height: '100%' }}>
@@ -135,12 +216,19 @@ export const TranscriptionDisplayContainer = ({
             <CommittedSections
               sections={commitedSections}
               textStyle={textStyle}
+              backgroundColor={backgroundColor}
             />
             <Typography color="transcriptionColor" sx={textStyle}>
-              {/* Keyed spans so React only appends new nodes — never mutates existing ones,
-                  keeping browser re-layout cost proportional to each new chunk. */}
-              {activeSection.sequences.map((seq) => (
-                <span key={seq.id}>{seq.text.join('')}</span>
+              {/* Keyed memoized sequences so React only appends new nodes — never
+                  mutates existing ones, keeping browser re-layout cost
+                  proportional to each new chunk. */}
+              {activeSequenceItems.map((item) => (
+                <ActiveSequenceText
+                  key={item.sequence.id}
+                  sequence={item.sequence}
+                  previousSpeaker={item.previousSpeaker}
+                  backgroundColor={backgroundColor}
+                />
               ))}
               <span>{inProgressTranscriptionText}</span>
             </Typography>

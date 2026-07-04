@@ -1,16 +1,20 @@
 import { type PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 
+import { type SpeakerRun, sequencesToSpeakerRuns } from './speaker-runs.js';
+
 /**
  * A sequence of transcribed text tokens with optional word-level timing data.
  * Each committed sequence has a stable `id` so it can be rendered as a keyed
- * DOM node without re-creating existing elements.
+ * DOM node without re-creating existing elements. `speakers` is aligned with
+ * `text` when the provider runs speaker diarization.
  */
 export interface TranscriptionSequence {
   id: string;
   text: string[];
   starts?: number[] | null;
   ends?: number[] | null;
+  speakers?: (string | null)[] | null;
 }
 
 /**
@@ -23,11 +27,16 @@ export type TranscriptionSequenceInput = Omit<TranscriptionSequence, 'id'>;
  * A committed paragraph of transcription text with a stable identity.
  * The `id` is a UUID assigned at creation so React can track DOM nodes
  * across re-renders without re-creating existing paragraph elements.
+ * `runs` carries the same content grouped by speaker for speaker-aware
+ * rendering; `text` remains the plain concatenation for consumers that
+ * do not render speakers. `runs` is optional so state persisted before
+ * speaker support rehydrates without error.
  */
 export interface TranscriptionSection {
   // Sections need a static id so React doesn't recreate existing paragraphs in DOM
   id: string;
   text: string;
+  runs?: SpeakerRun[];
 }
 
 /**
@@ -108,6 +117,7 @@ export const transcriptionContentSlice = createSlice({
         text: state.activeSection.sequences
           .map((s) => s.text.join(''))
           .join(''),
+        runs: sequencesToSpeakerRuns(state.activeSection.sequences),
       });
       state.activeSection = { id: uuidv4(), sequences: [] };
     },

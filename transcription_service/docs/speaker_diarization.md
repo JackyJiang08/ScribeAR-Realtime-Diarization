@@ -67,6 +67,31 @@ flip never delays caption finalization.
    (a lecture with occasional questions usually works well with
    `diarization_max_speakers: 4`).
 
+## Testing
+
+1. Unit tests (no models needed):
+
+   ```bash
+   make install_dev_cpu
+   make test_unit
+   ```
+
+2. End-to-end against a locally running service. Create a `.env`
+   (see repository docs) pointing `PROVIDER_CONFIG_PATH` at a config with
+   `diarization_detector: true`, export `HUGGINGFACE_ACCESS_TOKEN`, start
+   the service with `make dev`, then stream a recording into it:
+
+   ```bash
+   uv run python tests/manual/transcription_stream_file_client.py \
+       --audio sample.wav --api-key <API_KEY from .env>
+   ```
+
+   Finalized lines print with inline `[spk_N]` markers on speaker changes.
+   Use a 16 kHz mono WAV with at least two speakers; the first diarization
+   run downloads the pyannote model, so expect a slow first tick.
+
+3. Performance measurement on target hardware: `benchmarks/diarization/`.
+
 ## Performance notes
 
 Diarization shares the worker's CPU budget with Whisper. If ticks start
