@@ -1,0 +1,336 @@
+{
+  "label": "",
+  "generated_at": "2026-10-02T13:22:59-0500",
+  "code_revision": "6e67715",
+  "environment": {
+    "machine": "arm64",
+    "platform": "macOS-15.7.8-arm64-arm-64bit",
+    "python": "3.12.11",
+    "torch": "2.13.0",
+    "pyannote_audio": "4.0.7",
+    "device": "cpu",
+    "cpu_threads": 10
+  },
+  "config": {
+    "model": "pyannote/speaker-diarization-community-1",
+    "tick_sec": 5.0,
+    "max_buffer_sec": 30.0,
+    "stream_sec": 120.0,
+    "der_convention": "pyannote default: no collar, overlap scored"
+  },
+  "model_load_sec": 30.6,
+  "peak_rss_mb": 2161.0,
+  "aggregate": {
+    "offline": {
+      "der": {
+        "value": 0.2599,
+        "reference_speech_sec": 1409.58,
+        "missed_detection": 0.1877,
+        "false_alarm": 0.0379,
+        "confusion": 0.0344
+      },
+      "der_collar_0.25": {
+        "value": 0.2193,
+        "reference_speech_sec": 1251.96,
+        "missed_detection": 0.1617,
+        "false_alarm": 0.0295,
+        "confusion": 0.028
+      },
+      "jer": {
+        "value": 0.522
+      }
+    },
+    "streaming_first_seen": {
+      "der": {
+        "value": 0.4623,
+        "reference_speech_sec": 209.98,
+        "missed_detection": 0.2172,
+        "false_alarm": 0.1119,
+        "confusion": 0.1332
+      },
+      "der_collar_0.25": {
+        "value": 0.4261,
+        "reference_speech_sec": 188.72,
+        "missed_detection": 0.1888,
+        "false_alarm": 0.1054,
+        "confusion": 0.1318
+      },
+      "jer": {
+        "value": 0.6782
+      }
+    },
+    "streaming_settled": {
+      "der": {
+        "value": 0.4084,
+        "reference_speech_sec": 209.98,
+        "missed_detection": 0.2075,
+        "false_alarm": 0.1061,
+        "confusion": 0.0948
+      },
+      "der_collar_0.25": {
+        "value": 0.3717,
+        "reference_speech_sec": 188.72,
+        "missed_detection": 0.1823,
+        "false_alarm": 0.0997,
+        "confusion": 0.0897
+      },
+      "jer": {
+        "value": 0.6198
+      }
+    }
+  },
+  "files": [
+    {
+      "file": "ES2004a_10min.wav",
+      "audio_sec": 600.0,
+      "reference_speakers": 4,
+      "offline": {
+        "hypothesis_speakers": 4,
+        "wall_sec": 422.9,
+        "rtf": 0.7049,
+        "der": {
+          "value": 0.374,
+          "reference_speech_sec": 420.92,
+          "missed_detection": 0.2882,
+          "false_alarm": 0.0535,
+          "confusion": 0.0323
+        },
+        "der_collar_0.25": {
+          "value": 0.3346,
+          "reference_speech_sec": 362.4,
+          "missed_detection": 0.2572,
+          "false_alarm": 0.0497,
+          "confusion": 0.0277
+        },
+        "jer": {
+          "value": 0.3937
+        }
+      },
+      "streaming": {
+        "streamed_sec": 120.0,
+        "ticks": 24,
+        "tick_cost_sec": {
+          "mean": 12.045,
+          "p95": 15.874,
+          "worst": 16.703,
+          "budget": 5.0,
+          "fits_budget": false
+        },
+        "label_latency_sec": {
+          "mean": 23.3,
+          "p95": 44.29,
+          "onsets_scored": 16,
+          "onsets_never_labelled": 4
+        },
+        "label_flips_per_min": 3.0,
+        "session_labels_minted": 5,
+        "first_seen": {
+          "der": {
+            "value": 0.6346,
+            "reference_speech_sec": 61.6,
+            "missed_detection": 0.2833,
+            "false_alarm": 0.2335,
+            "confusion": 0.1178
+          },
+          "der_collar_0.25": {
+            "value": 0.5883,
+            "reference_speech_sec": 54.82,
+            "missed_detection": 0.2409,
+            "false_alarm": 0.2373,
+            "confusion": 0.1102
+          },
+          "jer": {
+            "value": 0.6766
+          }
+        },
+        "settled": {
+          "der": {
+            "value": 0.5769,
+            "reference_speech_sec": 61.6,
+            "missed_detection": 0.2929,
+            "false_alarm": 0.1999,
+            "confusion": 0.0842
+          },
+          "der_collar_0.25": {
+            "value": 0.5408,
+            "reference_speech_sec": 54.82,
+            "missed_detection": 0.2602,
+            "false_alarm": 0.2019,
+            "confusion": 0.0786
+          },
+          "jer": {
+            "value": 0.696
+          }
+        }
+      }
+    },
+    {
+      "file": "IS1009a_10min.wav",
+      "audio_sec": 600.0,
+      "reference_speakers": 4,
+      "offline": {
+        "hypothesis_speakers": 4,
+        "wall_sec": 411.5,
+        "rtf": 0.6859,
+        "der": {
+          "value": 0.2668,
+          "reference_speech_sec": 481.67,
+          "missed_detection": 0.1586,
+          "false_alarm": 0.0461,
+          "confusion": 0.062
+        },
+        "der_collar_0.25": {
+          "value": 0.213,
+          "reference_speech_sec": 410.9,
+          "missed_detection": 0.1279,
+          "false_alarm": 0.0331,
+          "confusion": 0.0521
+        },
+        "jer": {
+          "value": 0.3884
+        }
+      },
+      "streaming": {
+        "streamed_sec": 120.0,
+        "ticks": 24,
+        "tick_cost_sec": {
+          "mean": 12.473,
+          "p95": 15.81,
+          "worst": 15.834,
+          "budget": 5.0,
+          "fits_budget": false
+        },
+        "label_latency_sec": {
+          "mean": 17.79,
+          "p95": 19.71,
+          "onsets_scored": 17,
+          "onsets_never_labelled": 0
+        },
+        "label_flips_per_min": 5.0,
+        "session_labels_minted": 7,
+        "first_seen": {
+          "der": {
+            "value": 0.5308,
+            "reference_speech_sec": 61.73,
+            "missed_detection": 0.0491,
+            "false_alarm": 0.1463,
+            "confusion": 0.3355
+          },
+          "der_collar_0.25": {
+            "value": 0.499,
+            "reference_speech_sec": 54.74,
+            "missed_detection": 0.029,
+            "false_alarm": 0.1259,
+            "confusion": 0.344
+          },
+          "jer": {
+            "value": 0.5462
+          }
+        },
+        "settled": {
+          "der": {
+            "value": 0.4396,
+            "reference_speech_sec": 61.73,
+            "missed_detection": 0.0416,
+            "false_alarm": 0.1595,
+            "confusion": 0.2384
+          },
+          "der_collar_0.25": {
+            "value": 0.3929,
+            "reference_speech_sec": 54.74,
+            "missed_detection": 0.0209,
+            "false_alarm": 0.1413,
+            "confusion": 0.2307
+          },
+          "jer": {
+            "value": 0.3776
+          }
+        }
+      }
+    },
+    {
+      "file": "TS3003a_10min.wav",
+      "audio_sec": 600.0,
+      "reference_speakers": 4,
+      "offline": {
+        "hypothesis_speakers": 1,
+        "wall_sec": 401.3,
+        "rtf": 0.6688,
+        "der": {
+          "value": 0.1587,
+          "reference_speech_sec": 506.99,
+          "missed_detection": 0.132,
+          "false_alarm": 0.017,
+          "confusion": 0.0097
+        },
+        "der_collar_0.25": {
+          "value": 0.1373,
+          "reference_speech_sec": 478.66,
+          "missed_detection": 0.1184,
+          "false_alarm": 0.0113,
+          "confusion": 0.0077
+        },
+        "jer": {
+          "value": 0.7839
+        }
+      },
+      "streaming": {
+        "streamed_sec": 120.0,
+        "ticks": 24,
+        "tick_cost_sec": {
+          "mean": 13.186,
+          "p95": 16.203,
+          "worst": 16.473,
+          "budget": 5.0,
+          "fits_budget": false
+        },
+        "label_latency_sec": {
+          "mean": 17.72,
+          "p95": 25.28,
+          "onsets_scored": 14,
+          "onsets_never_labelled": 2
+        },
+        "label_flips_per_min": 1.0,
+        "session_labels_minted": 1,
+        "first_seen": {
+          "der": {
+            "value": 0.291,
+            "reference_speech_sec": 86.65,
+            "missed_detection": 0.29,
+            "false_alarm": 0.001,
+            "confusion": 0.0
+          },
+          "der_collar_0.25": {
+            "value": 0.2633,
+            "reference_speech_sec": 79.16,
+            "missed_detection": 0.2633,
+            "false_alarm": 0.0,
+            "confusion": 0.0
+          },
+          "jer": {
+            "value": 0.8114
+          }
+        },
+        "settled": {
+          "der": {
+            "value": 0.2665,
+            "reference_speech_sec": 86.65,
+            "missed_detection": 0.265,
+            "false_alarm": 0.0015,
+            "confusion": 0.0
+          },
+          "der_collar_0.25": {
+            "value": 0.2401,
+            "reference_speech_sec": 79.16,
+            "missed_detection": 0.2401,
+            "false_alarm": 0.0,
+            "confusion": 0.0
+          },
+          "jer": {
+            "value": 0.8048
+          }
+        }
+      }
+    }
+  ]
+}

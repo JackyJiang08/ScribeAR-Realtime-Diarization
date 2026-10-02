@@ -26,6 +26,8 @@ import numpy as np
 import soundfile as sf
 from websockets.asyncio.client import connect
 
+from src.shared.utils.audio_frame_protocol import encode_audio_frame
+
 SAMPLE_RATE = 16000
 
 
@@ -130,7 +132,13 @@ async def stream_audio(
     total_sec = samples.shape[0] / SAMPLE_RATE
     for start in range(0, samples.shape[0], chunk_samples):
         chunk = samples[start : start + chunk_samples]
-        await websocket.send(encode_wav_chunk(chunk))
+        # The service only accepts SAFP-framed audio (chunk id + payload),
+        # the same framing node-server forwards from a kiosk
+        await websocket.send(
+            encode_audio_frame(
+                f"chunk-{start // chunk_samples}", encode_wav_chunk(chunk)
+            )
+        )
         sent_sec = min((start + chunk_samples) / SAMPLE_RATE, total_sec)
         print(f"-> sent {sent_sec:6.1f}s / {total_sec:.1f}s", file=sys.stderr)
         if realtime:
