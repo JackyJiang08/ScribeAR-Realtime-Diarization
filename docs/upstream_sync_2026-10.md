@@ -223,6 +223,46 @@ pyannote.audio 4.0.7). Node v25.8.0.
 Pre-sync the Python suite had 162 tests; the merge brings upstream's new
 tests, so the count rose to 542 with the same two known failures.
 
+## Runtime verification after the merge (2026-10-02)
+
+- **Benchmark rerun** (`make benchmark_diarization_baseline`, saved as
+  `results/post_merge_baseline.json`): every DER / JER value and component,
+  offline and streaming, label latency, flips and minted labels are
+  identical to `pre_sync_baseline.json` to four decimals. Only timing moved
+  (offline RTF 0.72 to 0.69, tick cost within 1 s), which is run-to-run
+  noise. torch 2.13 therefore produced bit-identical pyannote output here.
+- **Caption latency**, ES2004a first 180 s streamed at real time into the
+  Python service (whisper base, Silero VAD, CPU, 0.5 s chunks), measured
+  from the moment a chunk was sent to the first message showing its words:
+
+  | | diarization off | diarization on |
+  |---|---|---|
+  | transcript messages in 180 s | 16 | 6 |
+  | words first shown | 185 | 49 |
+  | first-shown latency mean / p95 | 26.8 s / 39.5 s | 84.4 s / 105.5 s |
+  | finalized latency mean / p95 | 48.0 s / 59.0 s | 80.2 s / 84.9 s |
+  | job execution mean / max | 8.0 s / 32.8 s | 26.1 s / 74.4 s |
+
+  Diarization on this CPU delays the captions themselves by roughly a
+  minute and drops two thirds of the job periods. That is the Phase 2
+  problem, unchanged by the merge.
+- **End to end**: transcription service (diarization on), a stub session
+  manager serving the session-config long-poll, and node-server built from
+  this branch; a driver authenticated as kiosk and viewer with a locally
+  signed session token, streamed 120 s of ES2004a as SAFP frames, and
+  received transcripts with `speakers` through node-server. Every server
+  message validated against the published node-server schema. No word
+  changed its label between messages. The captured messages replayed
+  through the transcription-content store into `TranscriptionDisplayContainer`
+  rendered `Speaker 3:` in bold with the palette color `#007a59` inside the
+  `role="log"` region.
+- **Diarization off**: with the `pyannote` package made unimportable the
+  service imports and all 540 unit tests pass; with `diarization_detector`
+  false no message carries a `speakers` field.
+- The manual file client was sending raw WAV chunks, which the merged
+  controller drops as malformed frames; it now encodes SAFP frames
+  (commit after the merge).
+
 ## Pre-sync verification (step 1, 2026-10-01, at 4ce85ca)
 
 | Check | Result |
