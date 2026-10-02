@@ -12,8 +12,14 @@ redesign: the tick loop, the 30 s rolling buffer and the reconciler are
 unchanged, so a change in the benchmark after this merge is attributable to
 the merge alone.
 
-Safety net: branch `backup/speaker-diarization-pre-sync-2026-10-01` and tag
-`pre-upstream-sync-2026-10-01`, both at 4ce85ca, both on origin.
+Safety net: tag `pre-upstream-sync-2026-10-01` at 4ce85ca on origin (the
+matching backup branch was kept locally only and removed from GitHub once
+the merge was verified). To get the pre-sync state back at any time:
+
+```bash
+git fetch origin --tags
+git checkout -b restore-pre-sync pre-upstream-sync-2026-10-01
+```
 
 ## Manually resolved files
 
