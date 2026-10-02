@@ -111,6 +111,12 @@ class PyannoteDiarizationContext(
             )
         )
 
+    @property
+    def device(self) -> str | None:
+        # Reported on /metrics/status through the provider registry's
+        # tag-to-device map, the same way the whisper context reports its own.
+        return self._config.device
+
     def create(self, log: Logger) -> PyannoteDiarizationModelType:
         # pylint: disable=import-outside-toplevel
         # Only import pyannote when a diarization context is configured

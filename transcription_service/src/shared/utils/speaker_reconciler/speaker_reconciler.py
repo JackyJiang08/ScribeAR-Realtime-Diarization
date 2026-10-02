@@ -40,6 +40,13 @@ class SpeakerReconciler:
         self._previous: list[SpeakerSegment] = []
         self._next_label_id = 0
 
+    @property
+    def labels_minted(self) -> int:
+        """
+        Number of session-wide labels minted so far
+        """
+        return self._next_label_id
+
     def reconcile(self, segments: list[SpeakerSegment]) -> list[SpeakerSegment]:
         """
         Convert one diarization run's raw labels to session-wide labels

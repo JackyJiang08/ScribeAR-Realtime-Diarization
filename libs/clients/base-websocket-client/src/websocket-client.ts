@@ -144,12 +144,40 @@ interface WebSocketClientOptions<S extends BaseWebSocketRouteSchema> {
    */
   sendQueueOverflow?: SendQueueOverflow;
   /**
+   * Maximum age, in milliseconds, of a message buffered while not `OPEN`.
+   * Anything older is dropped when the queue is flushed instead of being
+   * sent. Defaults to `undefined`: buffered messages never expire, which is
+   * the right behaviour for a control channel where every message still
+   * matters however late it lands.
+   *
+   * Set this on a channel carrying realtime data, where a message that missed
+   * its moment is not merely late but wrong. The queue holds
+   * {@link sendQueueLimit} messages regardless of how long the socket was
+   * down, so without an age bound a reconnect flushes the whole backlog onto
+   * the fresh socket in one burst - for a 100 ms audio chunk and the default
+   * limit of 64, that is 6.4 s of stale audio delivered as if it were
+   * current.
+   */
+  sendQueueMaxAgeMs?: number;
+  /**
    * `bufferedAmount` threshold in bytes. When the socket is `OPEN` and the
    * underlying send buffer exceeds this value, the overflow policy is applied
    * instead of sending. Defaults to 65536 (64 KiB). Set to `Infinity` to
    * disable backpressure checking.
    */
   backpressureHighWaterMark?: number;
+  /**
+   * How long (ms) a connection must stay continuously `OPEN` before it is
+   * treated as a genuine success and the reconnect backoff counter is reset
+   * to zero. Reaching `OPEN` only proves the transport handshake succeeded;
+   * a server that accepts the socket and then immediately closes it (e.g. an
+   * upstream that rejects the session right after auth/config) would, if the
+   * counter reset on the bare `OPEN` transition, reconnect forever at
+   * `initialMs` with no escalation. Deferring the reset until the connection
+   * survives this window makes such "open-then-immediately-closed" flapping
+   * back off exponentially instead. Defaults to the backoff's `initialMs`.
+   */
+  stableConnectionThresholdMs?: number;
 }
 
 /**
@@ -178,11 +206,60 @@ interface WebSocketClientEvents<S extends BaseWebSocketRouteSchema> {
 /**
  * Tagged union of outbound frames waiting for the socket to reach `OPEN`.
  * Text frames carry a pre-serialized JSON string; binary frames carry the
- * raw buffer.
+ * raw buffer. `queuedAt` is the wall-clock time the message was buffered,
+ * used only to enforce {@link WebSocketClientOptions.sendQueueMaxAgeMs}.
  */
-type QueuedSend =
+type QueuedSend = { queuedAt: number } & (
   | { kind: 'text'; payload: string }
-  | { kind: 'binary'; payload: Buffer | ArrayBuffer };
+  | { kind: 'binary'; payload: Buffer | ArrayBuffer }
+);
+
+/**
+ * Messages the queue discarded rather than sending, by reason. `overflow` is
+ * the queue hitting {@link WebSocketClientOptions.sendQueueLimit} (or the
+ * socket's `bufferedAmount` exceeding the high-water mark while `OPEN`);
+ * `stale` is a message that outlived
+ * {@link WebSocketClientOptions.sendQueueMaxAgeMs} before the socket came
+ * back.
+ *
+ * Both are counted because both are silent otherwise: a client that drops
+ * every frame it sends looks, from the far end, exactly like a client that
+ * had nothing to say.
+ */
+interface SendQueueDrops {
+  overflow: number;
+  stale: number;
+}
+
+/**
+ * Stops a socket's errors reaching this client, without leaving it with no
+ * error handler at all.
+ *
+ * `sock.onerror = null` is the obvious way to write this and is a latent
+ * crash. Under `ws`, the `on*` accessors add and remove real listeners, so
+ * assigning `null` leaves the socket with **no** `'error'` listener - and
+ * `close()` on a socket that is still `CONNECTING` closes nothing and throws
+ * nothing. It calls `abortHandshake`, which does
+ * `process.nextTick(emitErrorAndClose, ...)`; that emit reaches an
+ * `EventEmitter` with no `'error'` listener, and *that* throws, one tick
+ * later, as an `uncaughtException`. The `try/catch` around `close()` cannot
+ * help, because it returned before the throw happened.
+ *
+ * The window is not exotic: it is every teardown that races a handshake -
+ * a source device disconnecting while node-server's upstream is still
+ * connecting, or `_handleFailure` reacting to a pre-open error, which by
+ * definition only ever runs while `CONNECTING`.
+ *
+ * A no-op listener keeps the emit harmless while still detaching this client
+ * from the socket, which is all the callers wanted.
+ *
+ * @param sock Socket being detached.
+ */
+function detachErrorHandler(sock: WebSocket): void {
+  sock.onerror = () => {
+    // Deliberately empty; see above.
+  };
+}
 
 /**
  * A self-managing WebSocket client that handles connection, an optional
@@ -214,11 +291,15 @@ export class WebSocketClient<
   private readonly _backoff: BackoffOptions;
   private readonly _sendQueueLimit: number;
   private readonly _sendQueueOverflow: SendQueueOverflow;
+  private readonly _sendQueueMaxAgeMs: number;
   private readonly _backpressureHighWaterMark: number;
+  private readonly _stableConnectionThresholdMs: number;
 
   private _ws: WebSocket | null = null;
   private _retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private _stableTimer: ReturnType<typeof setTimeout> | null = null;
   private _sendQueue: QueuedSend[] = [];
+  private _sendQueueDrops: SendQueueDrops = { overflow: 0, stale: 0 };
   private _handshakeRouter: EventEmitter<{
     message: (msg: ServerMessage<S>) => void;
   }> | null = null;
@@ -240,8 +321,11 @@ export class WebSocketClient<
     this._backoff = { ...DEFAULT_BACKOFF, ...options.backoff };
     this._sendQueueLimit = options.sendQueueLimit ?? 64;
     this._sendQueueOverflow = options.sendQueueOverflow ?? 'drop-oldest';
+    this._sendQueueMaxAgeMs = options.sendQueueMaxAgeMs ?? Infinity;
     this._backpressureHighWaterMark =
       options.backpressureHighWaterMark ?? 65536;
+    this._stableConnectionThresholdMs =
+      options.stableConnectionThresholdMs ?? this._backoff.initialMs;
   }
 
   get state(): ConnectionState {
@@ -249,11 +333,26 @@ export class WebSocketClient<
   }
 
   /**
-   * Number of completed retry cycles since the last successful `OPEN`. Resets
-   * to 0 on each successful connection.
+   * Number of completed retry cycles since the last confirmed-stable
+   * connection. Resets to 0 only once a connection has stayed `OPEN` for
+   * `stableConnectionThresholdMs`; connections that close before then leave
+   * the counter intact so repeated flapping escalates the backoff delay.
    */
   get attempt(): number {
     return this._attempt;
+  }
+
+  /**
+   * Lifetime count of outbound messages this client discarded instead of
+   * sending, by reason. See {@link SendQueueDrops}.
+   *
+   * Exposed because these drops are otherwise invisible from both ends: the
+   * caller's `send`/`sendBinary` returns exactly the same way whether the
+   * message went out or not, and the far end cannot tell a client that
+   * dropped everything from a client with nothing to say.
+   */
+  get sendQueueDrops(): Readonly<SendQueueDrops> {
+    return { ...this._sendQueueDrops };
   }
 
   /**
@@ -272,12 +371,13 @@ export class WebSocketClient<
    */
   terminate(code: WsCloseCodeOf<S>, reason = ''): void {
     this._clearRetry();
+    this._clearStableTimer();
     if (this._ws !== null) {
       const sock = this._ws;
       sock.onopen = null;
       sock.onmessage = null;
       sock.onclose = null;
-      sock.onerror = null;
+      detachErrorHandler(sock);
       this._ws = null;
       try {
         sock.close(code, reason);
@@ -298,7 +398,7 @@ export class WebSocketClient<
    */
   send(message: ClientMessage<S>): void {
     const payload = JSON.stringify(message);
-    this._enqueue({ kind: 'text', payload });
+    this._enqueue({ kind: 'text', payload, queuedAt: Date.now() });
   }
 
   /**
@@ -307,7 +407,7 @@ export class WebSocketClient<
    * @param data Binary payload to send.
    */
   sendBinary(data: Buffer | ArrayBuffer): void {
-    this._enqueue({ kind: 'binary', payload: data });
+    this._enqueue({ kind: 'binary', payload: data, queuedAt: Date.now() });
   }
 
   /**
@@ -326,6 +426,7 @@ export class WebSocketClient<
       // bufferedAmount exceeds high-water mark - apply overflow policy.
       // drop-oldest and drop-newest both drop the current item since there
       // is no queue to rearrange when the socket is already open.
+      this._sendQueueDrops.overflow += 1;
       if (this._sendQueueOverflow === 'error') {
         this.emit(
           'error',
@@ -338,6 +439,7 @@ export class WebSocketClient<
     }
 
     if (this._sendQueueLimit === 0) {
+      this._sendQueueDrops.overflow += 1;
       if (this._sendQueueOverflow === 'error') {
         this.emit('error', new Error('Send queue is disabled (limit 0).'));
       }
@@ -345,6 +447,7 @@ export class WebSocketClient<
     }
 
     if (this._sendQueue.length >= this._sendQueueLimit) {
+      this._sendQueueDrops.overflow += 1;
       switch (this._sendQueueOverflow) {
         case 'drop-oldest':
           this._sendQueue.shift();
@@ -367,13 +470,23 @@ export class WebSocketClient<
   }
 
   /**
-   * Drain every buffered send item onto the live socket, in order.
+   * Drain every buffered send item onto the live socket, in order, dropping
+   * any that outlived `sendQueueMaxAgeMs` while the socket was down.
+   *
+   * The expiry check belongs here rather than at enqueue time: how long a
+   * message waits is decided by how long the socket stays down, which is not
+   * known when it is buffered.
    */
   private _flushQueue(): void {
     if (this._ws === null) return;
+    const oldestAllowed = Date.now() - this._sendQueueMaxAgeMs;
     while (this._sendQueue.length > 0) {
       const item = this._sendQueue.shift();
       if (item === undefined) break;
+      if (item.queuedAt < oldestAllowed) {
+        this._sendQueueDrops.stale += 1;
+        continue;
+      }
       this._ws.send(item.payload);
     }
   }
@@ -458,10 +571,44 @@ export class WebSocketClient<
     // could have replaced this ws during the handshake.
     if (this._ws !== ws) return;
 
-    this._attempt = 0;
+    // Do NOT reset the backoff counter on the bare OPEN transition. Reaching
+    // OPEN only proves the transport handshake succeeded; an upstream that
+    // accepts the socket and then drops it right after receiving auth/config
+    // would otherwise reset backoff on every brief open and reconnect forever
+    // at `initialMs`. Instead arm a timer that clears the counter only once
+    // the connection has survived `_stableConnectionThresholdMs`.
+    this._armStableTimer(ws);
     this._setState('OPEN');
     this.emit('open');
     this._flushQueue();
+  }
+
+  /**
+   * Arm the stability timer for a freshly-opened socket. When it fires - and
+   * only if `ws` is still the live socket and the client is still `OPEN` -
+   * the backoff attempt counter is reset, marking the connection as a
+   * confirmed success. Re-arming cancels any previous timer first.
+   *
+   * @param ws The socket that just reached `OPEN`.
+   */
+  private _armStableTimer(ws: WebSocket): void {
+    this._clearStableTimer();
+    this._stableTimer = setTimeout(() => {
+      this._stableTimer = null;
+      if (this._ws === ws && this._state === 'OPEN') {
+        this._attempt = 0;
+      }
+    }, this._stableConnectionThresholdMs);
+  }
+
+  /**
+   * Cancel any pending stability timer. Safe to call when none is active.
+   */
+  private _clearStableTimer(): void {
+    if (this._stableTimer !== null) {
+      clearTimeout(this._stableTimer);
+      this._stableTimer = null;
+    }
   }
 
   /**
@@ -530,6 +677,10 @@ export class WebSocketClient<
     if (this._ws !== ws) return;
     this._ws = null;
     this._handshakeRouter = null;
+    // The socket is gone before the stability window elapsed (or after it
+    // already reset the counter); either way cancel the pending timer so a
+    // stale fire can't reset backoff mid-reconnect.
+    this._clearStableTimer();
 
     const code = rawCode;
     if (!(code in this._schema.closeCodes)) {
@@ -565,12 +716,13 @@ export class WebSocketClient<
    */
   private _handleFailure(err: Error): void {
     this.emit('error', err);
+    this._clearStableTimer();
     if (this._ws !== null) {
       const sock = this._ws;
       sock.onopen = null;
       sock.onmessage = null;
       sock.onclose = null;
-      sock.onerror = null;
+      detachErrorHandler(sock);
       this._ws = null;
       try {
         sock.close();
@@ -638,6 +790,7 @@ export type {
   ConnectionState,
   BackoffOptions,
   SendQueueOverflow,
+  SendQueueDrops,
   ConnectParams,
   WebSocketClientOptions,
   WebSocketClientEvents,

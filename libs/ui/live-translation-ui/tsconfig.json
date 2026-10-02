@@ -1,0 +1,30 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "paths": {
+      "#src/*": [
+        "./src/*"
+      ],
+      "#tests/*": [
+        "./tests/*"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "tests"
+  ],
+  "references": [
+    {
+      "path": "../core-ui"
+    },
+    {
+      "path": "../transcription-display-ui"
+    },
+    {
+      "path": "../../store/live-translation-store"
+    }
+  ]
+}

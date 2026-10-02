@@ -38,7 +38,7 @@ vi.mock('isomorphic-ws', () => {
 
     constructor(url: string) {
       this.url = url;
-      mockWsInstances.push(this as unknown as MockWsInstance);
+      mockWsInstances.push(this);
     }
   }
   return { default: MockWebSocket };
@@ -195,6 +195,73 @@ describe('WebSocketClient', () => {
     // Assert - a new socket was created
     expect(mockWsInstances.length).toBe(2);
     expect(client.state).toBe('CONNECTING');
+  });
+
+  it('escalates backoff when a connection opens then immediately closes (flapping)', () => {
+    // Arrange - zero jitter so the scheduled delays are deterministic. The
+    // stability threshold defaults to initialMs (100ms); each cycle below
+    // closes with no time elapsed while OPEN, so the connection never proves
+    // stable and the attempt counter must keep climbing.
+    const client = new WebSocketClient({
+      schema: TEST_SCHEMA,
+      route: TEST_ROUTE,
+      baseUrl: BASE_URL,
+      params: { params: { room: 'r1' } },
+      backoff: { initialMs: 100, maxMs: 10_000, factor: 2, jitterPct: 0 },
+    });
+    const closeHandler = vi.fn();
+    client.on('close', closeHandler);
+
+    // Act + Assert - three open-then-immediately-closed cycles.
+    client.start();
+    currentSocket().onopen!({ type: 'open' });
+    currentSocket().onclose!({ code: 1006, reason: 'drop' });
+    expect(client.attempt).toBe(1);
+    expect(closeHandler).toHaveBeenLastCalledWith(1006, 'drop', 100);
+
+    vi.advanceTimersByTime(100);
+    currentSocket().onopen!({ type: 'open' });
+    currentSocket().onclose!({ code: 1006, reason: 'drop' });
+    expect(client.attempt).toBe(2);
+    // Escalated: initialMs * factor^1 = 200 (not stuck at 100).
+    expect(closeHandler).toHaveBeenLastCalledWith(1006, 'drop', 200);
+
+    vi.advanceTimersByTime(200);
+    currentSocket().onopen!({ type: 'open' });
+    currentSocket().onclose!({ code: 1006, reason: 'drop' });
+    expect(client.attempt).toBe(3);
+    expect(closeHandler).toHaveBeenLastCalledWith(1006, 'drop', 400);
+  });
+
+  it('resets backoff once a connection stays open past the stability threshold', () => {
+    // Arrange - a 500ms stability window; flap once to prime the counter.
+    const client = new WebSocketClient({
+      schema: TEST_SCHEMA,
+      route: TEST_ROUTE,
+      baseUrl: BASE_URL,
+      params: { params: { room: 'r1' } },
+      backoff: { initialMs: 100, maxMs: 10_000, factor: 2, jitterPct: 0 },
+      stableConnectionThresholdMs: 500,
+    });
+    const closeHandler = vi.fn();
+    client.on('close', closeHandler);
+
+    client.start();
+    currentSocket().onopen!({ type: 'open' });
+    currentSocket().onclose!({ code: 1006, reason: 'drop' });
+    expect(client.attempt).toBe(1);
+
+    // Act - reconnect and this time stay open past the stability window.
+    vi.advanceTimersByTime(100);
+    currentSocket().onopen!({ type: 'open' });
+    expect(client.attempt).toBe(1); // not reset on the bare OPEN transition
+    vi.advanceTimersByTime(500);
+
+    // Assert - counter reset, so the next drop backs off from initialMs again.
+    expect(client.attempt).toBe(0);
+    currentSocket().onclose!({ code: 1006, reason: 'drop' });
+    expect(closeHandler).toHaveBeenLastCalledWith(1006, 'drop', 100);
+    expect(client.attempt).toBe(1);
   });
 
   it('emits close with reconnectInMs=null on normal close code (1000) and does not reconnect', () => {
@@ -358,6 +425,74 @@ describe('WebSocketClient', () => {
 
     // Assert
     expect(currentSocket().send).toHaveBeenCalledWith(data);
+  });
+
+  it('drops buffered messages older than sendQueueMaxAgeMs instead of replaying them', () => {
+    // Arrange - a realtime channel: capture keeps producing while the socket
+    // is down, so without an age bound the whole backlog lands on the fresh
+    // socket at once, seconds after the audio it carries was spoken.
+    const client = new WebSocketClient({
+      schema: TEST_SCHEMA,
+      route: TEST_ROUTE,
+      baseUrl: BASE_URL,
+      params: { params: { room: 'r1' } },
+      sendQueueMaxAgeMs: 1000,
+    });
+    client.start();
+    const stale = new ArrayBuffer(4);
+    const fresh = new ArrayBuffer(8);
+
+    // Act - one frame buffered well before the reconnect, one just before it
+    client.sendBinary(stale);
+    vi.advanceTimersByTime(1500);
+    client.sendBinary(fresh);
+    currentSocket().onopen!({ type: 'open' });
+
+    // Assert - only the frame that still means something is delivered
+    expect(currentSocket().send).toHaveBeenCalledTimes(1);
+    expect(currentSocket().send).toHaveBeenCalledWith(fresh);
+    expect(client.sendQueueDrops).toEqual({ overflow: 0, stale: 1 });
+  });
+
+  it('keeps buffered messages indefinitely when sendQueueMaxAgeMs is unset', () => {
+    // Arrange - the default: a control channel, where a message still matters
+    // however late it lands.
+    const client = new WebSocketClient({
+      schema: TEST_SCHEMA,
+      route: TEST_ROUTE,
+      baseUrl: BASE_URL,
+      params: { params: { room: 'r1' } },
+    });
+    client.start();
+    const data = new ArrayBuffer(4);
+
+    // Act
+    client.sendBinary(data);
+    vi.advanceTimersByTime(600_000);
+    currentSocket().onopen!({ type: 'open' });
+
+    // Assert
+    expect(currentSocket().send).toHaveBeenCalledWith(data);
+    expect(client.sendQueueDrops.stale).toBe(0);
+  });
+
+  it('counts messages the queue dropped for overflow', () => {
+    // Arrange - overflow drops are otherwise silent under both drop policies:
+    // `send` returns identically whether the message went out or not.
+    const client = new WebSocketClient({
+      schema: TEST_SCHEMA,
+      route: TEST_ROUTE,
+      baseUrl: BASE_URL,
+      params: { params: { room: 'r1' } },
+      sendQueueLimit: 2,
+    });
+    client.start();
+
+    // Act - four sends into a queue that holds two
+    for (let i = 0; i < 4; i += 1) client.sendBinary(new ArrayBuffer(1));
+
+    // Assert
+    expect(client.sendQueueDrops).toEqual({ overflow: 2, stale: 0 });
   });
 
   it('drops the newest message silently when the queue is full under drop-newest policy', () => {

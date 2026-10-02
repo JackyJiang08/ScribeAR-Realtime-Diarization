@@ -1,151 +1,76 @@
-# ScribeAR — Real-Time Speaker Diarization
+> **Fork notes — JackyJiang08/ScribeAR-Realtime-Diarization**
+>
+> This fork of [scribear/scribear](https://github.com/scribear/scribear) adds
+> **real-time speaker diarization**: the whisper-streaming provider can label
+> each word with a stable speaker (`spk_0`, `spk_1`, ...) and the viewer renders
+> colored `Speaker N:` labels. Everything else tracks upstream `staging`.
+>
+> **Status (2026-10):** working end to end, optional, off by default. Pre-sync
+> baseline on three AMI meetings, CPU (Apple M4): offline DER 0.26, streaming
+> DER 0.41 to 0.46, per-tick diarization 12.8 s mean / 18.6 s worst against a
+> 5 s job tick. Fitting the tick budget on CPU is the next phase.
+>
+> **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
+> `pyannote/speaker-diarization-community-1` terms, export
+> `HUGGINGFACE_ACCESS_TOKEN`, add the `pyannote-diarization` context to
+> `provider_config.json` and set `"diarization_detector": true` on the whisper
+> provider. Reproduce the baseline with `make benchmark_diarization_baseline`.
+>
+> Design, configuration, testing and benchmark details:
+> [`transcription_service/docs/speaker_diarization.md`](transcription_service/docs/speaker_diarization.md).
+> Upstream sync log: [`docs/upstream_sync_2026-10.md`](docs/upstream_sync_2026-10.md).
 
-Feature-development repository for [ScribeAR](https://github.com/scribear/scribear),
-UIUC's real-time classroom captioning system for accessibility. This repository
-extends ScribeAR with **live speaker diarization**: captions are labeled with
-stable speaker identities (`Speaker 1`, `Speaker 2`, ...) as people talk, with
-colorblind-aware, WCAG-AA-contrast speaker colors in the client UI.
+# ScribeAR
 
-All feature work (including this README) lives on the
-**`feature/speaker-diarization`** branch; `staging` mirrors the upstream
-baseline. Planned follow-ups: resumable lecture summarization
-(prompt-injection-resistant) and RNNoise-based denoising.
+Self-hosted, real-time transcription. This monorepo (`scribear/scribear`) contains everything behind [ScribeAR](https://scribear.illinois.edu/v/index.html): the speech-to-text service, the proxy/session backend, the Postgres schema, and the client/kiosk/standalone webapps.
 
-## What this branch adds
+Full architecture, protocols, and API reference live in the **[wiki](https://github.com/scribear/scribear/wiki)** — this README is just a map to get you to the right page.
 
-| Layer | Change |
-|---|---|
-| `transcription_service` (Python) | `PyannoteDiarizationContext` — optional worker-pool context running `pyannote/speaker-diarization-community-1` (CPU by default, CUDA-ready) |
-| `transcription_service` (Python) | `SpeakerReconciler` — stabilizes per-run diarization labels into session-wide labels via overlap voting, so a speaker keeps one label across streaming re-runs |
-| Wire format | Optional `speakers` array aligned with word tokens, end to end through the WebSocket messages and shared TypeScript schemas; omitted entirely when diarization is off |
-| Client UI (React) | `Speaker N:` labels on speaker change, colored from a colorblind-aware palette that is auto-adjusted to meet WCAG AA contrast (≥ 4.5:1) against the user-configured background |
-| Tooling | End-to-end manual test client, CPU/GPU benchmark harness, docs |
-
-Speaker labels never participate in caption finalization (Local Agreement), so
-label changes cannot delay live captions. Deployments that do not enable
-diarization behave byte-for-byte as before.
-
-Design notes and configuration reference:
-[`transcription_service/docs/speaker_diarization.md`](transcription_service/docs/speaker_diarization.md).
-
-## Testing
-
-All commands below run on this branch:
-
-```bash
-git clone https://github.com/JackyJiang08/scribear-realtime-diarization.git
-cd scribear-realtime-diarization
-git checkout feature/speaker-diarization
-```
-
-### 1. Unit tests (fast, no ML models required)
-
-Python service (requires Python 3.12 and [uv](https://docs.astral.sh/uv/)):
-
-```bash
-cd transcription_service
-make install_dev_cpu   # installs deps incl. CPU torch, faster-whisper, pyannote
-make format            # isort + black checks
-make lint              # pylint, must score 10/10
-make test_unit         # pytest with coverage
-```
-
-TypeScript monorepo (requires Node 20+):
-
-```bash
-npm ci
-npm run build          # type-checks and builds every workspace
-npm run lint
-npm run test:unit      # includes speaker-run grouping, reducer, and
-                       # WCAG color-contrast property tests
-```
-
-Expected: all suites pass. (Two `worker_process_manager` timing tests are
-known to be flaky on loaded laptops; they are unrelated to diarization.)
-
-### 2. End-to-end test with real audio
-
-This streams a recording into a locally running transcription service exactly
-like a classroom microphone would, and prints speaker-labeled transcripts.
-
-1. **Prepare a recording** — 3–10 minutes with at least two speakers works
-   best. Convert it to 16 kHz mono WAV:
-
-   ```bash
-   ffmpeg -i recording.m4a -ac 1 -ar 16000 -acodec pcm_s16le sample.wav
-   ```
-
-2. **Get model access** — accept the terms of the gated pyannote pipeline at
-   <https://huggingface.co/pyannote/speaker-diarization-community-1>, then:
-
-   ```bash
-   export HUGGINGFACE_ACCESS_TOKEN=hf_...
-   ```
-
-3. **Configure the service** — in `transcription_service/`, copy
-   `provider_config.template.json` to `provider_config.json` and set
-   `"diarization_detector": true` in the whisper provider config. Create a
-   `.env`:
-
-   ```env
-   PORT=8000
-   HOST=0.0.0.0
-   API_KEY=dev-secret
-   WS_INIT_TIMEOUT_SEC=5
-   PROVIDER_CONFIG_PATH=./provider_config.json
-   ```
-
-4. **Run the service**:
-
-   ```bash
-   make dev
-   ```
-
-5. **Stream the recording** (second terminal):
-
-   ```bash
-   uv run python tests/manual/transcription_stream_file_client.py \
-       --audio sample.wav --api-key dev-secret
-   ```
-
-Expected output: `FINAL` lines with inline `[spk_N]` markers at speaker
-changes, e.g.
+## Repo layout
 
 ```
-FINAL      | [spk_0] Hello everyone, welcome to class. [spk_1] Professor, I have a question.
+apps/
+  client-webapp/       # viewer — joins a session via a join code, receives transcripts
+  kiosk-webapp/         # source — the device sending audio for a room, shows a join QR code
+  standalone-webapp/    # all-in-one viewer+source app, no kiosk/client split
+  node-server/           # proxies kiosk/client websockets to transcription-service
+  session-manager/       # devices, rooms, sessions, auth — issues session tokens
+  admin-webapp/         # IT admin console SPA (rooms, devices, kiosks) — talks only to admin-server
+  admin-server/          # admin BFF — holds the Session Manager admin key, authenticates staff, proxies + audits
+infra/
+  scribear-db/           # Postgres schema + migrations
+  scribear-nginx/        # reverse proxy used in the deployment stack
+libs/
+  clients/               # typed clients (session-manager, node-server, transcription-service, ...)
+  schemas/                # shared request/response schemas
+  store/                  # shared Redux slices used by the webapps
+  ui/                     # shared React components used by the webapps
+transcription_service/   # Python: the actual speech-to-text models (faster-whisper, CPU/CUDA)
+deployment/               # Docker Compose stack for running the full system
 ```
 
-Verify that the **same voice keeps the same label for the whole session** —
-that is the `SpeakerReconciler` working. The first tick is slow while the
-pyannote model downloads.
+## Start here, by audience
 
-### 3. Performance benchmark on target hardware
+**New here / just curious / thinking about joining** — start at the wiki [Home](https://github.com/scribear/scribear/wiki/Home) page for the full architecture picture, [`RELEASING.md`](RELEASING.md) for how branches (`staging`/`main`) and releases work, and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo-specific rules this codebase has learned the hard way (monitoring guards, long-lived-branch merges, protocol and schema compatibility, accessibility traps).
 
-Live use requires each re-diarization of the rolling 30 s buffer to fit inside
-the 5 s streaming job tick. Measure on the machine that will run production:
+**Frontend developers** (client-webapp, kiosk-webapp, standalone-webapp, `libs/ui`, `libs/store`) — see the wiki [Developing Frontend](https://github.com/scribear/scribear/wiki/Developing-Frontend) page to get an app running locally, and [Connecting From Frontend](https://github.com/scribear/scribear/wiki/Connecting-From-Frontend) for the session-token/websocket protocol these apps speak.
 
-```bash
-cd transcription_service/benchmarks/diarization
-python3 -m venv .venv && source .venv/bin/activate
-pip install soundfile numpy torch torchaudio "pyannote.audio>=4.0,<5.0"
-python benchmark_diarization.py --audio sample.wav --engine pyannote --device cpu
-```
+**Backend developers** (node-server, session-manager, transcription-service, scribear-db) — see [Developing Node Server](https://github.com/scribear/scribear/wiki/Developing-Node-Server), [Developing Session Manager](https://github.com/scribear/scribear/wiki/Developing-Session-Manager), and [Developing Transcription Service](https://github.com/scribear/scribear/wiki/Developing-Transcription-Service), plus the full [Documentation](https://github.com/scribear/scribear/wiki/Documentation) page for the API/protocol/config reference.
 
-Read the `Tick sim worst` number: it must stay well under 5 s while
-faster-whisper shares the machine. See
-[`transcription_service/benchmarks/diarization/README.md`](transcription_service/benchmarks/diarization/README.md)
-for GPU comparison runs (NVIDIA Streaming Sortformer).
+**Deployment & production** — see the wiki [Deployment](https://github.com/scribear/scribear/wiki/Deployment) page for the Docker Compose stack, and [`RELEASING.md`](RELEASING.md#container-tags) for how image tags map to branches (`staging` → `staging`/`staging-<sha>`, `main` → `latest`/`v<version>`). **Upgrading an existing deployment — read [`deployment/UPGRADING.md`](deployment/UPGRADING.md) first**: `deployment/.env` is untracked and does not update when you pull, so releases that add a required key will refuse to start until you add it. Evaluating the stack on a staging box — see [`deployment/monitoring/README.md`](deployment/monitoring/README.md) for the opt-in, zero-click Prometheus + Grafana fleet dashboard.
 
-### 4. Full-stack UI check (optional)
+**AI coding agents / LLMs** — read this file, [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`RELEASING.md`](RELEASING.md) first, then the wiki [Documentation](https://github.com/scribear/scribear/wiki/Documentation) page before making assumptions about API shapes, message protocols, or config — it's the authoritative machine-actionable reference. This is an npm workspace monorepo: `npm install` at the root installs everything, and `npm run build|lint|format|test:unit|test:integration` at the root run across all workspaces (`--workspace <path>` to scope to one). CI/CD is in `.github/workflows/` (`node-ci`/`node-cd`, `python-ci`/`python-cd`) and the composite actions it uses are in `.github/actions/`.
 
-Run the complete stack with Docker Compose (see `deployment/`), join a session
-from the client webapp, and speak with two people: captions should show
-`Speaker 1:` / `Speaker 2:` labels in distinct, readable colors on any
-background theme.
+## Full wiki index
 
-## Acknowledgments
-
-Built on [ScribeAR](https://github.com/scribear/scribear) by the ScribeAR team
-at the University of Illinois Urbana-Champaign. This repository is an
-independent feature-development copy; upstream retains all rights to the
-original code.
+* [Home](https://github.com/scribear/scribear/wiki/Home) — architecture overview
+* [Deployment](https://github.com/scribear/scribear/wiki/Deployment) — run the full stack with Docker
+* [Connecting From Frontend](https://github.com/scribear/scribear/wiki/Connecting-From-Frontend) — session tokens and the node-server websocket protocol
+* [Developing Frontend](https://github.com/scribear/scribear/wiki/Developing-Frontend) — client/kiosk/standalone webapps
+* [Developing Node Server](https://github.com/scribear/scribear/wiki/Developing-Node-Server)
+* [Developing Session Manager](https://github.com/scribear/scribear/wiki/Developing-Session-Manager)
+* [Developing Transcription Service](https://github.com/scribear/scribear/wiki/Developing-Transcription-Service)
+* [Admin Website](https://github.com/scribear/scribear/wiki/Admin-Website) — operator guide for the IT admin console
+* [Developing Admin](https://github.com/scribear/scribear/wiki/Developing-Admin)
+* [Documentation](https://github.com/scribear/scribear/wiki/Documentation) — full API/protocol/config reference
+* [ScribeAR Multi Tenancy HLD](https://github.com/scribear/scribear/wiki/ScribeAR-Multi-Tenency-HLD) — historical design notes, background only

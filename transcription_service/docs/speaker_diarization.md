@@ -130,6 +130,47 @@ process: raise `num_workers` and give the `pyannote-diarization` context a
 dedicated entry in `worker_ids`. Measure real hardware with
 `benchmarks/diarization/` before enabling in production.
 
+## Fork testing checklist
+
+Everything the fork adds can be verified from a clean clone of
+`JackyJiang08/ScribeAR-Realtime-Diarization` on `feature/speaker-diarization`.
+
+1. **Unit tests, no models needed.** Python (3.12 + uv):
+   `make install_dev_cpu`, `make format`, `make lint` (must score 10/10),
+   `make test_unit`. TypeScript (Node 20+): `npm ci`, `npm run build`,
+   `npm run lint`, `npm run test:unit`, which includes the speaker-run
+   grouping, reducer and WCAG color-contrast tests. Two
+   `worker_process_manager` timing tests are known to be flaky on loaded
+   laptops and are unrelated to diarization.
+2. **End to end with real audio.** Follow "Testing" above: 16 kHz mono WAV
+   with at least two speakers, token exported, `diarization_detector: true`,
+   `make dev`, then stream the file with the manual client. Finalized lines
+   carry inline `[spk_N]` markers; the same voice must keep the same label
+   for the whole session, which is the `SpeakerReconciler` working.
+3. **Accuracy and speed baseline.** `make benchmark_diarization_baseline`
+   (see above). Compare against `results/pre_sync_baseline.json`.
+4. **Full-stack UI check.** Run the Docker Compose stack in `deployment/`,
+   join a session from the client webapp and speak with two people: captions
+   show `Speaker 1:` / `Speaker 2:` labels in distinct colors that stay
+   readable (WCAG AA, contrast at least 4.5:1) on any background theme.
+
+## What the fork adds, by layer
+
+| Layer | Change |
+|---|---|
+| `transcription_service` | `PyannoteDiarizationContext`: optional worker-pool context running `pyannote/speaker-diarization-community-1` (CPU by default, CUDA-ready) |
+| `transcription_service` | `SpeakerReconciler`: maps per-run labels to session-wide labels by overlap voting, so one voice keeps one label across streaming re-runs |
+| Wire format | Optional `speakers` array aligned with word tokens, end to end through the WebSocket messages and the shared TypeScript schemas; omitted entirely when diarization is off |
+| Client UI | `Speaker N:` labels on speaker change, colored from a colorblind-aware palette auto-adjusted to WCAG AA contrast against the configured background |
+| Tooling | Manual end-to-end client, CPU/GPU timing harness, AMI accuracy baseline, this document |
+
+Planned follow-ups beyond diarization: resumable lecture summarization
+(prompt-injection resistant) and RNNoise-based denoising.
+
+This fork is an independent feature-development copy built on ScribeAR by the
+ScribeAR team at the University of Illinois Urbana-Champaign; upstream retains
+all rights to the original code.
+
 ## Known limitations
 
 - Labels can still drift after long silences or when the rolling buffer is

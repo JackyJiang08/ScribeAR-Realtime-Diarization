@@ -6,7 +6,10 @@ import {
   setMicrophoneServiceStatus,
 } from '@scribear/microphone-store';
 import { appInitialization } from '@scribear/redux-remember-store';
-import { handleTranscript } from '@scribear/transcription-content-store';
+import {
+  handleTranscript,
+  recordLatency,
+} from '@scribear/transcription-content-store';
 
 import type { RootState } from '#src/store/store';
 
@@ -21,6 +24,7 @@ import {
   setLifecycle,
   setRegistrationError,
   setRoom,
+  setScheduleSyncError,
   setSessionStatus,
   setSessions,
 } from './kiosk-slice';
@@ -89,14 +93,20 @@ export const createKioskMiddleware =
     kioskService.on('transcript', (event) => {
       store.dispatch(handleTranscript(event));
     });
+    kioskService.on('latency', (sample) => {
+      store.dispatch(recordLatency(sample));
+    });
     kioskService.on('joinCode', (codes) => {
       store.dispatch(setJoinCodes(codes));
     });
     kioskService.on('registrationError', (message) => {
       store.dispatch(setRegistrationError(message));
     });
-    kioskService.on('error', (message) => {
-      store.dispatch(setError(message));
+    kioskService.on('error', (fault) => {
+      store.dispatch(setError(fault));
+    });
+    kioskService.on('scheduleSyncError', (fault) => {
+      store.dispatch(setScheduleSyncError(fault));
     });
 
     return (next) => (action) => {
