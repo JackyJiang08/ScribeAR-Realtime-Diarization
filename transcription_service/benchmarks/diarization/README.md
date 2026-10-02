@@ -54,3 +54,21 @@ python benchmark_diarization.py --audio sample.wav --engine both --device cuda
 
 Record results in `results.md` alongside the hardware used, so decisions
 stay traceable.
+
+## Accuracy baseline (AMI)
+
+`benchmark_diarization.py` only measures speed. For accuracy against
+ground truth plus a replay of the real tick loop use the baseline script:
+
+```bash
+# from transcription_service/
+make benchmark_diarization_baseline            # download AMI data + run
+make benchmark_diarization_baseline STREAM_SEC=60 RESULT=results/my_run.json
+```
+
+`prepare_ami_baseline.sh` fetches the AMI meetings and reference RTTM/UEM
+files into `data/` (gitignored, never commit audio); `benchmark_baseline.py`
+scores DER/JER offline and in streaming replay and writes a JSON report to
+`results/`. `results/pre_sync_baseline.json` is the reference run captured
+before the upstream sync. See `../../docs/speaker_diarization.md` for the
+report fields.

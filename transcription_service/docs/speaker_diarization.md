@@ -92,6 +92,36 @@ flip never delays caption finalization.
 
 3. Performance measurement on target hardware: `benchmarks/diarization/`.
 
+## Accuracy and speed baseline
+
+`make benchmark_diarization_baseline` reproduces the reference benchmark in
+one command. It downloads three AMI corpus meetings (ES2004a, IS1009a,
+TS3003a; single distant microphone, first 10 minutes) with the standard
+pyannote `only_words` reference RTTMs into the gitignored
+`benchmarks/diarization/data/` folder, then runs
+`benchmarks/diarization/benchmark_baseline.py` on CPU and writes a JSON
+report to `benchmarks/diarization/results/`.
+
+The report contains, per file and aggregated:
+
+- **offline** DER (pyannote convention: no collar, overlap scored) with its
+  missed-speech / false-alarm / confusion breakdown, a 0.25 s collar
+  variant, JER, real-time factor and peak memory.
+- **streaming** replay of the job loop (5 s tick, 30 s rolling buffer,
+  `SpeakerReconciler` labels): DER for the label a viewer sees first and for
+  the label a region settles on two ticks later, per-tick cost against the
+  5 s budget, label latency from speech onset, label flips per minute and
+  how many session labels were minted. The replay covers the first
+  `STREAM_SEC` seconds of each file (default 120) because each tick
+  re-diarizes up to 30 s of audio.
+
+Requirements: `ffmpeg`, `HUGGINGFACE_ACCESS_TOKEN` (or `HF_TOKEN`) with the
+pyannote model terms accepted, and the `pyannote-diarization` extra
+installed. `make benchmark_diarization_baseline RESULT=... STREAM_SEC=...`
+overrides the report path and replay length. The committed
+`results/pre_sync_baseline.json` is the reference run from before the
+upstream sync; compare new runs against it.
+
 ## Performance notes
 
 Diarization shares the worker's CPU budget with Whisper. If ticks start

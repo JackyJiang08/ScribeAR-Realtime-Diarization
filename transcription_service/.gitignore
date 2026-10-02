@@ -174,3 +174,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Benchmark audio and references (downloaded by prepare_ami_baseline.sh)
+benchmarks/diarization/data/

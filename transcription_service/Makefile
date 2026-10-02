@@ -45,3 +45,15 @@ test_unit:
 
 test_integration:
 	uv run coverage run -m pytest tests/integration && uv run coverage xml --include=src/* && uv run coverage report --include=src/*
+
+# Speaker diarization accuracy/speed baseline on AMI meetings (CPU).
+# First run downloads ~110 MB of AMI audio into benchmarks/diarization/data
+# (gitignored). Needs HUGGINGFACE_ACCESS_TOKEN or HF_TOKEN for the gated
+# pyannote model. Override RESULT=... to write a differently named report.
+RESULT ?= benchmarks/diarization/results/$(shell date +%Y%m%d)_baseline.json
+STREAM_SEC ?= 120
+benchmark_diarization_baseline:
+	benchmarks/diarization/prepare_ami_baseline.sh 10
+	uv run python benchmarks/diarization/benchmark_baseline.py \
+		--data benchmarks/diarization/data/ami --suffix _10min \
+		--stream-sec $(STREAM_SEC) --out $(RESULT)
