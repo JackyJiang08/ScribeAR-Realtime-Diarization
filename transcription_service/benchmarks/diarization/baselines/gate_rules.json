@@ -8,7 +8,8 @@
     "the gate must not fail on machine noise. Tighten them once the Linux",
     "container runs are the only gated environment.",
     "replay.memory_growth_mb_total is deliberately not gated: over a 120 s replay it mostly measures the rolling window filling from 5 s to 30 s, and natively the preceding offline pass is still releasing memory, so the number can even be negative. Peak RSS is gated; leaks are the soak harness's job (benchmark_diarization_soak).",
-    "Phase 2a adds the label-latency and diarization-cost metrics (caption.on.label.*, caption.on.diarization.*). They are gated against the baseline once a Phase 2a baseline is committed; before that they are SKIPPED (missing on the baseline side) and acceptance.py checks their absolute targets."
+    "Phase 2a adds the label-latency and diarization-cost metrics (caption.on.label.*, caption.on.diarization.*). They are gated against the baseline once a Phase 2a baseline is committed; before that they are SKIPPED (missing on the baseline side) and acceptance.py checks their absolute targets.",
+    "Phase 2b adds the end-of-stream and overlap-aware DER views, the speaker-count-within-one fraction, revisions and merges. end_of_stream and speaker count are gated; the overlap-aware views, revisions and merges are informational."
   ],
   "rules": {
     "replay.offline.der": {
@@ -38,6 +39,18 @@
     "replay.settled.jer": {
       "direction": "lower",
       "abs": 0.02
+    },
+    "replay.end_of_stream.der": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.speaker_count_within_1_fraction": {
+      "direction": "higher",
+      "abs": 0.0
+    },
+    "replay.session_labels_merged": {
+      "direction": "lower",
+      "abs": 2
     },
     "replay.speaker_count_abs_error_mean": {
       "direction": "lower",

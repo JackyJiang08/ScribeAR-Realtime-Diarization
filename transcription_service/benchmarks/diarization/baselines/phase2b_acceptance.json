@@ -1,0 +1,48 @@
+{
+  "_comment": [
+    "Phase 2b acceptance targets (speaker identity quality), checked by",
+    "acceptance.py against a run_suite.py report from the Linux CPU",
+    "reference container, on top of every Phase 2a target",
+    "(phase2a_acceptance.json, which is checked as well). 'must' targets",
+    "block the baseline move; 'target' ones are reported. A missed target",
+    "is reported by how much, never relaxed here."
+  ],
+  "targets": {
+    "must: settled DER better than the pre-2a baseline (0.408)": {
+      "metric": "replay.settled.der",
+      "max": 0.407,
+      "note": "Phase 2 starting point: 30 s window inside the caption tick"
+    },
+    "must: at least 97% of final words labelled": {
+      "metric": "caption.on.final_words_labelled_fraction",
+      "min": 0.97,
+      "note": "finalized words that ever got a non-null label, probe run"
+    },
+    "target: settled DER at most 0.32": {
+      "metric": "replay.settled.der",
+      "max": 0.32
+    },
+    "target: speaker confusion at most 0.08": {
+      "metric": "replay.settled.der_confusion",
+      "max": 0.08,
+      "note": "confusion term of the settled DER, as a fraction of reference speech"
+    },
+    "target: at most 1.2 labels minted per real speaker": {
+      "metric": "replay.labels_minted_per_reference_speaker",
+      "max": 1.2
+    },
+    "target: speaker count within one on at least 80% of meetings": {
+      "metric": "replay.speaker_count_within_1_fraction",
+      "min": 0.8
+    },
+    "label corrections before finalization at most 5%": {
+      "metric": "caption.on.label_changes_before_final_fraction",
+      "max": 0.05,
+      "note": "words whose in-progress label differed from their finalized label"
+    },
+    "labels never change after being sent": {
+      "metric": "caption.on.label_changes_after_sent",
+      "max": 0
+    }
+  }
+}

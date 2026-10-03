@@ -4,7 +4,7 @@ and never in front of, the caption job
 """
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -13,6 +13,8 @@ from src.shared.utils.audio_decoder import AudioDecoder, TargetFormat
 from src.shared.utils.np_circular_buffer import NPCircularBuffer
 from src.shared.utils.speaker_reconciler import (
     SpeakerReconciler,
+    SpeakerReconcilerConfig,
+    SpeakerReconcilerState,
     SpeakerSegment,
 )
 from src.shared.utils.worker_pool import JobInterface
@@ -77,6 +79,13 @@ class DiarizationResult:
         lag_sec         - Age of the newest audio in the window when the
                             labels were ready
         labels_minted   - Session labels minted so far, cumulative
+        confidences     - Session label -> score the reconciler attached it
+                            with in this pass (cosine similarity to the
+                            speaker's centroid, plus overlap bonus)
+        relabel         - Junior -> senior labels merged in this pass
+        state           - The reconciler's speaker memory after this pass,
+                            when it changed; the session keeps the newest
+                            one so a reconnect can continue the labels
     """
 
     segments: list[SpeakerSegment]
@@ -84,6 +93,26 @@ class DiarizationResult:
     window_end: float
     lag_sec: float
     labels_minted: int
+    confidences: dict[str, float] = field(default_factory=dict)
+    relabel: dict[str, str] = field(default_factory=dict)
+    state: SpeakerReconcilerState | None = None
+
+
+def reconciler_config_from(
+    config: WhisperStreamingProviderConfig,
+) -> SpeakerReconcilerConfig:
+    """
+    The reconciler thresholds a provider config asks for
+    """
+    return SpeakerReconcilerConfig(
+        match_threshold=config.diarization_match_threshold,
+        new_speaker_threshold=config.diarization_new_speaker_threshold,
+        attach_threshold=config.diarization_attach_threshold,
+        min_mint_duration_sec=config.diarization_min_mint_sec,
+        max_speakers=config.diarization_max_session_speakers,
+        merge_threshold=config.diarization_merge_threshold,
+        overlap_bonus=config.diarization_overlap_bonus,
+    )
 
 
 class DiarizationJob(
@@ -108,7 +137,17 @@ class DiarizationJob(
     deployment can see labels falling behind without captions ever doing so.
     """
 
-    def __init__(self, config: WhisperStreamingProviderConfig):
+    def __init__(
+        self,
+        config: WhisperStreamingProviderConfig,
+        state: SpeakerReconcilerState | None = None,
+    ):
+        """
+        Args:
+            config  - The provider config
+            state   - Speaker memory of an earlier connection of the same
+                        session to continue from (reconnect), or None
+        """
         self._counters = JobCounterCollector()
         self._decoder = AudioDecoder(
             SAMPLE_RATE, NUM_CHANNELS, TargetFormat.FLOAT_32
@@ -128,7 +167,10 @@ class DiarizationJob(
         self._newest_received_at: float | None = None
         self._min_speakers = config.diarization_min_speakers
         self._max_speakers = config.diarization_max_speakers
-        self._reconciler = SpeakerReconciler()
+        self._reconciler = SpeakerReconciler(
+            config=reconciler_config_from(config), state=state
+        )
+        self._state_version_sent = self._reconciler.state_version
 
     @property
     def labels_minted(self) -> int:
@@ -226,9 +268,58 @@ class DiarizationJob(
         window_start_samples = self._buffer_offset_samples
         window_end_samples = window_start_samples + len(window)
 
+        diarized = self._run_pass(log, diarizer, window)
+        if diarized is None:
+            return None
+
+        offset_sec = window_start_samples / SAMPLE_RATE
+        reconciled = self._reconcile(
+            [
+                SpeakerSegment(
+                    start=offset_sec + segment.start,
+                    end=offset_sec + segment.end,
+                    speaker=segment.speaker,
+                )
+                for segment in diarized.segments
+            ],
+            diarized.embeddings,
+        )
+
+        self._covered_through_samples = max(
+            self._covered_through_samples, window_end_samples
+        )
+        lag_sec = (
+            max(0.0, time.time() - self._newest_received_at)
+            if self._newest_received_at is not None
+            else 0.0
+        )
+        self._counters.inc(
+            TranscriptionJobCounter.DIARIZATION_LAG_SECONDS, lag_sec
+        )
+
+        state = None
+        if self._reconciler.state_version != self._state_version_sent:
+            state = self._reconciler.export_state()
+            self._state_version_sent = self._reconciler.state_version
+
+        return DiarizationResult(
+            segments=reconciled,
+            window_start=offset_sec,
+            window_end=window_end_samples / SAMPLE_RATE,
+            lag_sec=lag_sec,
+            labels_minted=self._reconciler.labels_minted,
+            confidences=dict(self._reconciler.last_confidence),
+            relabel=dict(self._reconciler.last_merges),
+            state=state,
+        )
+
+    def _run_pass(self, log: Logger, diarizer, window: np.ndarray):
+        """
+        One pyannote pass over the window, counted; None when it raised
+        """
         started = time.perf_counter()
         try:
-            raw = diarizer.diarize(
+            diarized = diarizer.diarize(
                 window,
                 SAMPLE_RATE,
                 min_speakers=self._min_speakers,
@@ -247,20 +338,18 @@ class DiarizationJob(
             TranscriptionJobCounter.DIARIZATION_SECONDS,
             time.perf_counter() - started,
         )
+        return diarized
 
-        offset_sec = window_start_samples / SAMPLE_RATE
-        session_relative = [
-            SpeakerSegment(
-                start=offset_sec + segment.start,
-                end=offset_sec + segment.end,
-                speaker=segment.speaker,
-            )
-            for segment in raw
-        ]
-
+    def _reconcile(
+        self, session_relative: list[SpeakerSegment], embeddings: dict
+    ) -> list[SpeakerSegment]:
+        """
+        Maps the pass's raw labels onto session labels, counting the cost
+        and the labels minted
+        """
         started = time.perf_counter()
         minted_before = self._reconciler.labels_minted
-        reconciled = self._reconciler.reconcile(session_relative)
+        reconciled = self._reconciler.reconcile(session_relative, embeddings)
         self._counters.inc(
             TranscriptionJobCounter.RECONCILER_SECONDS,
             time.perf_counter() - started,
@@ -270,26 +359,7 @@ class DiarizationJob(
             self._counters.inc(
                 TranscriptionJobCounter.DIARIZATION_LABELS_MINTED, minted
             )
-
-        self._covered_through_samples = max(
-            self._covered_through_samples, window_end_samples
-        )
-        lag_sec = (
-            max(0.0, time.time() - self._newest_received_at)
-            if self._newest_received_at is not None
-            else 0.0
-        )
-        self._counters.inc(
-            TranscriptionJobCounter.DIARIZATION_LAG_SECONDS, lag_sec
-        )
-
-        return DiarizationResult(
-            segments=reconciled,
-            window_start=offset_sec,
-            window_end=window_end_samples / SAMPLE_RATE,
-            lag_sec=lag_sec,
-            labels_minted=self._reconciler.labels_minted,
-        )
+        return reconciled
 
     def drain_counters(self) -> dict[str, float]:
         return self._counters.drain()

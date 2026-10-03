@@ -252,3 +252,172 @@ def test_fully_labelled_or_pending_final_sequence_returns_no_update():
         is None
     )
     assert attacher.pending_sequences == 1
+
+
+def test_a_later_pass_with_clearly_better_evidence_revises_unfinalized_words():
+    """
+    Phase 2b: on audio two passes both covered, the later label replaces
+    the earlier one only when it is at least `revision_margin` more
+    confident, and only words not yet finalized see it.
+    """
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5, revision_margin=0.1)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 4.5, "spk_0")],
+        0.0,
+        5.0,
+        now=100.0,
+        confidences={"spk_0": 0.5},
+    )
+    # Same confidence: nothing changes
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 9.5, "spk_1")],
+        0.0,
+        10.0,
+        now=105.0,
+        confidences={"spk_1": 0.55},
+    )
+    sequence = _sequence([("a", 1.0, 2.0), ("b", 6.0, 7.0)])
+    attacher.label_sequence(sequence, final=False, now=105.0)
+    assert sequence.speakers == ["spk_0", "spk_1"]
+    assert attacher.revisions == (0, 0.0)
+
+    # Clearly better: the earlier stretch is relabelled for words not yet
+    # finalized
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 14.5, "spk_1")],
+        5.0,
+        15.0,
+        now=110.0,
+        confidences={"spk_1": 0.9},
+    )
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 19.5, "spk_1")],
+        0.0,
+        20.0,
+        now=115.0,
+        confidences={"spk_1": 0.9},
+    )
+    sequence = _sequence([("a", 1.0, 2.0), ("b", 6.0, 7.0)])
+    attacher.label_sequence(sequence, final=False, now=115.0)
+    assert sequence.speakers == ["spk_1", "spk_1"]
+    revisions, revised_sec = attacher.revisions
+    assert revisions == 1 and revised_sec == 4.5
+
+
+def test_a_label_sent_on_a_finalized_sequence_is_never_sent_differently():
+    """
+    A revision reaches words still waiting for their first label, never a
+    label already sent: the update for a pending sequence repeats the sent
+    labels unchanged and fills only the nulls.
+    """
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 4.5, "spk_0")],
+        0.0,
+        5.0,
+        now=100.0,
+        confidences={"spk_0": 0.5},
+    )
+    sequence = _sequence([("a", 1.0, 2.0), ("b", 6.0, 7.0)])
+    attacher.label_sequence(sequence, final=True, now=100.0)
+    assert sequence.speakers == ["spk_0", None]
+
+    updates = attacher.add_coverage(
+        [SpeakerSegment(0.0, 9.5, "spk_1")],
+        0.0,
+        10.0,
+        now=105.0,
+        confidences={"spk_1": 0.95},
+    )
+
+    assert len(updates) == 1
+    assert updates[0].speakers == ["spk_0", "spk_1"]
+    assert updates[0].settled is True
+
+
+def test_a_pass_fills_silence_an_earlier_pass_left():
+    """
+    Where the earlier pass found no speech and the later one does, the
+    later label is added regardless of confidence: nothing is overwritten.
+    """
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 2.0, "spk_0")], 0.0, 5.0, now=100.0
+    )
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 2.0, "spk_0"), SpeakerSegment(2.0, 9.5, "spk_1")],
+        0.0,
+        10.0,
+        now=105.0,
+    )
+    sequence = _sequence([("a", 1.0, 2.0), ("b", 3.0, 4.0), ("c", 6.0, 7.0)])
+
+    attacher.label_sequence(sequence, final=False, now=105.0)
+
+    assert sequence.speakers == ["spk_0", "spk_1", "spk_1"]
+    assert attacher.revisions == (0, 0.0)
+
+
+def test_merged_labels_are_replaced_on_the_timeline():
+    """
+    When the reconciler merges a junior label into a senior one, words not
+    yet labelled take the senior label everywhere on the timeline.
+    """
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 2.0, "spk_0"), SpeakerSegment(2.0, 4.5, "spk_1")],
+        0.0,
+        5.0,
+        now=100.0,
+    )
+    attacher.add_coverage(
+        [SpeakerSegment(5.0, 9.5, "spk_0")],
+        5.0,
+        10.0,
+        now=105.0,
+        relabel={"spk_1": "spk_0"},
+    )
+    sequence = _sequence([("a", 1.0, 1.5), ("b", 3.0, 4.0), ("c", 6.0, 7.0)])
+
+    attacher.label_sequence(sequence, final=False, now=105.0)
+
+    assert sequence.speakers == ["spk_0", "spk_0", "spk_0"]
+
+
+def test_a_word_in_a_short_pause_takes_the_nearest_speaker():
+    """
+    Coverage: a decided word that no speaker segment overlaps (the diarizer
+    heard no speech there) is attributed to the nearest segment within
+    `attach_gap_sec`; farther than that it stays unlabelled.
+    """
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5, attach_gap_sec=1.0)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 2.0, "spk_0"), SpeakerSegment(6.0, 9.5, "spk_1")],
+        0.0,
+        10.0,
+        now=100.0,
+    )
+    sequence = _sequence(
+        [("a", 2.2, 2.6), ("b", 3.5, 4.2), ("c", 5.4, 5.8), ("d", 8.0, 8.5)]
+    )
+
+    attacher.label_sequence(sequence, final=False, now=100.0)
+
+    assert sequence.speakers == ["spk_0", None, "spk_1", "spk_1"]
+    spans = attacher._segments  # pylint: disable=protected-access
+    assert assign_speaker(3.5, 4.2, spans, 2.0) == "spk_0"
+
+
+def test_sequence_ids_continue_from_an_earlier_connection():
+    """
+    A reconnect's attacher continues the earlier connection's sequence ids
+    so a client holding the old sequences never sees one reused.
+    """
+    attacher = SpeakerLabelAttacher()
+    attacher.continue_sequence_ids_from(7)
+    sequence = _sequence([("a", 0.0, 1.0)])
+
+    attacher.label_sequence(sequence, final=True, now=100.0)
+
+    assert sequence.sequence_id == "s7"
+    assert attacher.next_sequence_id == 8

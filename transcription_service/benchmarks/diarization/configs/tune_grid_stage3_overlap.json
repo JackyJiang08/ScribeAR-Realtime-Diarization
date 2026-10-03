@@ -1,0 +1,44 @@
+{
+  "_comment": [
+    "Stage 3 grid scored on pyannote's overlap-aware turns instead of the",
+    "exclusive ones (which collapse a single 10 s window to one speaker)."
+  ],
+  "grid": {
+    "match_threshold": [
+      0.5
+    ],
+    "new_speaker_threshold": [
+      0.3,
+      0.35,
+      0.4,
+      0.45
+    ],
+    "attach_threshold": [
+      {
+        "relative_to": "new_speaker_threshold",
+        "offset": -0.1
+      }
+    ],
+    "min_mint_duration_sec": [
+      2.5,
+      4.0,
+      6.0
+    ],
+    "min_mint_passes": [
+      1,
+      2
+    ],
+    "overlap_bonus": [
+      0.0
+    ],
+    "merge_threshold": [
+      1.0
+    ],
+    "revision_margin": [
+      0.1
+    ],
+    "overlap_aware": [
+      true
+    ]
+  }
+}

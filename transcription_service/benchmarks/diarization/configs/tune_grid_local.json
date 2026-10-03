@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Grid for the local speaker-track mode (one-chunk windows report the",
+    "segmentation model's tracks with their embeddings): matching",
+    "thresholds, minting minimum, overlap bonus and revision margin."
+  ],
+  "grid": {
+    "match_threshold": [0.4, 0.5, 0.6],
+    "new_speaker_threshold": [
+      {"relative_to": "match_threshold", "offset": 0.0},
+      {"relative_to": "match_threshold", "offset": -0.1},
+      {"relative_to": "match_threshold", "offset": -0.2}
+    ],
+    "attach_threshold": [
+      {"relative_to": "new_speaker_threshold", "offset": -0.1}
+    ],
+    "min_mint_duration_sec": [1.5, 2.5, 4.0, 6.0],
+    "overlap_bonus": [0.0, 0.15],
+    "merge_threshold": [1.0],
+    "revision_margin": [0.1, 5.0]
+  }
+}

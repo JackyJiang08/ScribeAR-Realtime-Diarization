@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Stage 3 grid for tune_reconciler.py: the minting rule (new-speaker",
+    "threshold, minimum speech, minimum passes) with everything else at",
+    "the stage 1 and 2 winners."
+  ],
+  "grid": {
+    "match_threshold": [0.5],
+    "new_speaker_threshold": [0.3, 0.35, 0.4, 0.45],
+    "attach_threshold": [
+      {"relative_to": "new_speaker_threshold", "offset": -0.1}
+    ],
+    "min_mint_duration_sec": [2.5, 4.0, 6.0],
+    "min_mint_passes": [1, 2],
+    "overlap_bonus": [0.0],
+    "merge_threshold": [1.0],
+    "revision_margin": [0.1]
+  }
+}

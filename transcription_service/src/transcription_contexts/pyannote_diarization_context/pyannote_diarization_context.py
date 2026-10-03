@@ -8,6 +8,7 @@ diarization pipeline in WorkerProcess
 # so deployments without the pyannote-diarization extra never load them
 
 import os
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import numpy as np
@@ -18,14 +19,55 @@ from src.shared.utils.speaker_reconciler import SpeakerSegment
 from src.shared.utils.worker_pool import JobContextInterface
 
 
+@dataclass
+class DiarizationPass:
+    """
+    Everything one pyannote pass reports about a stretch of audio
+
+    Properties:
+        segments            - Speaker turns to attribute words against:
+                                the exclusive diarization (one speaker per
+                                instant) unless the context is configured
+                                `overlap_aware`, then the overlap-aware one
+        embeddings          - Raw label -> unit-normalised speaker
+                                embedding (pyannote's per-speaker centroid
+                                for the pass); a label whose centroid the
+                                pipeline could not compute is absent
+        overlap_segments    - The overlap-aware diarization, always, so a
+                                benchmark can score both conventions from
+                                one pass
+    """
+
+    segments: list[SpeakerSegment]
+    embeddings: dict[str, np.ndarray] = field(default_factory=dict)
+    overlap_segments: list[SpeakerSegment] = field(default_factory=list)
+
+
+def _annotation_segments(annotation: Any) -> list[SpeakerSegment]:
+    return [
+        SpeakerSegment(
+            start=float(turn.start), end=float(turn.end), speaker=str(speaker)
+        )
+        for turn, _, speaker in annotation.itertracks(yield_label=True)
+    ]
+
+
 class PyannoteDiarizationService:
     """
     Service for speaker diarization backed by a pyannote Pipeline
     """
 
-    def __init__(self, pipeline: Any, num_threads: int | None = None):
+    def __init__(
+        self,
+        pipeline: Any,
+        num_threads: int | None = None,
+        overlap_aware: bool = False,
+        local_speakers: bool = True,
+    ):
         self._pipeline = pipeline
         self._num_threads = num_threads
+        self._overlap_aware = overlap_aware
+        self._local_speakers = local_speakers
 
     @property
     def num_threads(self) -> int | None:
@@ -35,13 +77,20 @@ class PyannoteDiarizationService:
         """
         return self._num_threads
 
+    @property
+    def overlap_aware(self) -> bool:
+        """
+        Whether `segments` of every pass carry overlapping speech turns
+        """
+        return self._overlap_aware
+
     def diarize(
         self,
         samples: np.ndarray,
         sample_rate: int,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
-    ) -> list[SpeakerSegment]:
+    ) -> DiarizationPass:
         """
         Run speaker diarization over mono float32 audio samples
 
@@ -52,7 +101,8 @@ class PyannoteDiarizationService:
             max_speakers    - Optional upper bound on speaker count
 
         Returns:
-            List of SpeakerSegments with timestamps relative to provided audio
+            The pass: segments with timestamps relative to the provided
+            audio, one embedding per raw label, and the overlap-aware turns
         """
         import torch
 
@@ -74,25 +124,154 @@ class PyannoteDiarizationService:
         if max_speakers is not None:
             kwargs["max_speakers"] = max_speakers
 
+        captured: dict[str, Any] = {}
+
+        def capture(step_name, step_artefact=None, file=None, **progress):
+            # Progress calls of a step carry `completed`; the final call
+            # of each step carries the whole artefact and no progress.
+            del file
+            if step_artefact is not None and progress.get("completed") is None:
+                captured[step_name] = step_artefact
+
         output = self._pipeline(
-            {"waveform": waveform, "sample_rate": sample_rate}, **kwargs
+            {"waveform": waveform, "sample_rate": sample_rate},
+            hook=capture,
+            **kwargs,
         )
 
+        if self._local_speakers:
+            local = self._local_pass(captured)
+            if local is not None:
+                return local
+        return self._clustered_pass(output)
+
+    def _clustered_pass(self, output: Any) -> DiarizationPass:
+        """
+        The pipeline's own clustered output, both conventions and the
+        per-speaker centroids
+        """
         # Newer pyannote pipelines wrap the annotation in an output object
-        diarization = getattr(
-            output,
-            "exclusive_speaker_diarization",
-            getattr(output, "speaker_diarization", output),
+        # carrying both conventions and the per-speaker centroids; an older
+        # pipeline returns the annotation alone.
+        overlap = getattr(output, "speaker_diarization", output)
+        exclusive = getattr(output, "exclusive_speaker_diarization", overlap)
+        overlap_segments = _annotation_segments(overlap)
+        segments = (
+            overlap_segments
+            if self._overlap_aware
+            else _annotation_segments(exclusive)
+        )
+        return DiarizationPass(
+            segments=segments,
+            embeddings=self._embeddings(output, overlap),
+            overlap_segments=overlap_segments,
         )
 
-        return [
-            SpeakerSegment(
-                start=float(turn.start),
-                end=float(turn.end),
-                speaker=str(speaker),
+    def _local_pass(self, captured: dict[str, Any]) -> DiarizationPass | None:
+        """
+        The segmentation model's own speaker tracks for a one-chunk window,
+        each with its embedding, instead of the pipeline's clustered output.
+
+        On a window no longer than the segmentation chunk (10 s) the
+        pipeline has a single chunk to cluster, and its VBx step collapses
+        the chunk's two or three local speakers into one label almost
+        every time (measured: 0 of 360 passes with more than one speaker on
+        the AMI set, while the segmentation itself separated two voices in
+        a fifth of them). The local tracks are what the session-level
+        reconciler needs: one turn sequence per voice in the window and a
+        centroid per track to match against the session's speakers.
+        Multi-chunk windows keep the pipeline's clustering, which is needed
+        to join a voice across chunks.
+
+        Returns:
+            The pass, or None when the window had no speech, more than one
+            chunk, or the pipeline did not expose the artefacts
+        """
+        segmentations = captured.get("segmentation")
+        embeddings = captured.get("embeddings")
+        count = captured.get("speaker_counting")
+        if segmentations is None or embeddings is None or count is None:
+            return None
+        if segmentations.data.shape[0] != 1:
+            return None
+        overlap = self._local_annotation(segmentations, count, exclusive=False)
+        exclusive = self._local_annotation(segmentations, count, exclusive=True)
+        mapping = {
+            label: f"LOCAL_{label}"
+            for label in set(overlap.labels()) | set(exclusive.labels())
+        }
+        overlap_segments = _annotation_segments(
+            overlap.rename_labels(mapping=mapping)
+        )
+        return DiarizationPass(
+            segments=(
+                overlap_segments
+                if self._overlap_aware
+                else _annotation_segments(
+                    exclusive.rename_labels(mapping=mapping)
+                )
+            ),
+            embeddings=self._local_embeddings(embeddings, mapping),
+            overlap_segments=overlap_segments,
+        )
+
+    def _local_annotation(
+        self, segmentations: Any, count: Any, exclusive: bool
+    ):
+        """
+        Turns of the local speaker tracks, through the pipeline's own
+        frame-to-time reconstruction; `exclusive` caps the speaker count
+        at one per frame
+        """
+        from pyannote.core import SlidingWindowFeature
+
+        pipeline = self._pipeline
+        if exclusive:
+            count = SlidingWindowFeature(
+                np.minimum(count.data, 1), count.sliding_window
             )
-            for turn, _, speaker in diarization.itertracks(yield_label=True)
-        ]
+        return pipeline.to_annotation(
+            pipeline.to_diarization(segmentations, count),
+            min_duration_on=0.0,
+            min_duration_off=pipeline.segmentation.min_duration_off,
+        )
+
+    @staticmethod
+    def _local_embeddings(
+        embeddings: Any, mapping: dict
+    ) -> dict[str, np.ndarray]:
+        vectors = np.asarray(embeddings, dtype=np.float32)[0]
+        unit: dict[str, np.ndarray] = {}
+        for label, name in mapping.items():
+            index = int(label)
+            if index >= len(vectors):
+                continue
+            vector = vectors[index].reshape(-1)
+            norm = float(np.linalg.norm(vector))
+            if np.isfinite(norm) and norm > 0.0:
+                unit[name] = vector / norm
+        return unit
+
+    @staticmethod
+    def _embeddings(output: Any, diarization: Any) -> dict[str, np.ndarray]:
+        """
+        Pyannote's per-speaker centroids, keyed by raw label and normalised
+        to unit length. The array is sorted in `labels()` order and padded
+        with zero rows for speakers without a centroid, which are skipped
+        """
+        centroids = getattr(output, "speaker_embeddings", None)
+        if centroids is None:
+            return {}
+        centroids = np.asarray(centroids, dtype=np.float32)
+        embeddings: dict[str, np.ndarray] = {}
+        for index, label in enumerate(diarization.labels()):
+            if index >= len(centroids):
+                break
+            vector = centroids[index].reshape(-1)
+            norm = float(np.linalg.norm(vector))
+            if np.isfinite(norm) and norm > 0.0:
+                embeddings[str(label)] = vector / norm
+        return embeddings
 
 
 PyannoteDiarizationModelType = PyannoteDiarizationService
@@ -126,6 +305,23 @@ class PyannoteDiarizationContextConfig(BaseModel):
     # default; the Phase 2a sweep in docs/speaker_diarization.md records
     # what each value costs and buys.
     segmentation_step: float | None = None
+    # Report pyannote's overlap-aware turns instead of its exclusive ones
+    # (one speaker per instant). Off by default: words are attributed to
+    # the speaker overlapping them the most either way, and the Phase 2b
+    # measurement in docs/speaker_diarization.md records what each
+    # convention costs.
+    overlap_aware: bool = False
+    # On windows of one segmentation chunk (10 s or less) report the
+    # segmentation model's own speaker tracks with their embeddings instead
+    # of the pipeline's clustered output, which collapses such a window to
+    # one speaker (see PyannoteDiarizationService._local_pass). The
+    # session-level reconciler does the clustering. Longer windows always
+    # use the pipeline's clustering.
+    local_speakers: bool = True
+    # Override of the pipeline's clustering threshold (VBx agglomerative
+    # distance, 0.6 in the shipped community-1 config; lower splits more
+    # readily inside a window). None keeps the model's value.
+    clustering_threshold: float | None = None
 
 
 pyannote_diarization_context_config_adapter = TypeAdapter(
@@ -190,6 +386,12 @@ class PyannoteDiarizationContext(
                 f"{self._config.segmentation_step} of the segmentation "
                 f"window ({applied:.2f}s)"
             )
+        if self._config.clustering_threshold is not None:
+            self._apply_clustering_threshold(pipeline)
+            log.info(
+                "Pyannote clustering threshold set to "
+                f"{self._config.clustering_threshold}"
+            )
 
         self._lower_scheduling_priority(log)
 
@@ -197,7 +399,26 @@ class PyannoteDiarizationContext(
             "Pyannote diarization model loaded successfully "
             f"(torch threads per pass: {self._config.num_threads})"
         )
-        return PyannoteDiarizationService(pipeline, self._config.num_threads)
+        return PyannoteDiarizationService(
+            pipeline,
+            self._config.num_threads,
+            self._config.overlap_aware,
+            self._config.local_speakers,
+        )
+
+    def _apply_clustering_threshold(self, pipeline: Any) -> None:
+        """
+        Re-points the loaded pipeline's clustering at the configured
+        threshold. The pipeline instantiates its hyper-parameters as plain
+        attributes of the clustering object, which it reads on every call.
+        """
+        clustering = pipeline.clustering
+        if not hasattr(clustering, "threshold"):
+            raise RuntimeError(
+                "clustering_threshold is set but this pyannote pipeline's "
+                f"clustering ({type(clustering).__name__}) has no threshold"
+            )
+        clustering.threshold = float(self._config.clustering_threshold)
 
     def _apply_segmentation_step(self, pipeline: Any) -> float:
         """

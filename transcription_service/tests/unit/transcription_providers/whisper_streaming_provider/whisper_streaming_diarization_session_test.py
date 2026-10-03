@@ -7,12 +7,16 @@ SpeakerLabelsEvents, and with diarization off nothing beyond upstream runs.
 
 # pylint: disable=protected-access
 
+import time
 from unittest.mock import MagicMock
 
 import pytest
 
 from src.shared.logger import Logger
-from src.shared.utils.speaker_reconciler import SpeakerSegment
+from src.shared.utils.speaker_reconciler import (
+    SpeakerReconcilerState,
+    SpeakerSegment,
+)
 from src.shared.utils.worker_pool import (
     JobException,
     JobStatistics,
@@ -104,6 +108,7 @@ def mock_worker_pool_fixture():
 
 def _emit_result(session, handle, value, counters=None):
     """Fires a job result through the handler the session registered."""
+    del session  # the handle carries the handler; kept for readability
     callback = handle.on.call_args[0][1]
     callback(JobSuccess(value, STATS, counters or {}))
 
@@ -237,7 +242,7 @@ def test_late_labels_arrive_as_speaker_label_events(
         ),
     )
     assert results[0].final.speakers == [None, None]
-    assert updates == []
+    assert not updates
 
     _emit_result(
         session,
@@ -376,3 +381,85 @@ async def test_health_is_down_when_the_diarization_context_is_missing(
     assert health.status == ProviderStatus.DOWN
     assert health.model_loaded is False
     assert PYANNOTE_TAG in (health.detail or "")
+
+
+def test_a_reconnect_within_the_grace_continues_the_speaker_memory(
+    mock_logger, mock_worker_pool
+):
+    """
+    Phase 2b: when a session's socket closes, the provider keeps its
+    reconciler state and sequence counter in memory for the grace period;
+    a new session with the same session_uid starts its diarization job from
+    that state and continues the sequence ids. The memory is handed over
+    once and is gone afterwards.
+    """
+    provider = WhisperStreamingProvider(
+        {**DIARIZED_CONFIG, "diarization_reconnect_grace_sec": 60},
+        mock_logger,
+        mock_worker_pool,
+        PROVIDER_KEY,
+    )
+    session = provider.create_session("cfg", "session-1", "room-1", mock_logger)
+    session.handle_audio_chunk("c0", b"audio")
+    state = SpeakerReconcilerState(next_label_id=2, version=3)
+    _emit_result(
+        session,
+        session._diarization_job,
+        DiarizationResult(
+            segments=[SpeakerSegment(0.0, 4.0, "spk_1")],
+            window_start=0.0,
+            window_end=5.0,
+            lag_sec=0.3,
+            labels_minted=2,
+            state=state,
+        ),
+    )
+    session._attacher.continue_sequence_ids_from(5)
+    session.end_session()
+    assert provider.remembered_sessions == 1
+
+    mock_worker_pool.register_job.reset_mock()
+    rejoined = provider.create_session(
+        "cfg", "session-1", "room-1", mock_logger
+    )
+    rejoined.handle_audio_chunk("c1", b"audio")
+
+    assert provider.remembered_sessions == 0
+    diarization_call = mock_worker_pool.register_job.call_args_list[1]
+    job = diarization_call.args[2]
+    assert isinstance(job, DiarizationJob)
+    assert job.labels_minted == 2
+    assert rejoined._attacher.next_sequence_id == 5
+    # A third connection finds nothing: the memory was handed over
+    assert provider.recall_speakers("session-1") is None
+
+
+def test_speaker_memory_expires_after_the_grace_and_is_never_kept_without_uid(
+    mock_logger, mock_worker_pool
+):
+    """
+    Memory past its grace is dropped on the next sweep; a session without
+    a session_uid, or a provider with the grace at 0, remembers nothing.
+    """
+    provider = WhisperStreamingProvider(
+        {**DIARIZED_CONFIG, "diarization_reconnect_grace_sec": 0.01},
+        mock_logger,
+        mock_worker_pool,
+        PROVIDER_KEY,
+    )
+    state = SpeakerReconcilerState(next_label_id=1)
+    provider.remember_speakers("session-1", state, 1)
+    provider.remember_speakers(None, state, 1)
+    assert provider.remembered_sessions == 1
+    time.sleep(0.02)
+    assert provider.recall_speakers("session-1") is None
+    assert provider.remembered_sessions == 0
+
+    disabled = WhisperStreamingProvider(
+        {**DIARIZED_CONFIG, "diarization_reconnect_grace_sec": 0},
+        mock_logger,
+        mock_worker_pool,
+        PROVIDER_KEY,
+    )
+    disabled.remember_speakers("session-1", state, 1)
+    assert disabled.remembered_sessions == 0

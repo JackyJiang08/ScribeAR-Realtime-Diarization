@@ -65,6 +65,9 @@ from bench_common import (  # noqa: E402
 )
 
 sys.path.insert(0, str(ROOT))
+from src.shared.utils.speaker_attribution import (  # noqa: E402
+    SpeakerLabelAttacher,
+)
 from src.shared.utils.speaker_reconciler import (  # noqa: E402
     SpeakerReconciler,
     SpeakerSegment,
@@ -84,13 +87,21 @@ class TimedPipeline:
         self.stage_times: dict[str, list[float]] = defaultdict(list)
         self.last: dict[str, float] = {}
 
-    def __call__(self, file, **kwargs):
+    def __call__(self, file, hook=None, **kwargs):
         from pyannote.audio.pipelines.utils.hook import TimingHook
 
-        hook = TimingHook()
-        hook.__enter__()
+        timing = TimingHook()
+        timing.__enter__()
+        caller_hook = hook
+
+        def chained(step_name, step_artefact=None, file=None, **progress):
+            timing(step_name, step_artefact, file=file, **progress)
+            if caller_hook is not None:
+                caller_hook(step_name, step_artefact, file=file, **progress)
+
+        hook = timing
         try:
-            output = self._pipeline(file, hook=hook, **kwargs)
+            output = self._pipeline(file, hook=chained, **kwargs)
         finally:
             try:
                 hook.__exit__(None, None, None)
@@ -179,8 +190,90 @@ def speakers_in(reference, start: float, end: float) -> int:
 
 def run_offline(service, samples: np.ndarray) -> tuple[list, float]:
     start = time.perf_counter()
-    segments = service.diarize(samples, SAMPLE_RATE)
+    segments = service.diarize(samples, SAMPLE_RATE).segments
     return segments, time.perf_counter() - start
+
+
+def timeline_between(attacher: SpeakerLabelAttacher, start: float, end: float):
+    """The attacher's label timeline clipped to [start, end)."""
+    out = []
+    if end <= start:
+        return out
+    for span in attacher._segments:  # pylint: disable=protected-access
+        s, e = max(span.start, start), min(span.end, end)
+        if e > s:
+            out.append(SpeakerSegment(s, e, span.speaker))
+    return out
+
+
+class _Chain:
+    """
+    One reconciler + attacher pair replaying the production path over a
+    sequence of passes, collecting the three hypotheses a viewer could see.
+    """
+
+    def __init__(self, tick_sec: float, edge_margin_sec: float):
+        self.reconciler = SpeakerReconciler()
+        # Unbounded history: the replay reads the whole timeline at the end
+        self.attacher = SpeakerLabelAttacher(
+            edge_margin_sec=edge_margin_sec, attach_gap_sec=0.0, history_sec=1e9
+        )
+        self.tick_sec = tick_sec
+        self.first_seen: list[SpeakerSegment] = []
+        self.settled: list[SpeakerSegment] = []
+        self.settled_through = 0.0
+        self.labels_used: set[str] = set()
+        self.merges = 0
+        self.reconciler_costs: list[float] = []
+        self.last_reconciled: list[SpeakerSegment] = []
+
+    def step(self, segments, embeddings, window_start, window_end):
+        started = time.perf_counter()
+        reconciled = self.reconciler.reconcile(segments, embeddings)
+        self.reconciler_costs.append(time.perf_counter() - started)
+        self.last_reconciled = reconciled
+        self.labels_used.update(s.speaker for s in reconciled)
+        self.merges += len(self.reconciler.last_merges)
+        before = self.attacher.covered_through
+        self.attacher.add_coverage(
+            reconciled,
+            window_start,
+            window_end,
+            now=window_end,
+            confidences=self.reconciler.last_confidence,
+            relabel=dict(self.reconciler.last_merges),
+        )
+        after = self.attacher.covered_through
+        self.first_seen.extend(timeline_between(self.attacher, before, after))
+        settle_to = max(self.settled_through, window_end - 2 * self.tick_sec)
+        self.settled.extend(
+            timeline_between(self.attacher, self.settled_through, settle_to)
+        )
+        self.settled_through = settle_to
+
+    def finish(self) -> dict:
+        self.settled.extend(
+            timeline_between(
+                self.attacher,
+                self.settled_through,
+                self.attacher.covered_through,
+            )
+        )
+        revisions, revised_sec = self.attacher.revisions
+        return {
+            "hypotheses": {
+                "first_seen": self.first_seen,
+                "settled": self.settled,
+                "end_of_stream": timeline_between(
+                    self.attacher, 0.0, self.attacher.covered_through
+                ),
+            },
+            "labels_minted": self.reconciler.labels_minted,
+            "labels_used": len(self.labels_used),
+            "merges": self.merges,
+            "revisions": revisions,
+            "revised_sec": round(revised_sec, 1),
+        }
 
 
 def model_schedule(tick_costs: list[float], tick_sec: float) -> dict:
@@ -222,14 +315,20 @@ def run_streaming(
     max_buffer_sec: float,
     stream_sec: float | None,
     reference,
+    edge_margin_sec: float = 0.5,
 ):
     """
-    Replay the job loop: each tick re-diarizes the rolling buffer, offsets
-    the result to session time and reconciles labels.
+    Replay the job loop through the production path: each tick diarizes
+    the newest window, the reconciler maps the pass's labels (with its
+    embeddings) onto session labels, and the attacher extends the label
+    timeline exactly as the session does. The same passes are also run
+    through a second chain fed pyannote's overlap-aware turns, so both
+    conventions are scored from one set of passes.
 
-    Returns the hypothesis a viewer sees, plus tick cost / stability stats.
+    Returns the hypotheses a viewer sees (`hypotheses`: first seen, settled
+    two ticks later, end of stream; and `overlap_hypotheses` for the
+    overlap-aware chain), plus tick cost / stability stats.
     """
-    reconciler = SpeakerReconciler()
     tick = int(tick_sec * SAMPLE_RATE)
     max_buf = int(max_buffer_sec * SAMPLE_RATE)
     limit = (
@@ -247,15 +346,10 @@ def run_streaming(
     rss_min = float("inf")
     rss_max = 0.0
     tick_costs: list[float] = []
-    reconciler_costs: list[float] = []
-    # Label a viewer sees for the newest tick (what in-progress words get)
-    first_seen: list[SpeakerSegment] = []
-    # Label each region settles on once it has been re-diarized a couple of
-    # times (approximates what finalized words get after LocalAgree)
-    settled_by_region: dict[int, list[SpeakerSegment]] = {}
+    chain = _Chain(tick_sec, edge_margin_sec)
+    overlap_chain = _Chain(tick_sec, edge_margin_sec)
     region_label_history: dict[int, list[str | None]] = {}
     onset_latency: list[float] = []
-    labels_used: set[str] = set()
 
     onsets = [seg.start for seg, _ in reference.itertracks()]
     pending_onsets = sorted(o for o in onsets if o < limit / SAMPLE_RATE)
@@ -266,7 +360,7 @@ def run_streaming(
         offset_sec = window_start / SAMPLE_RATE
 
         started = time.perf_counter()
-        raw = service.diarize(window, SAMPLE_RATE)
+        result = service.diarize(window, SAMPLE_RATE)
         cost = time.perf_counter() - started
         tick_costs.append(cost)
         rss_now = current_rss_mb()
@@ -275,34 +369,40 @@ def run_streaming(
         rss_min = min(rss_min, rss_now)
         rss_max = max(rss_max, rss_now)
 
-        session_relative = [
-            SpeakerSegment(
-                start=seg.start + offset_sec,
-                end=seg.end + offset_sec,
-                speaker=seg.speaker,
-            )
-            for seg in raw
-        ]
-        started = time.perf_counter()
-        reconciled = reconciler.reconcile(session_relative)
-        reconciler_costs.append(time.perf_counter() - started)
-        labels_used.update(seg.speaker for seg in reconciled)
+        def shifted(segments):
+            return [
+                SpeakerSegment(
+                    start=seg.start + offset_sec,  # noqa: B023
+                    end=seg.end + offset_sec,  # noqa: B023
+                    speaker=seg.speaker,
+                )
+                for seg in segments
+            ]
 
         tick_end_sec = end / SAMPLE_RATE
-        newest_start = tick_end_sec - tick_sec
-        first_seen.extend(_clip(reconciled, newest_start, tick_end_sec))
+        chain.step(
+            shifted(result.segments),
+            result.embeddings,
+            offset_sec,
+            tick_end_sec,
+        )
+        overlap_chain.step(
+            shifted(result.overlap_segments),
+            result.embeddings,
+            offset_sec,
+            tick_end_sec,
+        )
+        reconciled = chain.last_reconciled
 
         # Track the dominant label for every tick-sized region in the buffer
         region_first = int(round(window_start / tick))
         region_last = int(round(end / tick))
         for region in range(region_first, region_last):
             r_start, r_end = region * tick_sec, (region + 1) * tick_sec
-            clipped = _clip(reconciled, r_start, r_end)
-            dominant = _dominant_label(clipped)
+            dominant = _dominant_label(
+                timeline_between(chain.attacher, r_start, r_end)
+            )
             region_label_history.setdefault(region, []).append(dominant)
-            # "settled" = label seen two ticks after the region arrived
-            if len(region_label_history[region]) == 3:
-                settled_by_region[region] = clipped
 
         # Label latency: time from reference speech onset until the first
         # tick whose hypothesis covers it, including that tick's compute cost
@@ -325,17 +425,13 @@ def run_streaming(
         rss_start = rss_end
         rss_min = rss_max = rss_end
 
-    # Regions near the end that never reached three ticks keep the label
-    # they were first seen with
-    for region in region_label_history:
-        if region not in settled_by_region:
-            r_start, r_end = region * tick_sec, (region + 1) * tick_sec
-            settled_by_region[region] = _clip(first_seen, r_start, r_end)
-    settled = [seg for segs in settled_by_region.values() for seg in segs]
+    chain_report = chain.finish()
+    overlap_report = overlap_chain.finish()
 
     # Flips: a region's dominant label changing between consecutive ticks
     # (rate per minute, the original metric) and, per region, whether the
-    # label ever changed after it was first shown (what a viewer notices).
+    # label ever changed after it was first shown (what a viewer notices;
+    # since Phase 2b a change here is a revision before finalization).
     flips = 0
     regions_labelled = 0
     regions_flipped = 0
@@ -351,10 +447,12 @@ def run_streaming(
     minutes = limit / SAMPLE_RATE / 60.0
     streamed_sec = limit / SAMPLE_RATE
     reference_speakers_streamed = speakers_in(reference, 0.0, streamed_sec)
+    labels_used = chain_report["labels_used"]
+    labels_minted = chain_report["labels_minted"]
 
     return {
-        "first_seen": first_seen,
-        "settled": settled,
+        "hypotheses": chain_report["hypotheses"],
+        "overlap_hypotheses": overlap_report["hypotheses"],
         "streamed_sec": round(streamed_sec, 1),
         "ticks": len(tick_costs),
         "tick_cost_sec": {
@@ -365,7 +463,7 @@ def run_streaming(
             "budget": tick_sec,
             "fits_budget": bool(tick_costs and np.max(tick_costs) < tick_sec),
         },
-        "reconciler_cost_sec": summarize(reconciler_costs, digits=6),
+        "reconciler_cost_sec": summarize(chain.reconciler_costs, digits=6),
         "stage_cost_sec": (
             timed_pipeline.stage_summary() if timed_pipeline else {}
         ),
@@ -396,15 +494,27 @@ def run_streaming(
             else None
         ),
         "regions_labelled": regions_labelled,
-        "session_labels_minted": reconciler.labels_minted,
-        "session_labels_used": len(labels_used),
+        "session_labels_minted": labels_minted,
+        "session_labels_used": labels_used,
+        "session_labels_merged": chain_report["merges"],
+        "revisions": chain_report["revisions"],
+        "revised_sec": chain_report["revised_sec"],
+        "revised_fraction": (
+            round(chain_report["revised_sec"] / streamed_sec, 4)
+            if streamed_sec
+            else None
+        ),
+        "overlap_labels_minted": overlap_report["labels_minted"],
         "reference_speakers_streamed": reference_speakers_streamed,
         "labels_minted_per_reference_speaker": (
-            round(reconciler.labels_minted / reference_speakers_streamed, 2)
+            round(labels_minted / reference_speakers_streamed, 2)
             if reference_speakers_streamed
             else None
         ),
-        "speaker_count_error": len(labels_used) - reference_speakers_streamed,
+        "speaker_count_error": labels_used - reference_speakers_streamed,
+        "speaker_count_within_1": bool(
+            abs(labels_used - reference_speakers_streamed) <= 1
+        ),
         "memory": {
             "rss_after_first_tick_mb": round(rss_start, 1),
             "rss_end_mb": round(rss_end, 1),
@@ -585,6 +695,15 @@ def main():
     offline_metrics = build_metrics()
     first_seen_metrics = build_metrics()
     settled_metrics = build_metrics()
+    extra_metrics = {
+        kind: build_metrics()
+        for kind in (
+            "end_of_stream",
+            "overlap_first_seen",
+            "overlap_settled",
+            "overlap_end_of_stream",
+        )
+    }
     files = []
     stream_sec = None if not args.stream_sec else args.stream_sec
 
@@ -641,8 +760,10 @@ def main():
             stream_uem = uem.crop(
                 Timeline([Segment(0.0, stream["streamed_sec"])])
             )
-            hyp_first = to_annotation(stream.pop("first_seen"), stem)
-            hyp_settled = to_annotation(stream.pop("settled"), stem)
+            hypotheses = stream.pop("hypotheses")
+            overlap_hypotheses = stream.pop("overlap_hypotheses")
+            hyp_first = to_annotation(hypotheses["first_seen"], stem)
+            hyp_settled = to_annotation(hypotheses["settled"], stem)
             stream["first_seen"] = {
                 k: score(m, reference, hyp_first, stream_uem)
                 for k, m in first_seen_metrics.items()
@@ -651,6 +772,17 @@ def main():
                 k: score(m, reference, hyp_settled, stream_uem)
                 for k, m in settled_metrics.items()
             }
+            for kind, hyp_segments in (
+                ("end_of_stream", hypotheses["end_of_stream"]),
+                ("overlap_first_seen", overlap_hypotheses["first_seen"]),
+                ("overlap_settled", overlap_hypotheses["settled"]),
+                ("overlap_end_of_stream", overlap_hypotheses["end_of_stream"]),
+            ):
+                hyp = to_annotation(hyp_segments, stem)
+                stream[kind] = {
+                    k: score(m, reference, hyp, stream_uem)
+                    for k, m in extra_metrics[kind].items()
+                }
             entry["streaming"] = stream
             print(
                 f"streaming: first-seen DER "
@@ -660,7 +792,10 @@ def main():
                 f"{stream['tick_cost_sec']['worst']:.2f}s, labels "
                 f"{stream['session_labels_minted']} for "
                 f"{stream['reference_speakers_streamed']} speakers, "
-                f"label latency p50 {stream['label_latency_sec']['p50']}s",
+                f"label latency p50 {stream['label_latency_sec']['p50']}s, "
+                f"end-of-stream DER {stream['end_of_stream']['der']['value']:.3f}, "
+                f"overlap-aware settled DER "
+                f"{stream['overlap_settled']['der']['value']:.3f}",
                 flush=True,
             )
         files.append(entry)
@@ -687,6 +822,8 @@ def main():
     if not args.skip_streaming:
         aggregate_report["streaming_first_seen"] = aggregate(first_seen_metrics)
         aggregate_report["streaming_settled"] = aggregate(settled_metrics)
+        for kind, metrics in extra_metrics.items():
+            aggregate_report[f"streaming_{kind}"] = aggregate(metrics)
         aggregate_report["streaming"] = {
             "tick_cost_mean_sec": _mean_of(
                 files, ["streaming", "tick_cost_sec", "mean"]
@@ -735,6 +872,31 @@ def main():
                     if "streaming" in f
                 ],
                 ["v"],
+            ),
+            "speaker_count_within_1_fraction": _mean_of(
+                [
+                    {
+                        "v": (
+                            1.0
+                            if f["streaming"]["speaker_count_within_1"]
+                            else 0.0
+                        )
+                    }
+                    for f in files
+                    if "streaming" in f
+                ],
+                ["v"],
+            ),
+            "session_labels_merged": sum(
+                f["streaming"]["session_labels_merged"]
+                for f in files
+                if "streaming" in f
+            ),
+            "revisions": sum(
+                f["streaming"]["revisions"] for f in files if "streaming" in f
+            ),
+            "revised_fraction": _mean_of(
+                files, ["streaming", "revised_fraction"], 4
             ),
             "stage_cost_sec": _pool_stages(files),
             "reconciler_cost_mean_sec": _mean_of(

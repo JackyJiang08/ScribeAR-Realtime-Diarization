@@ -131,11 +131,13 @@ benchmark_diarization_soak:
 	uv run python $(BENCH_DIR)/soak.py --minutes $(SOAK_MINUTES) --label "$(LABEL)" \
 		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_soak_$(SOAK_MINUTES)min.json,$(RESULT))
 
-# Phase 2a acceptance: absolute targets (baselines/phase2a_acceptance.json)
-# checked against a suite report; the Linux container run is the one that
-# decides. RESULT=path picks the report (default: today's suite report).
+# Acceptance: absolute targets checked against a suite report; the Linux
+# container run is the one that decides. RESULT=path picks the report
+# (default: today's suite report); TARGETS=path picks the target file
+# (default: Phase 2a). Phase 2b targets: TARGETS=$(BENCH_DIR)/baselines/phase2b_acceptance.json
+TARGETS ?= $(BENCH_DIR)/baselines/phase2a_acceptance.json
 benchmark_diarization_acceptance:
-	uv run python $(BENCH_DIR)/acceptance.py --report $(RESULT)
+	uv run python $(BENCH_DIR)/acceptance.py --report $(RESULT) --targets $(TARGETS)
 
 # Concurrency: the suite plus N concurrent sessions with diarization on
 # (SESSIONS="2 3 4"), reporting how many the environment sustains.

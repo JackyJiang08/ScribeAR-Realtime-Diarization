@@ -6,10 +6,11 @@ Defines FasterWhisperStreamingProvider
 # pylint: disable=duplicate-code
 
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from src.shared.logger import Logger
 from src.shared.utils.speaker_attribution import SpeakerLabelAttacher
+from src.shared.utils.speaker_reconciler import SpeakerReconcilerState
 from src.shared.utils.worker_pool import (
     JobException,
     JobSuccess,
@@ -35,6 +36,22 @@ from .diarization_job import (
 )
 from .whisper_streaming_config import whisper_streaming_config_adapter
 from .whisper_streaming_job import WhisperStreamingProviderJob
+
+
+@dataclass
+class RememberedSpeakers:
+    """
+    Speaker memory of a session whose socket closed, kept for a reconnect
+
+    Properties:
+        state               - The reconciler's exported memory
+        next_sequence_id    - The attacher's sequence counter
+        expires_at          - Wall clock after which it is dropped
+    """
+
+    state: SpeakerReconcilerState
+    next_sequence_id: int
+    expires_at: float
 
 
 class WhisperStreamingProvider(TranscriptionProviderInterface):
@@ -98,6 +115,10 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             # touches nothing upstream does not.
             self._diarization_job = None
             self._attacher: SpeakerLabelAttacher | None = None
+            # Speaker memory to start the diarization job from (a reconnect
+            # of a session the provider still remembers) and the newest
+            # memory this session's job reported, kept for the next one.
+            self._speaker_state = None
             if provider.config.diarization_detector:
                 self._attacher = SpeakerLabelAttacher(
                     edge_margin_sec=(
@@ -106,7 +127,25 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
                     label_timeout_sec=(
                         provider.config.diarization_label_timeout_sec
                     ),
+                    attach_gap_sec=provider.config.diarization_attach_gap_sec,
+                    revision_margin=(
+                        provider.config.diarization_revision_margin
+                    ),
                 )
+                remembered = provider.recall_speakers(session_uid)
+                if remembered is not None:
+                    self._speaker_state = remembered.state
+                    self._attacher.continue_sequence_ids_from(
+                        remembered.next_sequence_id
+                    )
+                    self._log.info(
+                        "Continuing speaker labels from an earlier "
+                        "connection of this session",
+                        context={
+                            "session_uid": session_uid,
+                            "labels": remembered.state.next_label_id,
+                        },
+                    )
 
             self._provider.session_started()
 
@@ -227,11 +266,15 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             if result.value is None or self._attacher is None:
                 return
             value = result.value
+            if value.state is not None:
+                self._speaker_state = value.state
             updates = self._attacher.add_coverage(
                 value.segments,
                 value.window_start,
                 value.window_end,
                 time.time(),
+                confidences=value.confidences,
+                relabel=value.relabel,
             )
             for update in updates:
                 self.emit(self.SpeakerLabelsEvent, update)
@@ -285,7 +328,7 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             self._diarization_job = self._provider.worker_pool.register_job(
                 self._provider.diarization_context_tags,
                 self._provider.config.diarization_period_ms,
-                DiarizationJob(self._provider.config),
+                DiarizationJob(self._provider.config, self._speaker_state),
                 self._provider.provider_key + DIARIZATION_JOB_LABEL_SUFFIX,
                 session_uid=self.session_uid,
                 room_uid=self.room_uid,
@@ -311,6 +354,13 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
                 self._job.deregister()
             if self._diarization_job is not None:
                 self._diarization_job.deregister()
+            if self._attacher is not None and self._speaker_state is not None:
+                self._provider.remember_speakers(
+                    self.session_uid,
+                    self._speaker_state,
+                    self._attacher.next_sequence_id,
+                )
+            self._speaker_state = None
             self._provider.session_ended()
 
     def __init__(
@@ -326,8 +376,76 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
         )
         self.worker_pool = worker_pool
         self.provider_key = provider_key
+        # Speaker memory of sessions whose socket closed, by session_uid,
+        # kept in memory for `diarization_reconnect_grace_sec` so a reconnect
+        # continues its labels. Never written anywhere; swept on every
+        # remember and recall, and emptied for good when the grace expires.
+        self._remembered_speakers: dict[str, RememberedSpeakers] = {}
         if self.config.diarization_detector:
             self._check_diarization_placement()
+
+    def remember_speakers(
+        self,
+        session_uid: str | None,
+        state: SpeakerReconcilerState,
+        next_sequence_id: int,
+    ) -> None:
+        """
+        Keeps a closed session's speaker memory for the reconnect grace
+        period
+
+        Args:
+            session_uid         - The session; None (unknown) is not kept
+            state               - The reconciler's exported memory
+            next_sequence_id    - The attacher's sequence counter, so the
+                                    next connection's ids never collide
+        """
+        now = time.time()
+        self._sweep_remembered(now)
+        grace = self.config.diarization_reconnect_grace_sec
+        if session_uid is None or grace <= 0:
+            return
+        self._remembered_speakers[session_uid] = RememberedSpeakers(
+            state=state,
+            next_sequence_id=next_sequence_id,
+            expires_at=now + grace,
+        )
+
+    def recall_speakers(
+        self, session_uid: str | None
+    ) -> "RememberedSpeakers | None":
+        """
+        Takes the speaker memory remembered for a session, if any is left
+        within its grace period. The memory is handed over, not copied: it
+        belongs to the new connection now
+
+        Args:
+            session_uid - The session reconnecting
+
+        Returns:
+            The remembered memory, or None
+        """
+        now = time.time()
+        self._sweep_remembered(now)
+        if session_uid is None:
+            return None
+        return self._remembered_speakers.pop(session_uid, None)
+
+    @property
+    def remembered_sessions(self) -> int:
+        """
+        Closed sessions whose speaker memory is still within its grace
+        """
+        return len(self._remembered_speakers)
+
+    def _sweep_remembered(self, now: float) -> None:
+        expired = [
+            uid
+            for uid, entry in self._remembered_speakers.items()
+            if entry.expires_at <= now
+        ]
+        for uid in expired:
+            del self._remembered_speakers[uid]
 
     def _check_diarization_placement(self) -> None:
         """

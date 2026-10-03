@@ -150,8 +150,10 @@ def main():
                 stream_uem = uem.crop(
                     Timeline([Segment(0.0, stream["streamed_sec"])])
                 )
-                hyp_first = to_annotation(stream.pop("first_seen"), stem)
-                hyp_settled = to_annotation(stream.pop("settled"), stem)
+                hypotheses = stream.pop("hypotheses")
+                stream.pop("overlap_hypotheses")
+                hyp_first = to_annotation(hypotheses["first_seen"], stem)
+                hyp_settled = to_annotation(hypotheses["settled"], stem)
                 stream["first_seen"] = {
                     k: score(m, reference, hyp_first, stream_uem)
                     for k, m in first_seen_metrics.items()

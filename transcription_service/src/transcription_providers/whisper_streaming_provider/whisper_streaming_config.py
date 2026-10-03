@@ -6,6 +6,12 @@ from typing import Optional
 
 from pydantic import BaseModel, TypeAdapter, model_validator
 
+from src.shared.utils.speaker_attribution import SpeakerLabelAttacher
+from src.shared.utils.speaker_reconciler import SpeakerReconcilerConfig
+
+_RECONCILER_DEFAULTS = SpeakerReconcilerConfig()
+_ATTACHER_DEFAULTS = SpeakerLabelAttacher()
+
 
 class WhisperStreamingProviderConfig(BaseModel):
     """
@@ -61,6 +67,38 @@ class WhisperStreamingProviderConfig(BaseModel):
     # with whatever labels it has, so a stalled diarization job can never
     # leave a caption pending forever.
     diarization_label_timeout_sec: float = 15.0
+    # Speaker identity (Phase 2b). The reconciler keeps one centroid
+    # embedding per session speaker and matches every pass's clusters
+    # against the whole session by cosine similarity (plus a bonus for time
+    # overlap with the previous pass). Defaults were tuned on the AMI
+    # benchmark set; docs/speaker_diarization.md ("Phase 2b") records the
+    # tradeoff of each. A cluster attaches to the best-matching speaker at
+    # or above `match_threshold`; it mints a new speaker only when it is
+    # below `new_speaker_threshold` against every speaker and has at least
+    # `min_mint_sec` of speech (in one pass or accumulated); a short cluster
+    # attaches at or above `attach_threshold` or stays unlabelled.
+    diarization_match_threshold: float = _RECONCILER_DEFAULTS.match_threshold
+    diarization_new_speaker_threshold: float = (
+        _RECONCILER_DEFAULTS.new_speaker_threshold
+    )
+    diarization_attach_threshold: float = _RECONCILER_DEFAULTS.attach_threshold
+    diarization_min_mint_sec: float = _RECONCILER_DEFAULTS.min_mint_duration_sec
+    diarization_max_session_speakers: int = _RECONCILER_DEFAULTS.max_speakers
+    # Two speakers whose centroids reach this similarity are merged (1.0
+    # disables).
+    diarization_merge_threshold: float = _RECONCILER_DEFAULTS.merge_threshold
+    diarization_overlap_bonus: float = _RECONCILER_DEFAULTS.overlap_bonus
+    # A word the diarizer found no speech under takes the nearest speaker
+    # within this gap (seconds); 0 leaves such words unlabelled.
+    diarization_attach_gap_sec: float = _ATTACHER_DEFAULTS.attach_gap_sec
+    # A later pass replaces an earlier label on audio both covered only when
+    # it is at least this much more confident, and only for words not yet
+    # finalized.
+    diarization_revision_margin: float = _ATTACHER_DEFAULTS.revision_margin
+    # After a session's socket closes, its speaker memory (labels and
+    # centroid embeddings, in memory only) is kept this long so a reconnect
+    # of the same session_uid continues with the same labels; 0 disables.
+    diarization_reconnect_grace_sec: float = 60.0
 
     # Guard thresholds over Whisper's own quality signals (see
     # TranscriptionJobCounter). Configurable rather than hardcoded so a
@@ -145,6 +183,7 @@ class WhisperStreamingProviderConfig(BaseModel):
             )
         if self.diarization_label_timeout_sec <= 0:
             raise ValueError("diarization_label_timeout_sec must be positive")
+        self._validate_speaker_identity()
         for name in ("diarization_min_speakers", "diarization_max_speakers"):
             value = getattr(self, name)
             if value is not None and value < 1:
@@ -159,6 +198,33 @@ class WhisperStreamingProviderConfig(BaseModel):
                 "diarization_max_speakers"
             )
         return self
+
+    def _validate_speaker_identity(self) -> None:
+        """
+        Rejects reconciler and attacher settings outside their domains
+        """
+        for name in (
+            "diarization_match_threshold",
+            "diarization_new_speaker_threshold",
+            "diarization_attach_threshold",
+        ):
+            value = getattr(self, name)
+            if not -1.0 <= value <= 2.0:
+                raise ValueError(f"{name} must be a similarity in [-1, 2]")
+        if not 0.0 < self.diarization_merge_threshold <= 1.0:
+            raise ValueError("diarization_merge_threshold must be in (0, 1]")
+        if self.diarization_min_mint_sec <= 0:
+            raise ValueError("diarization_min_mint_sec must be positive")
+        if self.diarization_max_session_speakers < 1:
+            raise ValueError("diarization_max_session_speakers must be >= 1")
+        for name in (
+            "diarization_overlap_bonus",
+            "diarization_attach_gap_sec",
+            "diarization_revision_margin",
+            "diarization_reconnect_grace_sec",
+        ):
+            if getattr(self, name) < 0:
+                raise ValueError(f"{name} must not be negative")
 
 
 whisper_streaming_config_adapter = TypeAdapter[WhisperStreamingProviderConfig](

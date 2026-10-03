@@ -203,7 +203,7 @@ def main():
         window_start = max(0, end - max_buf)
         offset_sec = window_start / SAMPLE_RATE
         started = time.perf_counter()
-        raw = service.diarize(samples[window_start:end], SAMPLE_RATE)
+        result = service.diarize(samples[window_start:end], SAMPLE_RATE)
         cost = time.perf_counter() - started
         tick_costs.append(cost)
         bin_costs.append(cost)
@@ -212,8 +212,9 @@ def main():
                 SpeakerSegment(
                     seg.start + offset_sec, seg.end + offset_sec, seg.speaker
                 )
-                for seg in raw
-            ]
+                for seg in result.segments
+            ],
+            result.embeddings,
         )
         tick_end = end / SAMPLE_RATE
         first_seen.extend(_clip(reconciled, tick_end - args.tick_sec, tick_end))

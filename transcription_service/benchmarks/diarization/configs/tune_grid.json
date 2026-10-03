@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "Stage 1 grid for tune_reconciler.py: the matching thresholds, the",
+    "minting minimum and the overlap bonus, with merging off and the",
+    "default revision margin. Stage 2 (tune_grid_stage2.json) sweeps",
+    "merge and revision around the stage 1 optimum."
+  ],
+  "grid": {
+    "match_threshold": [0.35, 0.45, 0.55, 0.65, 0.75],
+    "new_speaker_threshold": [
+      {"relative_to": "match_threshold", "offset": 0.0},
+      {"relative_to": "match_threshold", "offset": -0.1},
+      {"relative_to": "match_threshold", "offset": -0.2}
+    ],
+    "attach_threshold": [
+      {"relative_to": "new_speaker_threshold", "offset": -0.1}
+    ],
+    "min_mint_duration_sec": [1.0, 1.5, 2.5],
+    "overlap_bonus": [0.0, 0.15, 0.3],
+    "merge_threshold": [1.0],
+    "revision_margin": [0.1]
+  }
+}

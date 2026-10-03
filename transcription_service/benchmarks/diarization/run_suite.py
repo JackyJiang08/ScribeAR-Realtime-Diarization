@@ -221,7 +221,14 @@ def replay_key_metrics(report: dict | None) -> dict:
             "speaker_count_abs_error_mean"
         ]
         out["replay.offline.rtf_mean"] = offline["rtf_mean"]
-    for kind in ("first_seen", "settled"):
+    for kind in (
+        "first_seen",
+        "settled",
+        "end_of_stream",
+        "overlap_first_seen",
+        "overlap_settled",
+        "overlap_end_of_stream",
+    ):
         block = agg.get(f"streaming_{kind}")
         if block:
             out[f"replay.{kind}.der"] = block["der"]["value"]
@@ -249,6 +256,10 @@ def replay_key_metrics(report: dict | None) -> dict:
             "label_flip_rate_after_first_shown",
             "labels_minted_per_reference_speaker",
             "speaker_count_abs_error_mean",
+            "speaker_count_within_1_fraction",
+            "session_labels_merged",
+            "revisions",
+            "revised_fraction",
             "reconciler_cost_mean_sec",
             "memory_growth_mb_total",
         ):

@@ -4,15 +4,24 @@ Unit tests for SpeakerReconciler
 
 from src.shared.utils.speaker_reconciler import (
     SpeakerReconciler,
+    SpeakerReconcilerConfig,
     SpeakerSegment,
 )
+
+# The synthetic runs below are short, so the minting minimum is 1.5 s
+# instead of the production default; everything else is the default.
+SHORT_RUNS = SpeakerReconcilerConfig(min_mint_duration_sec=1.5)
+
+
+def _reconciler() -> SpeakerReconciler:
+    return SpeakerReconciler(config=SHORT_RUNS)
 
 
 def test_first_run_mints_sequential_session_labels():
     """
     Test first run assigns spk_0, spk_1... in order of appearance
     """
-    reconciler = SpeakerReconciler()
+    reconciler = _reconciler()
 
     result = reconciler.reconcile(
         [
@@ -28,7 +37,7 @@ def test_swapped_raw_labels_keep_stable_session_labels():
     """
     Test raw label flips between runs map back to stable session labels
     """
-    reconciler = SpeakerReconciler()
+    reconciler = _reconciler()
 
     reconciler.reconcile(
         [
@@ -52,7 +61,7 @@ def test_new_speaker_gets_fresh_session_label():
     """
     Test a raw label with no history mints the next session label
     """
-    reconciler = SpeakerReconciler()
+    reconciler = _reconciler()
 
     reconciler.reconcile([SpeakerSegment(0.0, 3.0, "SPEAKER_00")])
 
@@ -70,27 +79,50 @@ def test_mapping_prefers_largest_overlap():
     """
     Test a raw label maps to the session label it overlaps the most
     """
-    reconciler = SpeakerReconciler()
+    reconciler = _reconciler()
 
     reconciler.reconcile(
+        [
+            SpeakerSegment(0.0, 2.0, "SPEAKER_00"),
+            SpeakerSegment(2.0, 6.0, "SPEAKER_01"),
+        ]
+    )
+
+    # A single raw label spanning both previous speakers maps to the one
+    # it overlaps the most (spk_1 with 4s vs spk_0 with 2s)
+    result = reconciler.reconcile([SpeakerSegment(0.0, 6.0, "SPEAKER_00")])
+
+    assert [segment.speaker for segment in result] == ["spk_1"]
+
+
+def test_a_short_first_cluster_without_an_embedding_is_not_minted():
+    """
+    A raw label with less speech than the minting minimum and no embedding
+    to pool is left unlabelled rather than becoming a session speaker
+    """
+    reconciler = _reconciler()
+
+    result = reconciler.reconcile(
         [
             SpeakerSegment(0.0, 1.0, "SPEAKER_00"),
             SpeakerSegment(1.0, 5.0, "SPEAKER_01"),
         ]
     )
 
-    # A single raw label spanning both previous speakers maps to the one
-    # it overlaps the most (spk_1 with 4s vs spk_0 with 1s)
-    result = reconciler.reconcile([SpeakerSegment(0.0, 5.0, "SPEAKER_00")])
-
-    assert [segment.speaker for segment in result] == ["spk_1"]
+    assert [segment.speaker for segment in result] == ["spk_0"]
+    assert result[0].start == 1.0
+    assert reconciler.labels_minted == 1
+    assert reconciler.last_mapping == {
+        "SPEAKER_00": None,
+        "SPEAKER_01": "spk_0",
+    }
 
 
 def test_empty_run_returns_empty_and_keeps_state():
     """
     Test a silent run returns empty without erasing label continuity
     """
-    reconciler = SpeakerReconciler()
+    reconciler = _reconciler()
 
     reconciler.reconcile([SpeakerSegment(0.0, 2.0, "SPEAKER_00")])
     assert reconciler.reconcile([]) == []

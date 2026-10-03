@@ -1,7 +1,19 @@
 """
-Exports SpeakerReconciler and SpeakerSegment
+Exports SpeakerReconciler, its configuration and state, and SpeakerSegment
 """
 
-from .speaker_reconciler import SpeakerReconciler, SpeakerSegment
+from .speaker_reconciler import (
+    SpeakerMemory,
+    SpeakerReconciler,
+    SpeakerReconcilerConfig,
+    SpeakerReconcilerState,
+    SpeakerSegment,
+)
 
-__all__ = ["SpeakerReconciler", "SpeakerSegment"]
+__all__ = [
+    "SpeakerMemory",
+    "SpeakerReconciler",
+    "SpeakerReconcilerConfig",
+    "SpeakerReconcilerState",
+    "SpeakerSegment",
+]

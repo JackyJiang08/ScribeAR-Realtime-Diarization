@@ -83,7 +83,7 @@ describe('speaker label slot', (it) => {
     expect(container.querySelectorAll('br')).toHaveLength(0);
   });
 
-  it('keeps the placeholder as an explicit unattributed state once settled', () => {
+  it('empties the slot once the sequence is settled without a speaker', () => {
     const { container } = renderActive([
       {
         id: 'a',
@@ -95,8 +95,11 @@ describe('speaker label slot', (it) => {
     ]);
 
     const [slot] = slots(container);
-    expect(slot?.textContent?.trim()).toBe(`${PENDING_SPEAKER_LABEL}:`);
+    // The question mark never stays on screen: the slot keeps its width
+    // (so nothing moves) but shows no label at all.
+    expect(slot?.textContent?.trim()).toBe('');
     expect(slot).toHaveAttribute('data-speaker-slot', 'unattributed');
+    expect(screen.getByText(/Hello/)).toBeInTheDocument();
   });
 
   it('keeps the slot but blanks it when the speaker continues from the previous line', () => {

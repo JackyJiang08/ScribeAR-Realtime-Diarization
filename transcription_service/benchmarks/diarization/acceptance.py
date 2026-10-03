@@ -121,7 +121,8 @@ def main() -> int:
     rows = evaluate(report, baseline, targets)
 
     print(
-        f"Phase 2a acceptance for report @ {report.get('code_revision')} "
+        f"Acceptance ({Path(args.targets).stem}) for report @ "
+        f"{report.get('code_revision')} "
         f"({key}; baseline "
         f"{baseline.get('code_revision') if baseline else 'none'})\n"
     )

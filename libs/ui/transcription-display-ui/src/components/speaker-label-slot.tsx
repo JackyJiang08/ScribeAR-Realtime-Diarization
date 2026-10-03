@@ -8,12 +8,13 @@ import {
 } from '#src/utils/speaker-appearance.js';
 
 /**
- * What a label slot shows while the speaker is not known. Reads as an
- * explicit "unattributed" state rather than as silence, and has the same
+ * What a label slot shows while a label may still arrive. Reads as an
+ * explicit "not yet known" state rather than as silence, and has the same
  * character count as `Speaker N`, so the slot does not change width when
  * the label arrives (tabular digits keep `?` and a digit the same width in
  * most fonts; a tenth speaker adds one character, the one case the slot
- * grows).
+ * grows). Once the provider has settled the sequence without a speaker,
+ * the slot is emptied: a question mark never stays on screen.
  */
 export const PENDING_SPEAKER_LABEL = 'Speaker ?';
 
@@ -24,8 +25,9 @@ export interface SpeakerLabelSlotProps {
   // The speaker to show, `null` while unknown.
   speaker: string | null;
   // Whether a label may still arrive. When false and `speaker` is null, the
-  // slot shows the pending text permanently: the provider never attributed
-  // these words.
+  // provider has settled the sequence without attributing these words: the
+  // slot keeps its width but shows nothing, so the line reads as plain
+  // caption text rather than as a question that will never be answered.
   pending: boolean;
   // When true the slot is kept but rendered empty: the speaker continues from
   // the previous line, so the label is not repeated. The width is kept so
@@ -53,12 +55,13 @@ export const SpeakerLabelSlot = memo(
     continuation,
     backgroundColor,
   }: SpeakerLabelSlotProps) => {
-    // Pending and settled-but-unattributed read the same: both are "no
-    // speaker known"; they differ only in the data attribute, for tests and
-    // styling hooks.
+    // Pending shows the placeholder; settled-but-unattributed shows an
+    // empty slot of the same width. The data attribute tells the two apart
+    // for tests and styling hooks.
+    const unattributed = speaker === null && !pending;
     const label =
       speaker !== null ? formatSpeakerName(speaker) : PENDING_SPEAKER_LABEL;
-    const showText = speaker === null || !continuation;
+    const showText = !unattributed && (speaker === null || !continuation);
     return (
       <Box
         component="span"

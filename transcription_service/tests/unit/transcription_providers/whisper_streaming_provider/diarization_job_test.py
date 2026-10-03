@@ -14,7 +14,13 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from src.shared.utils.speaker_reconciler import SpeakerSegment
+from src.shared.utils.speaker_reconciler import (
+    SpeakerReconcilerConfig,
+    SpeakerSegment,
+)
+from src.transcription_contexts.pyannote_diarization_context import (
+    DiarizationPass,
+)
 from src.transcription_provider_interface import TranscriptionJobCounter
 from src.transcription_providers.whisper_streaming_provider.diarization_job import (
     SAMPLE_RATE,
@@ -36,6 +42,8 @@ def make_job(**overrides) -> DiarizationJob:
         "local_agree_dim": 2,
         "diarization_detector": True,
         "diarization_window_sec": 10.0,
+        # Short synthetic clusters: mint from 1.5 s instead of the default
+        "diarization_min_mint_sec": 1.5,
     }
     config.update(overrides)
     return DiarizationJob(WhisperStreamingProviderConfig(**config))
@@ -57,10 +65,18 @@ def log_fixture():
     return MagicMock(spec=logging.Logger)
 
 
-def _diarizer(segments):
+def _voice(index: int) -> np.ndarray:
+    vector = np.zeros(8, dtype=np.float32)
+    vector[index] = 1.0
+    return vector
+
+
+def _diarizer(segments, embeddings=None):
     """A pyannote stand-in returning window-relative segments."""
     diarizer = MagicMock()
-    diarizer.diarize.return_value = segments
+    diarizer.diarize.return_value = DiarizationPass(
+        segments=segments, embeddings=embeddings or {}
+    )
     return diarizer
 
 
@@ -90,7 +106,8 @@ def test_labels_are_reported_on_the_session_timeline(log):
     """
     job = make_job()
     diarizer = _diarizer([SpeakerSegment(1.0, 2.0, "SPEAKER_00")])
-    job.process_batch(log, (diarizer,), [chunk(5.0, "a")])
+    first = job.process_batch(log, (diarizer,), [chunk(5.0, "a")])
+    assert first is not None and not first.segments
 
     # 15 s received in total: the window is the newest 10 s, starting at 5 s.
     result = job.process_batch(log, (diarizer,), [chunk(10.0, "b")])
@@ -99,8 +116,10 @@ def test_labels_are_reported_on_the_session_timeline(log):
     assert result.window_start == pytest.approx(5.0)
     assert result.window_end == pytest.approx(15.0)
     # The first pass minted spk_0 at 1-2 s; this raw label overlaps nothing
-    # from it, so the reconciler mints a fresh session label.
-    assert result.segments == [SpeakerSegment(6.0, 7.0, "spk_1")]
+    # from it and carries no embedding, so it is a fresh session label when
+    # it is long enough to mint... which 1 s is not: left unlabelled.
+    assert not result.segments
+    assert result.labels_minted == 0
     args, _ = diarizer.diarize.call_args
     assert len(args[0]) == 10 * SAMPLE_RATE
 
@@ -172,3 +191,82 @@ def test_labels_minted_are_counted_once(log):
     counters = job.drain_counters()
     assert counters[TranscriptionJobCounter.DIARIZATION_LABELS_MINTED] == 2
     assert job.labels_minted == 2
+
+
+def test_embeddings_carry_identity_and_state_is_exported_when_it_changes(log):
+    """
+    The pass's embeddings reach the reconciler (the same voice keeps its
+    label without any time overlap), each pass reports the confidence the
+    label was attached with, and the speaker memory is exported only on
+    passes that changed it.
+    """
+    job = make_job()
+    diarizer = _diarizer(
+        [SpeakerSegment(0.0, 4.0, "SPEAKER_00")], {"SPEAKER_00": _voice(0)}
+    )
+    first = job.process_batch(log, (diarizer,), [chunk(5.0, "a")])
+    assert first is not None
+    assert first.segments == [SpeakerSegment(0.0, 4.0, "spk_0")]
+    assert first.state is not None and first.state.next_label_id == 1
+    # A minted label carries the match threshold as its confidence
+    assert first.confidences["spk_0"] == pytest.approx(
+        SpeakerReconcilerConfig().match_threshold
+    )
+
+    # 20 s later the window has slid entirely past the first pass
+    job.process_batch(log, (diarizer,), [chunk(10.0, "b")])
+    diarizer.diarize.return_value = DiarizationPass(
+        segments=[SpeakerSegment(0.0, 4.0, "SPEAKER_01")],
+        embeddings={"SPEAKER_01": _voice(0)},
+    )
+    result = job.process_batch(log, (diarizer,), [chunk(10.0, "c")])
+
+    assert result is not None
+    assert [s.speaker for s in result.segments] == ["spk_0"]
+    assert result.labels_minted == 1
+    assert result.confidences["spk_0"] > 0.9
+
+    # No audio: no pass, nothing exported
+    assert job.process_batch(log, (diarizer,), []) is None
+
+
+def test_a_restored_state_continues_the_labels(log):
+    """
+    A job built from an earlier job's state labels the same voice with the
+    same session label and mints from where the earlier job stopped.
+    """
+    first = make_job()
+    diarizer = _diarizer(
+        [
+            SpeakerSegment(0.0, 2.0, "SPEAKER_00"),
+            SpeakerSegment(2.0, 4.0, "SPEAKER_01"),
+        ],
+        {"SPEAKER_00": _voice(0), "SPEAKER_01": _voice(1)},
+    )
+    state = first.process_batch(log, (diarizer,), [chunk(5.0, "a")]).state
+
+    rebuilt = DiarizationJob(rebuilt_config(), state=state)
+    diarizer = _diarizer(
+        [SpeakerSegment(0.0, 3.0, "SPEAKER_00")], {"SPEAKER_00": _voice(1)}
+    )
+    result = rebuilt.process_batch(log, (diarizer,), [chunk(5.0, "b")])
+
+    assert result is not None
+    assert [s.speaker for s in result.segments] == ["spk_1"]
+    assert rebuilt.labels_minted == 2
+    counters = rebuilt.drain_counters()
+    assert TranscriptionJobCounter.DIARIZATION_LABELS_MINTED not in counters
+
+
+def rebuilt_config() -> WhisperStreamingProviderConfig:
+    """The config make_job uses, for building a job with a state."""
+    return WhisperStreamingProviderConfig(
+        whisper_context_tag="w",
+        silero_context_tag="s",
+        job_period_ms=5000,
+        max_buffer_len_sec=30,
+        local_agree_dim=2,
+        diarization_detector=True,
+        diarization_window_sec=10.0,
+        diarization_min_mint_sec=1.5,
+    )
