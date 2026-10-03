@@ -17,6 +17,7 @@ from src.shared.utils.audio_frame_protocol import (
     decode_audio_frame,
 )
 from src.transcription_provider_interface import (
+    SpeakerLabelUpdate,
     TranscriptionCapacityError,
     TranscriptionClientError,
     TranscriptionResult,
@@ -35,6 +36,7 @@ from src.webserver.shared.websocket_handler import WebsocketHandler
 from .transcription_stream_messages import (
     ClientJsonMessageAdapter,
     ClientMessageTypes,
+    SpeakersUpdateMessage,
     TranscriptMessage,
     TranscriptSequence,
 )
@@ -172,6 +174,7 @@ class TranscriptionStreamController(WebsocketHandler):
             service.TranscriptionResultEvent, self._handle_transcription_result
         )
         service.on(service.TranscriptionResultEvent, self._handle_audio_stages)
+        service.on(service.SpeakerLabelsEvent, self._handle_speaker_labels)
         service.on(service.TranscriptionErrorEvent, self._handle_error)
         service.start()
         self._service = service
@@ -189,6 +192,7 @@ class TranscriptionStreamController(WebsocketHandler):
                         starts=result.final.starts,
                         ends=result.final.ends,
                         speakers=result.final.speakers,
+                        sequence_id=result.final.sequence_id,
                     )
                     if result.final is not None
                     else None
@@ -199,12 +203,26 @@ class TranscriptionStreamController(WebsocketHandler):
                         starts=result.in_progress.starts,
                         ends=result.in_progress.ends,
                         speakers=result.in_progress.speakers,
+                        sequence_id=result.in_progress.sequence_id,
                     )
                     if result.in_progress is not None
                     else None
                 ),
                 final_chunk_ids=result.final_chunk_ids or None,
                 in_progress_chunk_ids=result.in_progress_chunk_ids or None,
+            )
+        )
+
+    def _handle_speaker_labels(self, update: SpeakerLabelUpdate):
+        """
+        Serialize late speaker labels for an already-sent finalized sequence
+        into a SpeakersUpdateMessage and send it over the websocket.
+        """
+        self.send(
+            SpeakersUpdateMessage(
+                sequence_id=update.sequence_id,
+                speakers=list(update.speakers),
+                settled=update.settled,
             )
         )
 

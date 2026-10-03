@@ -7,14 +7,20 @@ between them:
   1. warm-up: load whisper base, Silero and pyannote once (warmup.py)
   2. replay benchmark on the AMI set (benchmark_baseline.py): offline and
      streaming DER/JER, speaker-count error, label latency, flips, labels
-     minted, per-stage timing, modelled lag and skipped ticks, memory
+     minted, per-stage timing, modelled lag and skipped ticks, memory. The
+     streaming replay uses the diarization window and segmentation step of
+     the reference config, so it models the shipped job.
   3. end-to-end caption latency with the reference config, diarization ON
      and OFF (caption_latency.py): chunk-id (primary) and word (secondary)
-     methods, dropped periods, dropped audio, service RSS
-  4. optionally the same with the old VAD-on dev config, labelled
+     methods, speaker-label latency, dropped periods, dropped audio, the
+     diarization counters, per-worker CPU and RSS
+  4. optionally the same with N concurrent sessions (`--sessions-sweep`),
+     for the capacity question
+  5. optionally the same with the old VAD-on dev config, labelled
      `secondary_dev_vad` and never gated
 
-The report's `key_metrics` block is the flat view compare_baseline.py gates.
+The report's `key_metrics` block is the flat view compare_baseline.py gates
+and acceptance.py checks against the Phase 2a targets.
 
 Usage (from transcription_service/):
   uv run python benchmarks/diarization/run_suite.py \
@@ -50,7 +56,7 @@ from bench_common import (  # noqa: E402
     write_json,
 )
 
-STEPS = ("warmup", "replay", "caption")
+STEPS = ("warmup", "replay", "caption", "concurrency")
 
 
 def run_step(name: str, argv: list[str], log_dir: Path) -> float:
@@ -89,6 +95,28 @@ def _get(node, *path, default=None):
     return node
 
 
+def diarization_settings(config_path: Path, provider: str) -> dict:
+    """
+    The diarization window, period and pyannote segmentation step the
+    reference config ships, so the replay models the same job the live
+    service runs.
+    """
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    provider_config = config["providers"][provider]["provider_config"]
+    step = None
+    for ctx in config.get("contexts", []):
+        if ctx["context_uid"] == "pyannote-diarization":
+            step = ctx["context_config"].get("segmentation_step")
+    return {
+        "window_sec": float(provider_config.get("diarization_window_sec", 10)),
+        "period_ms": int(
+            provider_config.get("diarization_period_ms")
+            or provider_config["job_period_ms"]
+        ),
+        "segmentation_step": step,
+    }
+
+
 def caption_key_metrics(prefix: str, report: dict | None) -> dict:
     if not report:
         return {}
@@ -98,11 +126,15 @@ def caption_key_metrics(prefix: str, report: dict | None) -> dict:
     for method, key in (
         ("chunk_id", "chunk_id_method"),
         ("word", "word_method"),
+        ("label", "label_latency"),
     ):
-        for kind, stats in lat[key].items():
+        for kind, stats in lat.get(key, {}).items():
             for stat in ("p50", "p95", "mean"):
                 out[f"{prefix}.{method}.{kind}.{stat}"] = stats.get(stat)
     out[f"{prefix}.transcript_messages"] = lat["transcript_messages"]
+    out[f"{prefix}.speakers_update_messages"] = lat.get(
+        "speakers_update_messages"
+    )
     out[f"{prefix}.final_words"] = lat["final_words"]
     out[f"{prefix}.final_words_labelled_fraction"] = lat[
         "final_words_labelled_fraction"
@@ -111,6 +143,12 @@ def caption_key_metrics(prefix: str, report: dict | None) -> dict:
     out[f"{prefix}.label_changes_before_final"] = lat[
         "label_changes_before_final"
     ]
+    out[f"{prefix}.label_changes_before_final_fraction"] = lat.get(
+        "label_changes_before_final_fraction"
+    )
+    out[f"{prefix}.label_changes_after_sent"] = lat.get(
+        "label_changes_after_sent"
+    )
     out[f"{prefix}.dropped_periods"] = counters.get("asrDroppedPeriodsTotal")
     out[f"{prefix}.audio_dropped_buffer_full_sec"] = counters.get(
         "audioDroppedBufferFullSecondsTotal"
@@ -129,6 +167,37 @@ def caption_key_metrics(prefix: str, report: dict | None) -> dict:
     out[f"{prefix}.exec_ms_max"] = _get(
         report, "service_histograms_end", "asrExecutionMs", "max"
     )
+    workers = report["service"].get("workers") or []
+    for worker in workers:
+        index = worker["worker"]
+        out[f"{prefix}.worker{index}.cores"] = worker.get("cores")
+        out[f"{prefix}.worker{index}.rss_max_mb"] = worker.get("rss_max_mb")
+    cost = report.get("diarization_cost")
+    if cost:
+        out[f"{prefix}.diarization.rtf"] = cost.get("rtf_from_counters")
+        out[f"{prefix}.diarization.pass_cost_mean_sec"] = cost.get(
+            "pass_cost_mean_sec"
+        )
+        out[f"{prefix}.diarization.runs"] = cost.get("runs")
+        out[f"{prefix}.diarization.uncovered_sec"] = cost.get(
+            "uncovered_seconds"
+        )
+        out[f"{prefix}.diarization.dropped_periods"] = cost.get(
+            "dropped_periods"
+        )
+        out[f"{prefix}.diarization.failed_passes"] = cost.get("failed_passes")
+        out[f"{prefix}.diarization.worker_cores"] = cost.get(
+            "worker_cores_mean"
+        )
+        out[f"{prefix}.diarization.worker_rss_max_mb"] = cost.get(
+            "worker_rss_max_mb"
+        )
+        out[f"{prefix}.diarization.lag_ms_p95"] = _get(
+            report, "service_histograms_end", "diarizationLagMs", "p95"
+        )
+        out[f"{prefix}.diarization.exec_ms_p95"] = _get(
+            report, "service_histograms_end", "diarizationExecutionMs", "p95"
+        )
     return out
 
 
@@ -188,6 +257,57 @@ def replay_key_metrics(report: dict | None) -> dict:
             out[f"replay.stage.{stage}_mean_sec"] = stats.get("mean")
     out["replay.peak_rss_mb"] = report.get("peak_rss_mb")
     out["replay.model_load_sec"] = report.get("model_load_sec")
+    out["replay.window_sec"] = _get(report, "config", "max_buffer_sec")
+    out["replay.segmentation_step"] = _get(
+        report, "config", "segmentation_step"
+    )
+    return out
+
+
+def concurrency_key_metrics(runs: dict, off_single: dict | None) -> dict:
+    """
+    Per session count: caption latency, dropped periods and label latency,
+    plus the largest session count the container sustained. "Sustained"
+    means: caption chunk-id p50 within 10 percent of the diarization-off
+    single-session run plus 1 s, no more dropped caption periods than that
+    run, no diarization audio skipped, and label latency p50 under 2 s.
+    """
+    out: dict = {}
+    sustained = 0
+    off_p50 = (
+        _get(off_single, "latency", "chunk_id_method", "in_progress", "p50")
+        if off_single
+        else None
+    )
+    off_dropped = (
+        _get(off_single, "service_counters_delta", "asrDroppedPeriodsTotal")
+        if off_single
+        else None
+    )
+    for sessions in sorted(runs, key=int):
+        report = runs[sessions]
+        prefix = f"concurrency.{sessions}"
+        metrics = caption_key_metrics(prefix, report)
+        out.update(metrics)
+        p50 = metrics.get(f"{prefix}.chunk_id.in_progress.p50")
+        dropped = metrics.get(f"{prefix}.dropped_periods")
+        uncovered = metrics.get(f"{prefix}.diarization.uncovered_sec") or 0.0
+        label_p50 = metrics.get(f"{prefix}.label.after_text_shown.p50")
+        ok = (
+            p50 is not None
+            and off_p50 is not None
+            and p50 <= off_p50 * 1.1 + 1.0
+            and dropped is not None
+            and off_dropped is not None
+            and dropped <= off_dropped * int(sessions)
+            and uncovered <= 1.0
+            and label_p50 is not None
+            and label_p50 <= 2.0
+        )
+        out[f"{prefix}.sustained"] = ok
+        if ok and sustained == int(sessions) - 1:
+            sustained = int(sessions)
+    out["concurrency.sessions_sustained"] = sustained
     return out
 
 
@@ -224,11 +344,18 @@ def main():
     parser.add_argument("--chunk-ms", type=int, default=500)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument(
+        "--sessions-sweep",
+        nargs="*",
+        type=int,
+        default=None,
+        help="session counts for the concurrency step, e.g. 2 3 4",
+    )
+    parser.add_argument(
         "--only",
         choices=STEPS,
         nargs="*",
         default=None,
-        help="run only these steps (default: all)",
+        help="run only these steps (default: warmup replay caption)",
     )
     parser.add_argument(
         "--keep-logs", default=None, help="folder for step logs"
@@ -236,7 +363,10 @@ def main():
     args = parser.parse_args()
 
     ensure_hf_token_env()
-    steps = set(args.only or STEPS)
+    steps = set(args.only or ("warmup", "replay", "caption"))
+    if args.sessions_sweep:
+        steps.add("concurrency")
+        steps.add("caption")
     data = Path(args.data)
     caption_audio = Path(
         args.caption_audio or (data / f"ES2004a{args.suffix}.wav")
@@ -257,6 +387,7 @@ def main():
     hygiene_before = hygiene_check(limits)
     suite_started = time.perf_counter()
     durations: dict[str, float] = {}
+    settings = diarization_settings(Path(args.reference_config), "whisper")
 
     report: dict = {
         "label": args.label,
@@ -268,6 +399,7 @@ def main():
         "hygiene": {"before": hygiene_before},
         "config": {
             "reference_config": rel_path(args.reference_config),
+            "diarization": settings,
             "dev_vad_config": (
                 rel_path(args.dev_vad_config) if args.with_dev_vad else None
             ),
@@ -279,6 +411,7 @@ def main():
             "caption_audio": rel_path(caption_audio),
             "caption_seconds": args.caption_seconds,
             "chunk_ms": args.chunk_ms,
+            "sessions_sweep": args.sessions_sweep,
             "steps": sorted(steps),
         },
         "logs": rel_path(log_dir),
@@ -314,12 +447,18 @@ def main():
             args.suffix,
             "--stream-sec",
             str(args.stream_sec),
+            "--tick-sec",
+            str(settings["period_ms"] / 1000.0),
+            "--max-buffer-sec",
+            str(settings["window_sec"]),
             "--out",
             str(replay_out),
             "--label",
             args.label,
             "--no-hygiene",
         ]
+        if settings["segmentation_step"] is not None:
+            argv += ["--segmentation-step", str(settings["segmentation_step"])]
         if args.files:
             argv += ["--files", *args.files]
         if args.skip_offline:
@@ -329,43 +468,56 @@ def main():
         durations["replay"] = run_step("replay", argv, log_dir)
         report["replay"] = json.loads(replay_out.read_text(encoding="utf-8"))
 
-    if "caption" in steps:
-        runs = [
-            ("reference", args.reference_config, "on"),
-            ("reference", args.reference_config, "off"),
+    def caption_run(name: str, config_path: str, mode: str, sessions: int):
+        out_path = log_dir / f"{name}.json"
+        argv = [
+            str(bench / "caption_latency.py"),
+            "--provider-config",
+            str(config_path),
+            "--audio",
+            str(caption_audio),
+            "--diarization",
+            mode,
+            "--seconds",
+            str(args.caption_seconds),
+            "--chunk-ms",
+            str(args.chunk_ms),
+            "--sessions",
+            str(sessions),
+            "--service-log",
+            str(log_dir / f"{name}.service.log"),
+            "--label",
+            f"{args.label} [{name}]".strip(),
+            "--no-hygiene",
+            "--out",
+            str(out_path),
         ]
+        durations[name] = run_step(name, argv, log_dir)
+        return json.loads(out_path.read_text(encoding="utf-8"))
+
+    if "caption" in steps:
+        report["caption_latency"] = {"reference": {}}
+        for mode in ("on", "off"):
+            report["caption_latency"]["reference"][mode] = caption_run(
+                f"caption_reference_{mode}", args.reference_config, mode, 1
+            )
         if args.with_dev_vad:
-            runs += [
-                ("secondary_dev_vad", args.dev_vad_config, "on"),
-                ("secondary_dev_vad", args.dev_vad_config, "off"),
-            ]
-        report["caption_latency"] = {}
-        for group, config_path, mode in runs:
-            name = f"caption_{group}_{mode}"
-            out_path = log_dir / f"{name}.json"
-            argv = [
-                str(bench / "caption_latency.py"),
-                "--provider-config",
-                str(config_path),
-                "--audio",
-                str(caption_audio),
-                "--diarization",
-                mode,
-                "--seconds",
-                str(args.caption_seconds),
-                "--chunk-ms",
-                str(args.chunk_ms),
-                "--service-log",
-                str(log_dir / f"{name}.service.log"),
-                "--label",
-                f"{args.label} [{group} diarization {mode}]".strip(),
-                "--no-hygiene",
-                "--out",
-                str(out_path),
-            ]
-            durations[name] = run_step(name, argv, log_dir)
-            report["caption_latency"].setdefault(group, {})[mode] = json.loads(
-                out_path.read_text(encoding="utf-8")
+            report["caption_latency"]["secondary_dev_vad"] = {}
+            for mode in ("on", "off"):
+                report["caption_latency"]["secondary_dev_vad"][mode] = (
+                    caption_run(
+                        f"caption_secondary_dev_vad_{mode}",
+                        args.dev_vad_config,
+                        mode,
+                        1,
+                    )
+                )
+
+    if "concurrency" in steps and args.sessions_sweep:
+        report["concurrency"] = {}
+        for sessions in args.sessions_sweep:
+            report["concurrency"][str(sessions)] = caption_run(
+                f"concurrency_{sessions}", args.reference_config, "on", sessions
             )
 
     report["hygiene"]["after"] = system_state()
@@ -383,6 +535,12 @@ def main():
     key_metrics.update(
         caption_key_metrics("caption.off", reference_runs.get("off"))
     )
+    if report.get("concurrency"):
+        key_metrics.update(
+            concurrency_key_metrics(
+                report["concurrency"], reference_runs.get("off")
+            )
+        )
     report["key_metrics"] = key_metrics
     report["hygiene"]["clean"] = hygiene_before["clean"]
     report["hygiene"]["warnings"] = hygiene_before["warnings"]

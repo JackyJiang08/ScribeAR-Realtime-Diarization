@@ -1,5 +1,5 @@
 import { EventEmitter } from 'eventemitter3';
-import { afterEach, beforeEach, describe, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { encodeAudioFrame } from '@scribear/audio-frame-protocol';
 import { LatencyKind } from '@scribear/node-server-schema';
@@ -12,6 +12,7 @@ import {
 } from '#src/server/features/transcription-stream/events/latency.events.js';
 import { SessionEndedChannel } from '#src/server/features/transcription-stream/events/session-ended.events.js';
 import { SessionStatusChannel } from '#src/server/features/transcription-stream/events/session-status.events.js';
+import { SpeakersUpdateChannel } from '#src/server/features/transcription-stream/events/speakers-update.events.js';
 import { TranscriptChannel } from '#src/server/features/transcription-stream/events/transcript.events.js';
 import {
   SessionAlreadyEndedError,
@@ -1331,3 +1332,95 @@ async function registerAndDrain(
   h.longPoll.emit('data', fakeSession({ uid: sessionUid }));
   return await promise;
 }
+
+describe('speaker label relay', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = makeHarness();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('publishes upstream speakers_update messages on the SpeakersUpdateChannel', async () => {
+    // Arrange
+    const promise = h.orchestrator.registerSource(SESSION_UID);
+    h.longPoll.emit('data', fakeSession());
+    await promise;
+    const received: unknown[] = [];
+    h.bus.subscribe(
+      SpeakersUpdateChannel,
+      (m) => {
+        received.push(m);
+      },
+      SESSION_UID,
+    );
+    const transcripts: unknown[] = [];
+    h.bus.subscribe(
+      TranscriptChannel,
+      (m) => {
+        transcripts.push(m);
+      },
+      SESSION_UID,
+    );
+
+    // Act
+    h.upstream.emit('message', {
+      type: 'speakers_update',
+      sequence_id: 's7',
+      speakers: ['spk_1', null],
+      settled: false,
+    });
+
+    // Assert - snake_case `sequence_id` becomes `sequenceId`; no transcript
+    // is fabricated for it.
+    expect(received).toEqual([
+      { sequenceId: 's7', speakers: ['spk_1', null], settled: false },
+    ]);
+    expect(transcripts).toEqual([]);
+  });
+
+  it('carries a transcript sequence_id through as sequenceId', async () => {
+    // Arrange
+    const promise = h.orchestrator.registerSource(SESSION_UID);
+    h.longPoll.emit('data', fakeSession());
+    await promise;
+    const received: { final: unknown; inProgress: unknown }[] = [];
+    h.bus.subscribe(
+      TranscriptChannel,
+      (m) => {
+        received.push(m);
+      },
+      SESSION_UID,
+    );
+
+    // Act
+    h.upstream.emit('message', {
+      type: 'transcript',
+      final: {
+        text: ['hi'],
+        starts: [0],
+        ends: [0.5],
+        speakers: [null],
+        sequence_id: 's7',
+      },
+      in_progress: null,
+    });
+
+    // Assert
+    expect(received).toEqual([
+      {
+        final: {
+          text: ['hi'],
+          starts: [0],
+          ends: [0.5],
+          speakers: [null],
+          sequenceId: 's7',
+        },
+        inProgress: null,
+      },
+    ]);
+  });
+});

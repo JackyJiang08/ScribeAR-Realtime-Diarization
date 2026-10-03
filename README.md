@@ -5,16 +5,22 @@
 > each word with a stable speaker (`spk_0`, `spk_1`, ...) and the viewer renders
 > colored `Speaker N:` labels. Everything else tracks upstream `staging`.
 >
-> **Status (2026-10):** working end to end, optional, off by default. Pre-sync
-> baseline on three AMI meetings, CPU (Apple M4): offline DER 0.26, streaming
-> DER 0.41 to 0.46, per-tick diarization 12.8 s mean / 18.6 s worst against a
-> 5 s job tick. Fitting the tick budget on CPU is the next phase.
+> **Status (2026-10-03, Phase 2a):** working end to end, optional, off by
+> default. Captions never wait for diarization: it runs as its own worker-pool
+> job on its own worker process, labels arrive afterwards through a
+> backward-compatible `speakers_update` message, and the viewer shows a
+> `Speaker ?` slot that fills in place. Measured numbers (caption latency on
+> versus off, label latency, per-session CPU and RAM, sessions sustained on
+> 4 CPUs) and the accuracy cost of the 10 s diarization window are in the
+> design document below.
 >
 > **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
 > `pyannote/speaker-diarization-community-1` terms, export
 > `HUGGINGFACE_ACCESS_TOKEN`, add the `pyannote-diarization` context to
-> `provider_config.json` and set `"diarization_detector": true` on the whisper
-> provider. Reproduce the baseline with `make benchmark_diarization_baseline`.
+> `provider_config.json` on a worker of its own (`num_workers: 2`) and set
+> `"diarization_detector": true` on the whisper provider. Judge changes with
+> `make benchmark_diarization_gate_docker` and
+> `make benchmark_diarization_acceptance`.
 >
 > Design, configuration, testing and benchmark details:
 > [`transcription_service/docs/speaker_diarization.md`](transcription_service/docs/speaker_diarization.md).

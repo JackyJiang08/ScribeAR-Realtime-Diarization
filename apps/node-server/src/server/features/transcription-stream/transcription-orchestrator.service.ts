@@ -1,3 +1,5 @@
+import type { Static } from 'typebox';
+
 import {
   AudioFrameError,
   decodeAudioFrame,
@@ -7,7 +9,10 @@ import type {
   ConnectionState,
   WebSocketClient,
 } from '@scribear/base-websocket-client';
-import { LatencyKind } from '@scribear/node-server-schema';
+import {
+  LatencyKind,
+  type TranscriptFragment,
+} from '@scribear/node-server-schema';
 import {
   type SESSION_CONFIG_STREAM_SCHEMA,
   type Session,
@@ -15,6 +20,7 @@ import {
 import {
   TRANSCRIPTION_STREAM_SCHEMA,
   TranscriptionStreamClientMessageType,
+  TranscriptionStreamServerMessageType as TranscriptionStreamUpstreamMessageType,
 } from '@scribear/transcription-service-schema';
 
 import type { AppDependencies } from '#src/server/dependency-injection/app-dependencies.js';
@@ -29,7 +35,36 @@ import {
   type SessionStatusMessage,
   TranscriptionServiceDisconnectReason,
 } from './events/session-status.events.js';
+import { SpeakersUpdateChannel } from './events/speakers-update.events.js';
 import { TranscriptChannel } from './events/transcript.events.js';
+
+/** The upstream `transcript` message's sequence shape, as the schema types it. */
+type UpstreamSequence = Extract<
+  Static<(typeof TRANSCRIPTION_STREAM_SCHEMA)['serverMessage']>,
+  { type: TranscriptionStreamUpstreamMessageType.TRANSCRIPT }
+>['final'];
+
+/**
+ * Maps an upstream transcript sequence onto the client-facing fragment: the
+ * same fields, with `sequence_id` renamed to the schema's `sequenceId`. Only
+ * fields the upstream actually sent are set, since
+ * `exactOptionalPropertyTypes` treats an explicit `undefined` on an optional
+ * property as a type error rather than as "absent".
+ */
+function toTranscriptFragment(
+  sequence: UpstreamSequence,
+): TranscriptFragment | null {
+  if (sequence === null) return null;
+  return {
+    text: sequence.text,
+    starts: sequence.starts,
+    ends: sequence.ends,
+    ...(sequence.speakers !== undefined && { speakers: sequence.speakers }),
+    ...(sequence.sequence_id !== undefined && {
+      sequenceId: sequence.sequence_id,
+    }),
+  };
+}
 
 /**
  * Upper bound on the per-session map of audio frames still awaiting a matching
@@ -797,9 +832,28 @@ export class TranscriptionOrchestratorService {
     };
 
     upstream.on('message', (msg) => {
+      if (msg.type === TranscriptionStreamUpstreamMessageType.SPEAKERS_UPDATE) {
+        // Late labels for a fragment already published below. Relayed on
+        // its own channel so a per-connection service forwards it as its
+        // own server message; nothing here waits for it and a transcript is
+        // never held back by it.
+        this._eventBus.publish(
+          SpeakersUpdateChannel,
+          {
+            sequenceId: msg.sequence_id,
+            speakers: msg.speakers,
+            settled: msg.settled,
+          },
+          sessionUid,
+        );
+        return;
+      }
       this._eventBus.publish(
         TranscriptChannel,
-        { final: msg.final, inProgress: msg.in_progress },
+        {
+          final: toTranscriptFragment(msg.final),
+          inProgress: toTranscriptFragment(msg.in_progress),
+        },
         sessionUid,
       );
       this._emitLatency(

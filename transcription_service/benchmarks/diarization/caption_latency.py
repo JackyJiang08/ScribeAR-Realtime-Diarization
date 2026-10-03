@@ -2,9 +2,10 @@
 End-to-end caption latency probe: runs the real transcription service with
 a given provider config, streams a recording at it in real time as SAFP
 frames (the same instrument shape as upstream's tools/asr-load and the
-production kiosk) and measures how long captions take to appear.
+production kiosk) and measures how long captions take to appear, and - when
+diarization is on - how long their speaker labels take to follow.
 
-Two latency methods are reported, both from the audit
+Two caption-latency methods are reported, both from the audit
 (docs/diarization_production_audit.md, section 0):
 
   chunk-id (PRIMARY) - delay from the send time of the newest chunk listed in
@@ -17,10 +18,22 @@ Two latency methods are reported, both from the audit
       pair, in `in_progress` or `final`; and separately the first `final`
       showing it. Harsher: every re-timestamped word counts as new.
 
+Speaker labels (Phase 2a) are measured per finalized word: the delay from
+the first message that showed the word's text to the first message that gave
+it a non-null label, whether that was an in-progress sequence, the final
+sequence or a later `speakers_update`. Corrections are counted two ways: a
+label that changed between first showing and finalization, and a
+`speakers_update` that disagreed with a label already sent (which must be
+zero by design).
+
 It also records the service's own counters over the run (dropped periods,
-audio dropped because the buffer was full, buffer overflows, execution-time
-histograms) via /metrics/status, and the peak and final RSS of the service
-process tree.
+audio dropped because the buffer was full, buffer overflows, the diarization
+counters, execution-time and lag histograms) via /metrics/status, and the
+CPU and RSS of every process in the service tree, so the diarization
+worker's cost can be read off separately from the caption worker's.
+
+`--sessions N` streams the same recording over N concurrent sessions, for
+the capacity question.
 
 Usage (from transcription_service/):
   uv run python benchmarks/diarization/caption_latency.py \
@@ -31,7 +44,8 @@ Usage (from transcription_service/):
 
 # pylint: disable=too-many-locals,too-many-statements,too-many-instance-attributes
 # pylint: disable=missing-function-docstring,broad-exception-caught
-# pylint: disable=too-many-branches,import-outside-toplevel
+# pylint: disable=too-many-branches,import-outside-toplevel,too-many-arguments
+# pylint: disable=too-many-positional-arguments
 
 import argparse
 import asyncio
@@ -62,7 +76,7 @@ from bench_common import (  # noqa: E402
     hygiene_check,
     load_audio,
     now_iso,
-    process_tree_rss_mb,
+    process_tree_stats,
     rel_path,
     summarize,
     write_json,
@@ -90,8 +104,27 @@ COUNTERS_OF_INTEREST = (
     "noWordsTotal",
     "temperatureFallbackTotal",
     "repeatedSegmentDetectedTotal",
+    "diarizationRunsTotal",
+    "diarizationSecondsTotal",
+    "diarizationFailedTotal",
+    "reconcilerSecondsTotal",
+    "diarizationLabelsMintedTotal",
+    "diarizationAudioSecondsTotal",
+    "diarizationUncoveredSecondsTotal",
+    "diarizationDroppedPeriodsTotal",
 )
-HISTOGRAMS_OF_INTEREST = ("asrExecutionMs", "asrSchedulingDelayMs", "asrRtf")
+HISTOGRAMS_OF_INTEREST = (
+    "asrExecutionMs",
+    "asrSchedulingDelayMs",
+    "asrRtf",
+    "diarizationExecutionMs",
+    "diarizationLagMs",
+    "diarizationRtf",
+)
+
+# A worker process holds at least a Whisper model; anything smaller in the
+# service tree is the multiprocess resource tracker or the FastAPI parent.
+WORKER_MIN_RSS_MB = 200.0
 
 
 def free_port() -> int:
@@ -100,12 +133,34 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
-def prepare_config(path: Path, diarization_on: bool, provider: str) -> dict:
+def _parse_override(spec: str) -> tuple[str, object]:
+    """`key=value` with a JSON value (falls back to the raw string)."""
+    key, _, raw = spec.partition("=")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        value = raw
+    return key, value
+
+
+def prepare_config(
+    path: Path,
+    diarization_on: bool,
+    provider: str,
+    provider_overrides: list[str] | None = None,
+    context_overrides: list[str] | None = None,
+) -> dict:
     """
     Loads the reference provider config and derives the diarization-off
-    variant: `diarization_detector` false and the pyannote context removed,
-    so the off run is exactly upstream's shipped configuration (no pyannote
-    loaded, no HuggingFace token needed).
+    variant: `diarization_detector` false, the pyannote context removed and
+    the worker count reduced to the workers that still own a context, so the
+    off run is exactly upstream's shipped configuration (no pyannote loaded,
+    no HuggingFace token needed, one worker).
+
+    `provider_overrides` (`key=json`) patch the provider config and
+    `context_overrides` (`context_uid.key=json`) patch a context config, so a
+    sweep can vary the diarization window or the pyannote thread count in
+    the live service without a config file per point.
     """
     config = json.loads(path.read_text(encoding="utf-8"))
     config.pop("_comment", None)
@@ -116,13 +171,30 @@ def prepare_config(path: Path, diarization_on: bool, provider: str) -> dict:
         provider_config["diarization_detector"] = True
     else:
         provider_config["diarization_detector"] = False
-        provider_config.pop("diarization_min_speakers", None)
-        provider_config.pop("diarization_max_speakers", None)
+        for key in list(provider_config):
+            if key.startswith("diarization_") and key != "diarization_detector":
+                provider_config.pop(key)
         config["contexts"] = [
             ctx
             for ctx in config["contexts"]
             if ctx["context_uid"] != "pyannote-diarization"
         ]
+        used_workers = sorted(
+            {w for ctx in config["contexts"] for w in ctx["worker_ids"]}
+        )
+        remap = {old: new for new, old in enumerate(used_workers)}
+        for ctx in config["contexts"]:
+            ctx["worker_ids"] = [remap[w] for w in ctx["worker_ids"]]
+        config["num_workers"] = max(1, len(used_workers))
+    for spec in provider_overrides or []:
+        key, value = _parse_override(spec)
+        provider_config[key] = value
+    for spec in context_overrides or []:
+        key, value = _parse_override(spec)
+        uid, _, field = key.partition(".")
+        for ctx in config["contexts"]:
+            if ctx["context_uid"] == uid:
+                ctx["context_config"][field] = value
     return config
 
 
@@ -133,7 +205,10 @@ def encode_wav_chunk(samples: np.ndarray) -> bytes:
 
 
 class ServiceProcess:
-    """The transcription service as a child process with an RSS sampler."""
+    """
+    The transcription service as a child process, with a sampler that
+    records RSS and CPU time for every process in its tree once a second.
+    """
 
     def __init__(self, config_path: Path, port: int, log_path: Path, env_extra):
         self.port = port
@@ -161,7 +236,10 @@ class ServiceProcess:
             start_new_session=True,
         )
         self.rss_samples: list[float] = []
-        self.rss_detail_last: dict = {}
+        # pid -> {"rss_max_mb", "cpu_first", "cpu_last", "t_first", "t_last",
+        #         "rss_first_mb"}
+        self.per_pid: dict[int, dict] = {}
+        self._mark: dict[str, dict[int, tuple[float, float]]] = {}
         self._stop = threading.Event()
         self._sampler = threading.Thread(target=self._sample, daemon=True)
         self._sampler.start()
@@ -169,12 +247,58 @@ class ServiceProcess:
     def _sample(self):
         while not self._stop.is_set():
             try:
-                reading = process_tree_rss_mb(self.process.pid)
-                self.rss_samples.append(reading["total_mb"])
-                self.rss_detail_last = reading
+                now = time.perf_counter()
+                stats = process_tree_stats(self.process.pid)
+                self.rss_samples.append(stats["total_mb"])
+                for pid, reading in stats["per_pid"].items():
+                    entry = self.per_pid.setdefault(
+                        pid,
+                        {
+                            "rss_first_mb": reading["rss_mb"],
+                            "rss_max_mb": 0.0,
+                            "cpu_first": reading["cpu_sec"],
+                            "t_first": now,
+                            "cpu_last": reading["cpu_sec"],
+                            "t_last": now,
+                        },
+                    )
+                    entry["rss_max_mb"] = max(
+                        entry["rss_max_mb"], reading["rss_mb"]
+                    )
+                    entry["cpu_last"] = reading["cpu_sec"]
+                    entry["t_last"] = now
             except Exception:
                 pass
             self._stop.wait(1.0)
+
+    def mark(self, name: str) -> None:
+        """Snapshots every process's CPU seconds under a name."""
+        now = time.perf_counter()
+        try:
+            stats = process_tree_stats(self.process.pid)
+        except Exception:
+            stats = {"per_pid": {}}
+        self._mark[name] = {
+            pid: (reading["cpu_sec"], now)
+            for pid, reading in stats["per_pid"].items()
+        }
+
+    def cpu_between(self, start: str, end: str) -> dict[int, dict]:
+        """CPU seconds and cores per process between two marks."""
+        out: dict[int, dict] = {}
+        first = self._mark.get(start, {})
+        last = self._mark.get(end, {})
+        for pid, (cpu_end, t_end) in last.items():
+            if pid not in first:
+                continue
+            cpu_start, t_start = first[pid]
+            wall = max(1e-6, t_end - t_start)
+            out[pid] = {
+                "cpu_sec": round(cpu_end - cpu_start, 2),
+                "wall_sec": round(wall, 1),
+                "cores": round((cpu_end - cpu_start) / wall, 3),
+            }
+        return out
 
     @property
     def base_url(self) -> str:
@@ -285,7 +409,10 @@ def counter_deltas(before: dict, after: dict) -> dict:
 
 
 class LatencyCollector:
-    """Correlates transcript messages with the send times of audio chunks."""
+    """
+    Correlates transcript and speakers_update messages with the send times
+    of audio chunks, for one session.
+    """
 
     def __init__(self, chunk_sec: float):
         self.chunk_sec = chunk_sec
@@ -295,11 +422,18 @@ class LatencyCollector:
         self.word_first_shown: dict[tuple, float] = {}
         self.word_finalized: dict[tuple, float] = {}
         self.word_first_speaker: dict[tuple, str | None] = {}
+        self.word_final_speaker: dict[tuple, str | None] = {}
+        # Wall time the word first carried a non-null label, by any route.
+        self.word_label_known: dict[tuple, float] = {}
+        self.sequence_words: dict[str, list[tuple]] = {}
+        self.sequence_settled: set[str] = set()
         self.label_changes_before_final = 0
+        self.label_changes_after_sent = 0
+        self.speakers_updates = 0
+        self.speakers_updates_unknown_sequence = 0
         self.messages = 0
         self.messages_with_text = 0
         self.final_words = 0
-        self.final_words_labelled = 0
         self.labels_seen: set[str] = set()
         self.first_message_at: float | None = None
         self.last_sent_index = -1
@@ -315,13 +449,24 @@ class LatencyCollector:
         self.send_time[index] = at
         self.last_sent_index = index
 
+    def _note_label(self, word_key: tuple, speaker, arrival: float) -> None:
+        if speaker is None:
+            return
+        self.labels_seen.add(speaker)
+        if word_key not in self.word_label_known:
+            self.word_label_known[word_key] = arrival
+
     def on_message(self, payload: dict, arrival: float):
-        if payload.get("type") != "transcript":
+        kind = payload.get("type")
+        if kind == "speakers_update":
+            self._on_speakers_update(payload, arrival)
+            return
+        if kind != "transcript":
             return
         self.messages += 1
         if self.first_message_at is None:
             self.first_message_at = arrival
-        for kind, key in (
+        for sequence_kind, key in (
             ("in_progress", "in_progress_chunk_ids"),
             ("final", "final_chunk_ids"),
         ):
@@ -333,22 +478,25 @@ class LatencyCollector:
                     latency = arrival - self.send_time[newest]
                     (
                         self.chunk_id_in_progress
-                        if kind == "in_progress"
+                        if sequence_kind == "in_progress"
                         else self.chunk_id_final
                     ).append(latency)
         had_text = False
-        for kind in ("in_progress", "final"):
-            sequence = payload.get(kind)
+        for sequence_kind in ("in_progress", "final"):
+            sequence = payload.get(sequence_kind)
             if not sequence or not sequence.get("text"):
                 continue
             had_text = True
             texts = sequence["text"]
             ends = sequence.get("ends") or [None] * len(texts)
             speakers = sequence.get("speakers") or [None] * len(texts)
+            word_keys: list[tuple] = []
             for text, end, speaker in zip(texts, ends, speakers):
                 if end is None:
+                    word_keys.append((None, text))
                     continue
                 word_key = (round(float(end), 2), text)
+                word_keys.append(word_key)
                 chunk_index = min(
                     int(float(end) // self.chunk_sec), self.last_sent_index
                 )
@@ -358,13 +506,12 @@ class LatencyCollector:
                 if word_key not in self.word_first_shown:
                     self.word_first_shown[word_key] = latency
                     self.word_first_speaker[word_key] = speaker
-                if kind == "final":
+                self._note_label(word_key, speaker, arrival)
+                if sequence_kind == "final":
                     if word_key not in self.word_finalized:
                         self.word_finalized[word_key] = latency
+                        self.word_final_speaker[word_key] = speaker
                         self.final_words += 1
-                        if speaker is not None:
-                            self.final_words_labelled += 1
-                            self.labels_seen.add(speaker)
                         first = self.word_first_speaker.get(word_key)
                         if (
                             first is not None
@@ -372,10 +519,53 @@ class LatencyCollector:
                             and first != speaker
                         ):
                             self.label_changes_before_final += 1
+            if sequence_kind == "final" and sequence.get("sequence_id"):
+                self.sequence_words[sequence["sequence_id"]] = word_keys
         if had_text:
             self.messages_with_text += 1
 
+    def _on_speakers_update(self, payload: dict, arrival: float) -> None:
+        self.speakers_updates += 1
+        sequence_id = payload.get("sequence_id")
+        keys = self.sequence_words.get(sequence_id)
+        if keys is None:
+            self.speakers_updates_unknown_sequence += 1
+            return
+        for word_key, speaker in zip(keys, payload.get("speakers") or []):
+            if speaker is None:
+                continue
+            previous = self.word_final_speaker.get(word_key)
+            if previous is not None and previous != speaker:
+                self.label_changes_after_sent += 1
+                continue
+            if previous is None:
+                self.word_final_speaker[word_key] = speaker
+            self._note_label(word_key, speaker, arrival)
+        if payload.get("settled"):
+            self.sequence_settled.add(sequence_id)
+
     def report(self) -> dict:
+        label_after_text: list[float] = []
+        label_after_final: list[float] = []
+        labelled = 0
+        for word_key in self.word_finalized:
+            known = self.word_label_known.get(word_key)
+            if known is None:
+                continue
+            labelled += 1
+            # Both are wall-clock delays from the message that first showed
+            # the text (or finalized it) to the message that labelled it; a
+            # label that arrived with or before the text is 0.
+            shown_at = self.send_time.get(
+                min(int(word_key[0] // self.chunk_sec), self.last_sent_index),
+                None,
+            )
+            if shown_at is None:
+                continue
+            shown_wall = shown_at + self.word_first_shown[word_key]
+            final_wall = shown_at + self.word_finalized[word_key]
+            label_after_text.append(max(0.0, known - shown_wall))
+            label_after_final.append(max(0.0, known - final_wall))
         return {
             "chunk_id_method": {
                 "in_progress": summarize(self.chunk_id_in_progress, 3),
@@ -387,17 +577,33 @@ class LatencyCollector:
                 ),
                 "finalized": summarize(list(self.word_finalized.values()), 3),
             },
+            "label_latency": {
+                "after_text_shown": summarize(label_after_text, 3),
+                "after_finalized": summarize(label_after_final, 3),
+            },
             "transcript_messages": self.messages,
             "transcript_messages_with_text": self.messages_with_text,
+            "speakers_update_messages": self.speakers_updates,
+            "speakers_updates_for_unknown_sequence": (
+                self.speakers_updates_unknown_sequence
+            ),
+            "final_sequences_with_id": len(self.sequence_words),
+            "final_sequences_settled": len(self.sequence_settled),
             "final_words": self.final_words,
-            "final_words_labelled": self.final_words_labelled,
+            "final_words_labelled": labelled,
             "final_words_labelled_fraction": (
-                round(self.final_words_labelled / self.final_words, 3)
+                round(labelled / self.final_words, 3)
                 if self.final_words
                 else None
             ),
             "speaker_labels_seen": sorted(self.labels_seen),
             "label_changes_before_final": self.label_changes_before_final,
+            "label_changes_before_final_fraction": (
+                round(self.label_changes_before_final / self.final_words, 4)
+                if self.final_words
+                else None
+            ),
+            "label_changes_after_sent": self.label_changes_after_sent,
         }
 
 
@@ -408,6 +614,8 @@ async def stream(
     seconds: float,
     linger_sec: float,
     collector: LatencyCollector,
+    session_uid: str = "diarization-benchmark",
+    quiet: bool = False,
 ) -> dict:
     from websockets.asyncio.client import connect
 
@@ -424,7 +632,7 @@ async def stream(
                 {
                     "type": "config",
                     "config": {},
-                    "session_uid": "diarization-benchmark",
+                    "session_uid": session_uid,
                     "room_uid": "diarization-benchmark",
                 }
             )
@@ -467,7 +675,7 @@ async def stream(
             sent_at = time.perf_counter()
             await websocket.send(frame)
             collector.on_sent(index, sent_at)
-            if index % 20 == 0:
+            if index % 20 == 0 and not quiet:
                 print(
                     f"  sent {(index + 1) * chunk_sec:6.1f}s  messages "
                     f"{collector.messages}",
@@ -488,11 +696,83 @@ async def stream(
     return schedule
 
 
+async def stream_sessions(
+    url: str,
+    samples: np.ndarray,
+    chunk_sec: float,
+    seconds: float,
+    linger_sec: float,
+    collectors: list[LatencyCollector],
+) -> list[dict]:
+    """Streams the recording over every collector's session at once."""
+    return list(
+        await asyncio.gather(
+            *(
+                stream(
+                    url,
+                    samples,
+                    chunk_sec,
+                    seconds,
+                    linger_sec,
+                    collector,
+                    session_uid=f"diarization-benchmark-{index}",
+                    quiet=index > 0,
+                )
+                for index, collector in enumerate(collectors)
+            )
+        )
+    )
+
+
+def _pool(collectors: list[LatencyCollector], path: tuple[str, ...]) -> dict:
+    """Pools one summarized latency list across sessions."""
+    values: list[float] = []
+    for collector in collectors:
+        attr = collector
+        for key in path:
+            attr = getattr(attr, key)
+        values.extend(attr)
+    return summarize(values, 3)
+
+
+def worker_processes(service: ServiceProcess) -> list[dict]:
+    """
+    The worker processes of the service tree in spawn order (pid order),
+    with their CPU and RSS over the streaming window. The FastAPI parent and
+    the multiprocess resource tracker are left out by RSS. With the
+    reference config the first worker runs captions and the second runs
+    diarization.
+    """
+    cpu = service.cpu_between("stream_start", "stream_end")
+    workers = []
+    parent = service.process.pid
+    for pid in sorted(service.per_pid):
+        entry = service.per_pid[pid]
+        if pid == parent or entry["rss_max_mb"] < WORKER_MIN_RSS_MB:
+            continue
+        workers.append(
+            {
+                "pid": pid,
+                "rss_max_mb": round(entry["rss_max_mb"], 1),
+                **cpu.get(
+                    pid, {"cpu_sec": None, "wall_sec": None, "cores": None}
+                ),
+            }
+        )
+    for index, worker in enumerate(workers):
+        worker["worker"] = index
+    return workers
+
+
 def run_probe(args) -> dict:
     token_var = ensure_hf_token_env()
     diarization_on = args.diarization == "on"
     config = prepare_config(
-        Path(args.provider_config), diarization_on, args.provider
+        Path(args.provider_config),
+        diarization_on,
+        args.provider,
+        args.provider_set,
+        args.context_set,
     )
     hygiene = None if args.no_hygiene else hygiene_check()
 
@@ -511,7 +791,8 @@ def run_probe(args) -> dict:
         env_extra["HF_TOKEN"] = os.environ["HF_TOKEN"]
 
     print(
-        f"starting service (diarization {args.diarization}) on port {port}",
+        f"starting service (diarization {args.diarization}, "
+        f"{args.sessions} session(s)) on port {port}",
         file=sys.stderr,
         flush=True,
     )
@@ -521,31 +802,37 @@ def run_probe(args) -> dict:
         print(
             f"service ready after {ready_sec:.1f}s", file=sys.stderr, flush=True
         )
-        rss_ready = process_tree_rss_mb(service.process.pid)
+        rss_ready = process_tree_stats(service.process.pid)
         metrics_before = service.metrics()
-        collector = LatencyCollector(chunk_sec)
+        collectors = [LatencyCollector(chunk_sec) for _ in range(args.sessions)]
         url = f"ws://127.0.0.1:{port}/transcription_stream/{args.provider}"
+        service.mark("stream_start")
         wall_start = time.perf_counter()
-        schedule = asyncio.run(
-            stream(
+        schedules = asyncio.run(
+            stream_sessions(
                 url,
                 samples,
                 chunk_sec,
                 args.seconds,
                 args.linger_sec,
-                collector,
+                collectors,
             )
         )
         wall = time.perf_counter() - wall_start
+        service.mark("stream_end")
         metrics_after = service.metrics()
-        rss_end = process_tree_rss_mb(service.process.pid)
+        rss_end = process_tree_stats(service.process.pid)
         exited = service.process.poll()
+        workers = worker_processes(service)
     finally:
         service.stop()
 
     before = summarize_counters(metrics_before)
     after = summarize_counters(metrics_after)
-    latency = collector.report()
+    reports = [collector.report() for collector in collectors]
+    latency = reports[0] if args.sessions == 1 else _pooled_report(collectors)
+    deltas = counter_deltas(before, after)
+    diarization_cost = _diarization_cost(deltas, wall, workers, diarization_on)
     report = {
         "label": args.label,
         "generated_at": now_iso(),
@@ -557,10 +844,21 @@ def run_probe(args) -> dict:
             "provider_config": rel_path(args.provider_config),
             "provider": args.provider,
             "diarization": args.diarization,
+            "sessions": args.sessions,
+            "provider_overrides": args.provider_set,
+            "context_overrides": args.context_set,
             "effective_provider_config": config["providers"][args.provider][
                 "provider_config"
             ],
-            "contexts": [ctx["context_uid"] for ctx in config["contexts"]],
+            "num_workers": config["num_workers"],
+            "contexts": [
+                {
+                    "uid": ctx["context_uid"],
+                    "worker_ids": ctx["worker_ids"],
+                    "config": ctx["context_config"],
+                }
+                for ctx in config["contexts"]
+            ],
             "audio": rel_path(args.audio),
             "chunk_ms": args.chunk_ms,
             "seconds": args.seconds,
@@ -577,13 +875,132 @@ def run_probe(args) -> dict:
                 rss_end["total_mb"] - rss_ready["total_mb"], 1
             ),
             "rss_samples": len(service.rss_samples),
+            "workers": workers,
         },
-        "stream": schedule | {"wall_sec": round(wall, 1)},
+        "diarization_cost": diarization_cost,
+        "stream": {
+            "sessions": args.sessions,
+            "wall_sec": round(wall, 1),
+            "per_session": schedules,
+        },
         "latency": latency,
-        "service_counters_delta": counter_deltas(before, after),
+        "per_session_latency": reports if args.sessions > 1 else None,
+        "service_counters_delta": deltas,
         "service_histograms_end": summarize_histograms(metrics_after),
     }
     return report
+
+
+def _pooled_report(collectors: list[LatencyCollector]) -> dict:
+    """One latency report pooling every session's samples."""
+    reports = [c.report() for c in collectors]
+    pooled = json.loads(json.dumps(reports[0]))
+    pooled["chunk_id_method"] = {
+        "in_progress": _pool(collectors, ("chunk_id_in_progress",)),
+        "final": _pool(collectors, ("chunk_id_final",)),
+    }
+    pooled["word_method"] = {
+        "first_shown": summarize(
+            [v for c in collectors for v in c.word_first_shown.values()], 3
+        ),
+        "finalized": summarize(
+            [v for c in collectors for v in c.word_finalized.values()], 3
+        ),
+    }
+    for key in (
+        "transcript_messages",
+        "transcript_messages_with_text",
+        "speakers_update_messages",
+        "speakers_updates_for_unknown_sequence",
+        "final_sequences_with_id",
+        "final_sequences_settled",
+        "final_words",
+        "final_words_labelled",
+        "label_changes_before_final",
+        "label_changes_after_sent",
+    ):
+        pooled[key] = sum(r[key] for r in reports)
+    pooled["final_words_labelled_fraction"] = (
+        round(pooled["final_words_labelled"] / pooled["final_words"], 3)
+        if pooled["final_words"]
+        else None
+    )
+    pooled["label_changes_before_final_fraction"] = (
+        round(pooled["label_changes_before_final"] / pooled["final_words"], 4)
+        if pooled["final_words"]
+        else None
+    )
+    # Pool the per-word label delays by re-deriving them from each report's
+    # summary is impossible; recompute from the collectors instead.
+    after_text: list[float] = []
+    after_final: list[float] = []
+    for collector in collectors:
+        single = collector.report()["label_latency"]
+        # summarize() loses the samples, so rebuild them the same way
+        del single
+    for collector in collectors:
+        for word_key, known in collector.word_label_known.items():
+            if word_key not in collector.word_finalized:
+                continue
+            shown_at = collector.send_time.get(
+                min(
+                    int(word_key[0] // collector.chunk_sec),
+                    collector.last_sent_index,
+                )
+            )
+            if shown_at is None:
+                continue
+            after_text.append(
+                max(
+                    0.0,
+                    known - (shown_at + collector.word_first_shown[word_key]),
+                )
+            )
+            after_final.append(
+                max(
+                    0.0, known - (shown_at + collector.word_finalized[word_key])
+                )
+            )
+    pooled["label_latency"] = {
+        "after_text_shown": summarize(after_text, 3),
+        "after_finalized": summarize(after_final, 3),
+    }
+    pooled["speaker_labels_seen"] = sorted(
+        set().union(*(c.labels_seen for c in collectors))
+    )
+    return pooled
+
+
+def _diarization_cost(
+    deltas: dict, wall: float, workers: list[dict], diarization_on: bool
+) -> dict | None:
+    """
+    The per-run cost of diarization: compute seconds per second of audio
+    received (RTF, from the service's own counters), the diarization
+    worker's CPU cores and RSS, and the extra RSS the whole service tree
+    carries. The diarization worker is the last worker in spawn order under
+    the reference config (pyannote on worker 1).
+    """
+    if not diarization_on:
+        return None
+    audio = deltas.get("diarizationAudioSecondsTotal") or 0.0
+    seconds = deltas.get("diarizationSecondsTotal") or 0.0
+    runs = deltas.get("diarizationRunsTotal") or 0.0
+    worker = workers[-1] if len(workers) >= 2 else None
+    return {
+        "rtf_from_counters": round(seconds / audio, 3) if audio else None,
+        "pass_cost_mean_sec": round(seconds / runs, 3) if runs else None,
+        "runs": runs,
+        "audio_seconds": audio,
+        "uncovered_seconds": deltas.get("diarizationUncoveredSecondsTotal"),
+        "dropped_periods": deltas.get("diarizationDroppedPeriodsTotal"),
+        "failed_passes": deltas.get("diarizationFailedTotal"),
+        "labels_minted": deltas.get("diarizationLabelsMintedTotal"),
+        "worker_cores_mean": worker["cores"] if worker else None,
+        "worker_cpu_sec": worker["cpu_sec"] if worker else None,
+        "worker_rss_max_mb": worker["rss_max_mb"] if worker else None,
+        "wall_sec": round(wall, 1),
+    }
 
 
 def main():
@@ -595,12 +1012,29 @@ def main():
     parser.add_argument("--seconds", type=float, default=180.0)
     parser.add_argument("--chunk-ms", type=int, default=500)
     parser.add_argument("--linger-sec", type=float, default=20.0)
+    parser.add_argument("--sessions", type=int, default=1)
+    parser.add_argument(
+        "--provider-set",
+        action="append",
+        default=[],
+        metavar="KEY=JSON",
+        help="override a provider_config field, e.g. diarization_window_sec=15",
+    )
+    parser.add_argument(
+        "--context-set",
+        action="append",
+        default=[],
+        metavar="UID.KEY=JSON",
+        help="override a context_config field, e.g. pyannote-diarization.num_threads=2",
+    )
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--service-log", default=None)
     parser.add_argument("--label", default="")
     parser.add_argument("--no-hygiene", action="store_true")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
+    if args.sessions < 1:
+        raise SystemExit("--sessions must be at least 1")
 
     report = run_probe(args)
     write_json(Path(args.out), report)
@@ -612,11 +1046,17 @@ def main():
                 "chunk_id_in_progress": lat["chunk_id_method"]["in_progress"],
                 "chunk_id_final": lat["chunk_id_method"]["final"],
                 "word_first_shown": lat["word_method"]["first_shown"],
-                "word_finalized": lat["word_method"]["finalized"],
+                "label_after_text": lat["label_latency"]["after_text_shown"],
                 "messages": lat["transcript_messages"],
+                "speakers_updates": lat["speakers_update_messages"],
                 "final_words": lat["final_words"],
+                "labelled_fraction": lat["final_words_labelled_fraction"],
                 "labels": lat["speaker_labels_seen"],
+                "label_changes_before_final": lat["label_changes_before_final"],
+                "label_changes_after_sent": lat["label_changes_after_sent"],
                 "counters": report["service_counters_delta"],
+                "diarization_cost": report["diarization_cost"],
+                "workers": report["service"]["workers"],
                 "rss_peak_mb": report["service"]["rss_mb_peak"],
             },
             indent=2,

@@ -6,4 +6,5 @@ export * from './components/jump-to-bottom-button.js';
 export * from './hooks/use-auto-scroll.js';
 export * from './hooks/auto-scroll-debug.js';
 export * from './components/speaker-runs-text.js';
+export * from './components/speaker-label-slot.js';
 export * from './utils/speaker-appearance.js';

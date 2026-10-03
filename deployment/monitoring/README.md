@@ -3,7 +3,7 @@
 An opt-in, zero-click fleet-health dashboard for anyone evaluating ScribeAR on
 their own staging box. `docker compose --profile monitoring up -d` and a
 working Grafana dashboard — sessions, RTF, dropped periods, worker health,
-canary status — is already there, sourced from metrics the stack already
+speaker-diarization pass cost / label lag / skipped audio, canary status — is already there, sourced from metrics the stack already
 produces. See `archived-plans/2026-07-28-01-PLAN-Grafana-Monitoring.md`
 (outside this repo, in `~/scribear2/`) for the full design rationale; this
 file is the operator-facing "how do I use it" doc.

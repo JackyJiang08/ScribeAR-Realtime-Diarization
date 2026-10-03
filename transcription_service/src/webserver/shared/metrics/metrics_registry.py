@@ -31,6 +31,15 @@ NS_PER_SEC = 1_000_000_000
 # visible if it does turn up.
 UNLABELED_PROVIDER = "unknown"
 
+# Observer label suffix of the speaker-diarization job that the
+# whisper-streaming provider registers beside each caption job (see
+# DiarizationJob). Matched here so its executions are folded into their own
+# `diarization_*` series, keyed by the provider the captions belong to, and
+# never into an `asr_*` series: the caption numbers must describe the caption
+# job alone. Restated rather than imported from the provider package, which
+# the webserver layer does not depend on.
+DIARIZATION_JOB_LABEL_SUFFIX = ":diarization"
+
 
 class MetricsRegistry:
     """
@@ -214,11 +223,15 @@ class MetricsRegistry:
             "previously finalized segment",
         )
 
-        # Speaker diarization, reported by the whisper-streaming job when its
-        # pyannote context is enabled. Seconds / runs is the per-pass latency.
+        # Speaker diarization, reported by the diarization job the
+        # whisper-streaming provider runs beside each caption job (on its own
+        # worker). Keyed by the caption provider's key. Seconds / runs is the
+        # per-pass cost; lag is how old the newest labelled audio was when
+        # its labels were ready; uncovered seconds is audio the job skipped
+        # to catch up, whose words stay unlabelled.
         self.diarization_runs_total = Counter(
             "diarization_runs_total",
-            "Diarization passes run over the transcribe window, by provider",
+            "Diarization passes run over the newest window, by provider",
         )
         self.diarization_seconds_total = Counter(
             "diarization_seconds_total",
@@ -236,6 +249,39 @@ class MetricsRegistry:
         self.diarization_labels_minted_total = Counter(
             "diarization_labels_minted_total",
             "New session-wide speaker labels minted by the reconciler",
+        )
+        self.diarization_audio_seconds_total = Counter(
+            "diarization_audio_seconds_total",
+            "Seconds of audio received by diarization jobs, by provider",
+        )
+        self.diarization_uncovered_seconds_total = Counter(
+            "diarization_uncovered_seconds_total",
+            "Seconds of audio no diarization pass covered because the job "
+            "fell behind and skipped ahead; those words stay unlabelled",
+        )
+        self.diarization_dropped_periods_total = Counter(
+            "diarization_dropped_periods_total",
+            "Diarization job periods skipped because the previous pass "
+            "overran, by provider",
+        )
+        self.diarization_execution_ms = Histogram(
+            "diarization_execution_ms",
+            "Time a diarization pass spent executing",
+            max_histogram_samples,
+            histogram_retention_sec,
+        )
+        self.diarization_lag_ms = Histogram(
+            "diarization_lag_ms",
+            "Age of the newest audio a diarization pass labelled, at the "
+            "moment its labels were ready",
+            max_histogram_samples,
+            histogram_retention_sec,
+        )
+        self.diarization_rtf = Histogram(
+            "diarization_rtf",
+            "Diarization execution seconds per second of audio received",
+            max_histogram_samples,
+            histogram_retention_sec,
         )
 
         # The one counter here that describes the *scheduler* rather than the
@@ -283,6 +329,17 @@ class MetricsRegistry:
             TranscriptionJobCounter.REPEATED_SEGMENT_DETECTED: (
                 self.repeated_segment_detected_total
             ),
+            # Keyed by the pool's own constant, not a TranscriptionJobCounter:
+            # the worker pool knows nothing about transcription and the
+            # scheduler, not a job, is what reports this.
+            DROPPED_PERIODS_COUNTER: self.asr_dropped_periods_total,
+        }
+
+        # The diarization job's counters, folded by _record_diarization_
+        # execution only. Kept apart from the caption map so a caption job
+        # can never report a diarization counter and a diarization job can
+        # never move a caption one.
+        self._diarization_counters = {
             TranscriptionJobCounter.DIARIZATION_RUNS: (
                 self.diarization_runs_total
             ),
@@ -298,10 +355,13 @@ class MetricsRegistry:
             TranscriptionJobCounter.DIARIZATION_LABELS_MINTED: (
                 self.diarization_labels_minted_total
             ),
-            # Keyed by the pool's own constant, not a TranscriptionJobCounter:
-            # the worker pool knows nothing about transcription and the
-            # scheduler, not a job, is what reports this.
-            DROPPED_PERIODS_COUNTER: self.asr_dropped_periods_total,
+            TranscriptionJobCounter.DIARIZATION_AUDIO_SECONDS: (
+                self.diarization_audio_seconds_total
+            ),
+            TranscriptionJobCounter.DIARIZATION_UNCOVERED_SECONDS: (
+                self.diarization_uncovered_seconds_total
+            ),
+            DROPPED_PERIODS_COUNTER: self.diarization_dropped_periods_total,
         }
 
     def record_decode_drop(self, provider_key: str) -> None:
@@ -383,6 +443,47 @@ class MetricsRegistry:
             if counter is not None:
                 counter.inc(labels, delta)
 
+    def _record_diarization_execution(
+        self, observation: JobExecutionObservation, provider_key: str
+    ) -> None:
+        """
+        Folds one completed diarization job execution into the diarization
+        series, keyed by the caption provider it labels for
+
+        Args:
+            observation - Completed execution of a diarization job
+            provider_key - The caption provider's key (label minus suffix)
+
+        Nothing here touches an `asr_*` series: a diarization pass that
+        overruns is diarization lag and a dropped diarization period, never
+        a dropped caption period.
+        """
+        labels = {"provider_key": provider_key}
+        stats = observation.stats
+        counters = observation.counters
+        self.diarization_execution_ms.observe(
+            stats.execution_time_ns / NS_PER_MS, labels
+        )
+        lag_sec = counters.get(TranscriptionJobCounter.DIARIZATION_LAG_SECONDS)
+        if lag_sec is not None:
+            self.diarization_lag_ms.observe(lag_sec * 1000.0, labels)
+        audio_seconds = counters.get(
+            TranscriptionJobCounter.DIARIZATION_AUDIO_SECONDS, 0
+        )
+        if audio_seconds > 0:
+            self.diarization_rtf.observe(
+                (stats.execution_time_ns / NS_PER_SEC) / audio_seconds, labels
+            )
+        for name, delta in counters.items():
+            counter = self._diarization_counters.get(name)
+            if counter is not None:
+                counter.inc(labels, delta)
+        if observation.exception is not None:
+            # A raised pass is a failed pass; the pool also deregisters the
+            # job, which the session logs. Counted here so it is visible on
+            # the same series as an in-pipeline failure.
+            self.diarization_failed_total.inc(labels)
+
     def record_job_execution(
         self, observation: JobExecutionObservation
     ) -> None:
@@ -396,6 +497,13 @@ class MetricsRegistry:
             observation - Completed job execution reported by the worker pool
         """
         provider_key = observation.label or UNLABELED_PROVIDER
+        if provider_key.endswith(DIARIZATION_JOB_LABEL_SUFFIX):
+            self._record_diarization_execution(
+                observation,
+                provider_key[: -len(DIARIZATION_JOB_LABEL_SUFFIX)]
+                or UNLABELED_PROVIDER,
+            )
+            return
         labels = {"provider_key": provider_key}
 
         # Timings are recorded for failed executions too: a job that raises

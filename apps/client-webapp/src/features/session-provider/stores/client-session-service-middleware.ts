@@ -2,6 +2,7 @@ import { type Middleware } from '@reduxjs/toolkit';
 
 import { rememberRehydrated } from '@scribear/redux-remember-store';
 import {
+  applySpeakersUpdate,
   clearTranscription,
   handleTranscript,
   recordLatency,
@@ -77,6 +78,9 @@ export const createClientSessionServiceMiddleware =
     });
     service.on('transcript', (event) => {
       store.dispatch(handleTranscript(event));
+    });
+    service.on('speakersUpdate', (update) => {
+      store.dispatch(applySpeakersUpdate(update));
     });
     service.on('latency', (sample) => {
       store.dispatch(recordLatency(sample));

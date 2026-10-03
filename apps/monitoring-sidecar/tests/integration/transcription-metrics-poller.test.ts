@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { MetricsRegistry } from '#src/server/shared/metrics/metrics-registry.service.js';
 import { TranscriptionMetricsPollerService } from '#src/server/shared/transcription-metrics/transcription-metrics-poller.service.js';
@@ -1072,5 +1072,136 @@ describe('transcription-service metrics poller (B1.2 PR 5)', () => {
       expect(poller.lastResult).toBeNull();
       poller.stop();
     });
+  });
+});
+
+describe('transcription-service metrics poller: speaker diarization', () => {
+  let service: FakeTranscriptionMetrics;
+
+  beforeEach(async () => {
+    service = await startFakeTranscriptionMetrics(API_KEY);
+  });
+
+  afterEach(async () => {
+    await service.close();
+  });
+
+  async function createPoller() {
+    const metrics = new MetricsRegistry();
+    const { logger } = createLogger();
+    const poller = new TranscriptionMetricsPollerService(
+      {
+        enabled: true,
+        intervalMs: 60_000,
+        timeoutMs: 2_000,
+        service: SERVICE,
+        statusUrl: service.statusUrl,
+        apiKey: API_KEY,
+        jobPeriodMsByProvider: JOB_PERIODS,
+        jobPeriodSpecErrors: [],
+      },
+      metrics,
+      logger,
+    );
+    service.setBody(metricsBody());
+    await poller.pollOnce();
+    return { metrics, poller };
+  }
+
+  const providerLabels = { service: SERVICE, providerKey: 'whisper' };
+
+  it('reports no diarization support for a service that sends none', async () => {
+    // Arrange - diarization off, or a service too old to have it: the
+    // default body carries no diarization fields at all.
+    const { metrics, poller } = await createPoller();
+
+    // Act
+    const result = await poller.pollOnce();
+
+    // Assert
+    expect(result.ok).toBe(true);
+    expect(metrics.diarizationSupported.get({ service: SERVICE })).toBe(0);
+    expect(metrics.diarizationRunsTotal.entries()).toHaveLength(0);
+  });
+
+  it('folds the diarization counters and quantiles into their own series', async () => {
+    // Arrange
+    const { metrics, poller } = await createPoller();
+    const body = (runs: number, uncovered: number) =>
+      metricsBody({
+        counters: {
+          diarizationRunsTotal: [{ labels: WHISPER, value: runs }],
+          diarizationSecondsTotal: [{ labels: WHISPER, value: runs * 1.2 }],
+          diarizationFailedTotal: [],
+          reconcilerSecondsTotal: [{ labels: WHISPER, value: 0.01 }],
+          diarizationLabelsMintedTotal: [{ labels: WHISPER, value: 3 }],
+          diarizationAudioSecondsTotal: [{ labels: WHISPER, value: runs * 5 }],
+          diarizationUncoveredSecondsTotal: [
+            { labels: WHISPER, value: uncovered },
+          ],
+          diarizationDroppedPeriodsTotal: [{ labels: WHISPER, value: 1 }],
+        },
+        histograms: {
+          diarizationExecutionMs: [histogramSeries(1200)],
+          diarizationLagMs: [histogramSeries(4300)],
+          diarizationRtf: [histogramSeries(0.24)],
+        },
+      });
+    service.setBody(body(10, 0));
+    await poller.pollOnce();
+
+    // Act
+    service.setBody(body(22, 2.5));
+    await poller.pollOnce();
+
+    // Assert - differenced like every other counter; the asr_* caption
+    // series are untouched by any of it.
+    expect(metrics.diarizationSupported.get({ service: SERVICE })).toBe(1);
+    expect(metrics.diarizationRunsTotal.get(providerLabels)).toBe(22);
+    expect(metrics.diarizationAudioSecondsTotal.get(providerLabels)).toBe(110);
+    expect(metrics.diarizationUncoveredSecondsTotal.get(providerLabels)).toBe(
+      2.5,
+    );
+    expect(metrics.diarizationDroppedPeriodsTotal.get(providerLabels)).toBe(1);
+    expect(
+      metrics.diarizationLagMs.get({ ...providerLabels, quantile: 'p95' }),
+    ).toBe(4300);
+    expect(
+      metrics.diarizationExecutionMs.get({
+        ...providerLabels,
+        quantile: 'p50',
+      }),
+    ).toBe(1200);
+    expect(metrics.asrDroppedPeriodsTotal.entries()).toHaveLength(0);
+    expect(metrics.asrJobsCompletedTotal.entries()).toHaveLength(0);
+  });
+
+  it('drops the quantile gauges of a provider whose ring emptied', async () => {
+    // Arrange - a stale p95 would keep the lag alert firing after the
+    // session that produced it ended, exactly as the asr quantiles would.
+    const { metrics, poller } = await createPoller();
+    service.setBody(
+      metricsBody({
+        counters: { diarizationRunsTotal: [{ labels: WHISPER, value: 1 }] },
+        histograms: { diarizationLagMs: [histogramSeries(4300)] },
+      }),
+    );
+    await poller.pollOnce();
+
+    // Act
+    service.setBody(
+      metricsBody({
+        counters: { diarizationRunsTotal: [{ labels: WHISPER, value: 1 }] },
+        histograms: {
+          diarizationLagMs: [histogramSeries(4300, { sampleCount: 0 })],
+        },
+      }),
+    );
+    await poller.pollOnce();
+
+    // Assert
+    expect(
+      metrics.diarizationLagMs.get({ ...providerLabels, quantile: 'p95' }),
+    ).toBeUndefined();
   });
 });

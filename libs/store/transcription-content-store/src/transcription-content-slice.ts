@@ -70,7 +70,14 @@ function pushSample(window: LatencyWindow, value: number): void {
  * A sequence of transcribed text tokens with optional word-level timing data.
  * Each committed sequence has a stable `id` so it can be rendered as a keyed
  * DOM node without re-creating existing elements. `speakers` is aligned with
- * `text` when the provider runs speaker diarization.
+ * `text` when the provider runs speaker diarization; a `null` entry is a word
+ * without a label (yet).
+ *
+ * `sequenceId` is the provider's own id for a finalized sequence whose labels
+ * may still arrive after the text did (see {@link applySpeakersUpdate}); it is
+ * set only when the provider runs diarization, so its presence is what tells
+ * a renderer to reserve a label slot for the sequence. `speakersSettled`
+ * becomes true once the provider has said no further labels will follow.
  */
 export interface TranscriptionSequence {
   id: string;
@@ -78,6 +85,8 @@ export interface TranscriptionSequence {
   starts?: number[] | null;
   ends?: number[] | null;
   speakers?: (string | null)[] | null;
+  sequenceId?: string | null;
+  speakersSettled?: boolean;
 }
 
 /**
@@ -85,6 +94,57 @@ export interface TranscriptionSequence {
  * generated internally by the reducer and should not be provided by callers.
  */
 export type TranscriptionSequenceInput = Omit<TranscriptionSequence, 'id'>;
+
+/**
+ * Late speaker labels for a finalized sequence, as the session transport
+ * delivers them: the provider's `sequenceId`, labels aligned with that
+ * sequence's `text` (`null` = still unlabelled), and whether this is the last
+ * update for it.
+ */
+export interface SpeakersUpdateInput {
+  sequenceId: string;
+  speakers: (string | null)[];
+  settled: boolean;
+}
+
+/**
+ * Whether a sequence is still waiting for speaker labels: it came from a
+ * diarizing provider (has a `sequenceId`), the provider has not settled it,
+ * and at least one word is unlabelled.
+ */
+export const isAwaitingSpeakers = (
+  sequence: Pick<
+    TranscriptionSequence,
+    'text' | 'speakers' | 'sequenceId' | 'speakersSettled'
+  >,
+): boolean => {
+  if (sequence.sequenceId === undefined || sequence.sequenceId === null) {
+    return false;
+  }
+  if (sequence.speakersSettled === true) return false;
+  const speakers = sequence.speakers ?? [];
+  if (speakers.length < sequence.text.length) return true;
+  return speakers.some((speaker) => speaker === null);
+};
+
+/**
+ * Fills the unlabelled words of `sequence` from `update`, in place on an
+ * Immer draft. A label already present is never overwritten: a label the
+ * viewer has seen on a finalized caption must not change, and the provider
+ * honours the same rule, so a disagreement can only be a stale message.
+ */
+const mergeSpeakers = (
+  sequence: TranscriptionSequence,
+  update: SpeakersUpdateInput,
+): void => {
+  const merged: (string | null)[] = [];
+  for (let i = 0; i < sequence.text.length; i += 1) {
+    const existing = sequence.speakers?.[i] ?? null;
+    merged.push(existing ?? update.speakers[i] ?? null);
+  }
+  sequence.speakers = merged;
+  if (update.settled) sequence.speakersSettled = true;
+};
 
 /**
  * A committed paragraph of transcription text with a stable identity.
@@ -301,6 +361,31 @@ export const transcriptionContentSlice = createSlice({
       }
     },
     /**
+     * Attaches late speaker labels to the finalized sequence the provider
+     * named. Only unlabelled words change, so text already on screen never
+     * moves and a label already shown never flips. A sequence that was
+     * committed into a paragraph before its labels arrived keeps its
+     * paragraph as it was: committing is a layout decision the viewer has
+     * already seen. Unknown ids (a sequence cleared, or never received on
+     * this connection) are ignored.
+     */
+    applySpeakersUpdate: (
+      state,
+      action: PayloadAction<SpeakersUpdateInput>,
+    ) => {
+      const { sequenceId } = action.payload;
+      for (const sequence of state.activeSection.sequences) {
+        if (sequence.sequenceId === sequenceId) {
+          mergeSpeakers(sequence, action.payload);
+        }
+      }
+      for (const sequence of state.finalizedTranscription) {
+        if (sequence.sequenceId === sequenceId) {
+          mergeSpeakers(sequence, action.payload);
+        }
+      }
+    },
+    /**
      * Records a latency sample into the rolling windows. `pipelineMs` always
      * counts; `e2eMs` counts only when present and non-negative (a negative
      * value signals residual clock skew and is discarded).
@@ -334,6 +419,7 @@ export const {
   commitInProgressTranscription,
   replaceInProgressTranscription,
   handleTranscript,
+  applySpeakersUpdate,
   recordLatency,
   clearTranscription,
 } = transcriptionContentSlice.actions;

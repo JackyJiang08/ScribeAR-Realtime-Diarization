@@ -493,7 +493,20 @@ def main():
     )
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--tick-sec", type=float, default=5.0)
-    parser.add_argument("--max-buffer-sec", type=float, default=30.0)
+    parser.add_argument(
+        "--max-buffer-sec",
+        type=float,
+        default=30.0,
+        help="audio each streaming tick diarizes: the diarization window "
+        "(Phase 2a diarization_window_sec; 30 was the Phase 2 baseline)",
+    )
+    parser.add_argument(
+        "--segmentation-step",
+        type=float,
+        default=None,
+        help="pyannote segmentation step as a ratio of its window "
+        "(the context's segmentation_step; None = model default 0.1)",
+    )
     parser.add_argument(
         "--stream-sec",
         type=float,
@@ -549,7 +562,16 @@ def main():
     # call does not pay for lazy kernel initialisation or the download.
     load_start = time.perf_counter()
     context = PyannoteDiarizationContext(
-        {"device": args.device, "token_env_var": token_var}, ["benchmark"]
+        {
+            "device": args.device,
+            "token_env_var": token_var,
+            "segmentation_step": args.segmentation_step,
+            # The benchmark sets torch threads itself above and must not
+            # be reniced: it is the measurement, not a worker.
+            "num_threads": None,
+            "nice": 0,
+        },
+        ["benchmark"],
     )
     logging.basicConfig(level=logging.INFO)
     service = context.create(ContextLogger(logging.getLogger("benchmark")))
@@ -740,6 +762,7 @@ def main():
             "model": context._config.model,
             "tick_sec": args.tick_sec,
             "max_buffer_sec": args.max_buffer_sec,
+            "segmentation_step": args.segmentation_step,
             "stream_sec": stream_sec,
             "der_convention": "pyannote default: no collar, overlap scored",
             "data": rel_path(data),

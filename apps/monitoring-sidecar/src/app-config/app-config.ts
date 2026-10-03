@@ -222,6 +222,11 @@ const CONFIG_SCHEMA = Type.Object({
     maximum: 1,
     default: 0.8,
   }),
+  // Speaker diarization falling behind (see `diarizationBehindRule`). Empty
+  // means the rule's defaults.
+  ALERT_DIARIZATION_UNCOVERED_RATIO: OPTIONAL_NUMBER,
+  ALERT_DIARIZATION_MIN_AUDIO_SECONDS: OPTIONAL_NUMBER,
+  ALERT_DIARIZATION_LAG_P95_MS: OPTIONAL_NUMBER,
 
   /**
    * The standalone audio meter page (A4), served as a convenience by the
@@ -439,6 +444,18 @@ export class AppConfig {
       canaryFirstTranscriptMs: this._env.ALERT_CANARY_FIRST_TRANSCRIPT_MS,
       canaryMinRecall: this._env.ALERT_CANARY_MIN_RECALL,
       canaryMaxRepetitionRatio: this._env.ALERT_CANARY_MAX_REPETITION_RATIO,
+      diarizationUncoveredRatio: threshold(
+        this._env.ALERT_DIARIZATION_UNCOVERED_RATIO,
+        DEFAULT_THRESHOLDS.diarizationUncoveredRatio,
+      ),
+      diarizationMinAudioSeconds: threshold(
+        this._env.ALERT_DIARIZATION_MIN_AUDIO_SECONDS,
+        DEFAULT_THRESHOLDS.diarizationMinAudioSeconds,
+      ),
+      diarizationLagP95Ms: threshold(
+        this._env.ALERT_DIARIZATION_LAG_P95_MS,
+        DEFAULT_THRESHOLDS.diarizationLagP95Ms,
+      ),
     };
   }
 

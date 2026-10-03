@@ -160,6 +160,25 @@ export interface AlertThresholds {
   canaryMinRecall: number;
   /** Canary repetition ratio above which the hallucination alert fires. */
   canaryMaxRepetitionRatio: number;
+  /**
+   * Share of a provider's received audio that no diarization pass covered
+   * over `rateWindowMs` before the diarization-behind warning fires. Audio
+   * the job skipped is audio whose captions keep the neutral placeholder.
+   */
+  diarizationUncoveredRatio: number;
+  /**
+   * Minimum seconds of audio the diarization job must have received in the
+   * window before that share is believed. Counted on received audio, which
+   * keeps arriving however far behind the job is - a floor on passes would
+   * climb out of reach as the fault got worse.
+   */
+  diarizationMinAudioSeconds: number;
+  /**
+   * Reported p95 diarization lag (ms) at or above which the warning fires.
+   * Lag is the age of the newest audio a pass labelled when the labels were
+   * ready; above this a label lands well after its caption did.
+   */
+  diarizationLagP95Ms: number;
 }
 
 export const DEFAULT_THRESHOLDS: AlertThresholds = {
@@ -360,6 +379,20 @@ export const DEFAULT_THRESHOLDS: AlertThresholds = {
   // threshold here produces noise rather than signal.
   canaryMinRecall: 0.5,
   canaryMaxRepetitionRatio: 0.8,
+  // One word in ten going unlabelled is where a viewer notices the
+  // placeholders; the Phase 2a acceptance run on the 4-CPU reference
+  // container skipped no audio at all, so this is well clear of healthy.
+  diarizationUncoveredRatio: 0.1,
+  // A minute of audio in the window: at the 5 s period that is at least a
+  // dozen scheduled passes to judge on, and it keeps arriving however far
+  // behind the job is, which a pass floor would not.
+  diarizationMinAudioSeconds: 60,
+  // The Phase 2a target is a label within 2 s (p50) and 4 s (p95) of its
+  // caption. Lag here is measured before the caption path's own delay,
+  // and the reference run sat around one period (5 s) plus the pass cost,
+  // so 10 s is twice healthy and still well before a viewer gives up on
+  // the placeholders.
+  diarizationLagP95Ms: 10_000,
 };
 
 /** A rule returns zero or more alerts for the current state. */
@@ -1553,8 +1586,117 @@ export const canaryQualityRule: AlertRule = (ctx) => {
   return alerts;
 };
 
+/**
+ * Speaker diarization falling behind the audio, for a provider that runs it.
+ *
+ * Diarization runs beside the caption job, never in front of it, so nothing
+ * in the `asr_*` series moves when it struggles: captions keep arriving on
+ * time and only the speaker labels lag or go missing. This is the rule that
+ * sees that. Three signals, each checked for the direction it moves under
+ * the fault it is meant to catch (CONTRIBUTING.md, "assume every guard is
+ * censored"):
+ *
+ * 1. **Uncovered audio share** - seconds no pass covered over seconds
+ *    received. Rises as the job falls behind, and its denominator is audio
+ *    the *caption* side keeps producing, so it cannot be censored by the
+ *    fault. The primary signal.
+ * 2. **Stalled** - audio keeps arriving but no pass completes at all. The
+ *    uncovered counter is written by the job itself, so a job that is hung
+ *    rather than slow stops reporting both numerator and denominator; the
+ *    stall branch reads the caption side's audio counter instead, which the
+ *    hung job cannot touch. Critical rather than warning, because every
+ *    caption from here on keeps its placeholder.
+ * 3. **Lag p95** - a pre-computed percentile over the service's retained
+ *    ring, so it can go stale after the load that produced it; corroborating
+ *    only, and it clears on its own once the ring expires by age.
+ *
+ * Gated on `diarizationSupported`: a service with diarization off, or too
+ * old to report it, reports nothing here and that absence is not a stall.
+ */
+export const diarizationBehindRule: AlertRule = (ctx) => {
+  const window = ctx.thresholds.rateWindowMs;
+  const windowSec = String(Math.round(window / 1000));
+  const alerts: Alert[] = [];
+
+  for (const { labels } of ctx.metrics.diarizationAudioSecondsTotal.entries()) {
+    const providerKey = labels['providerKey'] ?? 'unknown';
+    const service = labels['service'] ?? '';
+    if ((ctx.metrics.diarizationSupported.get({ service }) ?? 0) !== 1) {
+      continue;
+    }
+    const audioSec = ctx.metrics.diarizationAudioSecondsTotal.windowCount(
+      labels,
+      window,
+      ctx.nowMs,
+    );
+    if (audioSec < ctx.thresholds.diarizationMinAudioSeconds) continue;
+
+    const runs = ctx.metrics.diarizationRunsTotal.windowCount(
+      labels,
+      window,
+      ctx.nowMs,
+    );
+    if (runs === 0) {
+      alerts.push({
+        id: `diarization-stalled:${providerKey}`,
+        failureModes: ['T1'],
+        severity: AlertSeverity.CRITICAL,
+        stage: PipelineStage.TRANSCRIPTION,
+        summary: `Speaker diarization for ${providerKey} has not completed a pass in ${windowSec}s while ${String(Math.round(audioSec))}s of audio arrived; captions keep their "Speaker ?" placeholder.`,
+        likelyCause: `The diarization job for ${providerKey} is hung or its worker is dead: audio keeps arriving but no pass finishes. Captions are unaffected by design. Check the diarization worker (scribear_asr_worker_alive for the worker owning the pyannote context) and the service log for a failed pyannote pass; restarting the service reloads the model.`,
+        value: 0,
+        threshold: 1,
+      });
+      continue;
+    }
+
+    const uncoveredSec =
+      ctx.metrics.diarizationUncoveredSecondsTotal.windowCount(
+        labels,
+        window,
+        ctx.nowMs,
+      );
+    const uncoveredShare = uncoveredSec / audioSec;
+    const lagP95 = ctx.metrics.diarizationLagMs.get({
+      ...labels,
+      quantile: 'p95',
+    });
+    const lagNote =
+      lagP95 !== undefined
+        ? `; p95 label lag ${String(Math.round(lagP95 / 100) / 10)}s`
+        : '';
+    if (uncoveredShare >= ctx.thresholds.diarizationUncoveredRatio) {
+      alerts.push({
+        id: `diarization-behind:${providerKey}`,
+        failureModes: ['T1'],
+        severity: AlertSeverity.WARNING,
+        stage: PipelineStage.TRANSCRIPTION,
+        summary: `Speaker diarization for ${providerKey} skipped ${String(Math.round(uncoveredShare * 100))}% of the last ${windowSec}s of audio (${uncoveredSec.toFixed(1)}s of ${audioSec.toFixed(0)}s)${lagNote}; those captions keep their "Speaker ?" placeholder.`,
+        likelyCause: `The diarization pass costs more than its period on this hardware, so the job skips ahead to the newest window rather than queueing - captions are unaffected, labels are missing for the skipped audio. Lower diarization_window_sec or raise diarization_period_ms in the provider config, give the pyannote context a worker with a spare core, or raise its num_threads if cores are free.`,
+        value: uncoveredShare,
+        threshold: ctx.thresholds.diarizationUncoveredRatio,
+      });
+      continue;
+    }
+    if (lagP95 !== undefined && lagP95 >= ctx.thresholds.diarizationLagP95Ms) {
+      alerts.push({
+        id: `diarization-lagging:${providerKey}`,
+        failureModes: ['T1'],
+        severity: AlertSeverity.WARNING,
+        stage: PipelineStage.TRANSCRIPTION,
+        summary: `Speaker labels for ${providerKey} are ready ${String(Math.round(lagP95 / 100) / 10)}s (p95) after the audio they describe; captions are on time, labels are late.`,
+        likelyCause: `Diarization passes are taking close to a full period, so labels land long after their captions did and viewers see "Speaker ?" for several seconds. Lower diarization_window_sec, or move the pyannote context to a less loaded worker.`,
+        value: lagP95,
+        threshold: ctx.thresholds.diarizationLagP95Ms,
+      });
+    }
+  }
+  return alerts;
+};
+
 /** Every rule, evaluated on each snapshot. */
 export const DEFAULT_RULES: readonly AlertRule[] = [
+  diarizationBehindRule,
   upstreamChurnRule,
   transcriptionSaturationRule,
   transcriptionFallingBehindRule,

@@ -12,6 +12,7 @@ import { AudioFrameChannel } from './events/audio-frame.events.js';
 import { LatencyChannel } from './events/latency.events.js';
 import { SessionEndedChannel } from './events/session-ended.events.js';
 import { SessionStatusChannel } from './events/session-status.events.js';
+import { SpeakersUpdateChannel } from './events/speakers-update.events.js';
 import { TranscriptChannel } from './events/transcript.events.js';
 import {
   type ClientHandle,
@@ -62,6 +63,7 @@ export class TranscriptionStreamService extends EventEmitter<TranscriptionStream
   private _transcriptionOrchestratorService: AppDependencies['transcriptionOrchestratorService'];
 
   private _unsubscribeTranscripts: (() => void) | null = null;
+  private _unsubscribeSpeakersUpdates: (() => void) | null = null;
   private _unsubscribeLatency: (() => void) | null = null;
   private _unsubscribeSessionStatus: (() => void) | null = null;
   private _unsubscribeSessionEnded: (() => void) | null = null;
@@ -330,6 +332,23 @@ export class TranscriptionStreamService extends EventEmitter<TranscriptionStream
       this._sessionUid,
     );
 
+    // Late speaker labels ride the same pre-`authOk` policy as transcripts:
+    // an update for a fragment this connection never received is worthless
+    // to it, and nothing replays either.
+    this._unsubscribeSpeakersUpdates = this._eventBusService.subscribe(
+      SpeakersUpdateChannel,
+      (update) => {
+        if (!this._mayForward()) return;
+        this.emit('send', {
+          type: TranscriptionStreamServerMessageType.SPEAKERS_UPDATE,
+          sequenceId: update.sequenceId,
+          speakers: update.speakers,
+          settled: update.settled,
+        });
+      },
+      this._sessionUid,
+    );
+
     this._unsubscribeLatency = this._eventBusService.subscribe(
       LatencyChannel,
       (latency) => {
@@ -392,6 +411,8 @@ export class TranscriptionStreamService extends EventEmitter<TranscriptionStream
     }
     this._unsubscribeTranscripts?.();
     this._unsubscribeTranscripts = null;
+    this._unsubscribeSpeakersUpdates?.();
+    this._unsubscribeSpeakersUpdates = null;
     this._unsubscribeLatency?.();
     this._unsubscribeLatency = null;
     this._unsubscribeSessionStatus?.();

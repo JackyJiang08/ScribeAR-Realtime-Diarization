@@ -7,6 +7,7 @@ import {
 } from '@scribear/microphone-store';
 import { appInitialization } from '@scribear/redux-remember-store';
 import {
+  applySpeakersUpdate,
   handleTranscript,
   recordLatency,
 } from '@scribear/transcription-content-store';
@@ -92,6 +93,9 @@ export const createKioskMiddleware =
     });
     kioskService.on('transcript', (event) => {
       store.dispatch(handleTranscript(event));
+    });
+    kioskService.on('speakersUpdate', (update) => {
+      store.dispatch(applySpeakersUpdate(update));
     });
     kioskService.on('latency', (sample) => {
       store.dispatch(recordLatency(sample));

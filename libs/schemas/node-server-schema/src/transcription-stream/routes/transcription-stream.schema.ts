@@ -7,7 +7,10 @@ import type {
 
 import { NODE_SERVER_BASE_PATH } from '#src/base-path.js';
 import { TRANSCRIPTION_STREAM_TAG } from '#src/tags.js';
-import { TRANSCRIPT_FRAGMENT_SCHEMA } from '#src/transcription-stream/entities/transcript.schema.js';
+import {
+  SPEAKERS_UPDATE_SCHEMA,
+  TRANSCRIPT_FRAGMENT_SCHEMA,
+} from '#src/transcription-stream/entities/transcript.schema.js';
 
 export enum TranscriptionStreamClientMessageType {
   AUTH = 'auth',
@@ -22,6 +25,13 @@ export enum TranscriptionStreamServerMessageType {
   SESSION_ENDED = 'sessionEnded',
   TIME_SYNC_PONG = 'timeSyncPong',
   LATENCY_UPDATE = 'latencyUpdate',
+  /**
+   * Late speaker labels for a finalized transcript fragment that was already
+   * delivered (see `SPEAKERS_UPDATE_SCHEMA`). Sent only for sessions whose
+   * provider runs diarization; a client that ignores it still has every
+   * caption.
+   */
+  SPEAKERS_UPDATE = 'speakersUpdate',
 }
 
 /**
@@ -102,6 +112,10 @@ const TRANSCRIPTION_STREAM_SCHEMA = {
       type: Type.Literal(TranscriptionStreamServerMessageType.TRANSCRIPT),
       final: Type.Union([TRANSCRIPT_FRAGMENT_SCHEMA, Type.Null()]),
       inProgress: Type.Union([TRANSCRIPT_FRAGMENT_SCHEMA, Type.Null()]),
+    }),
+    Type.Object({
+      type: Type.Literal(TranscriptionStreamServerMessageType.SPEAKERS_UPDATE),
+      ...SPEAKERS_UPDATE_SCHEMA.properties,
     }),
     Type.Object({
       type: Type.Literal(TranscriptionStreamServerMessageType.SESSION_STATUS),

@@ -763,6 +763,13 @@ services:
       # MONITORING_ASR_DUTY_RATIO above, if set, wins over both — the existing
       # flat override. Empty means "use the sidecar default" (0.7).
       ALERT_ASR_DUTY_RATIO_CPU: ${MONITORING_ASR_DUTY_RATIO_CPU:-}
+      # Speaker diarization falling behind (the fork's diarizationBehindRule):
+      # the share of audio no diarization pass covered, the audio needed
+      # before that share is believed, and the p95 label lag in ms. Empty
+      # means the sidecar defaults (0.1, 60, 10000).
+      ALERT_DIARIZATION_UNCOVERED_RATIO: ${MONITORING_DIARIZATION_UNCOVERED_RATIO:-}
+      ALERT_DIARIZATION_MIN_AUDIO_SECONDS: ${MONITORING_DIARIZATION_MIN_AUDIO_SECONDS:-}
+      ALERT_DIARIZATION_LAG_P95_MS: ${MONITORING_DIARIZATION_LAG_P95_MS:-}
       # The T1 warning and the T1 CRITICAL, both the share of scheduled job
       # periods in which no pass ran. The CRITICAL is keyed here rather than on
       # p95 RTF because RTF *falls* as the shared worker saturates - measured

@@ -20,6 +20,7 @@ import {
 import { createSessionManagerClient } from '@scribear/session-manager-client';
 import type {
   LatencySample,
+  SpeakersUpdateInput,
   TranscriptionSequenceInput,
 } from '@scribear/transcription-content-store';
 
@@ -76,6 +77,9 @@ interface ClientSessionServiceEvents {
   connectionStatus: (status: SessionConnectionStatus) => void;
   sessionStatus: (status: SessionStatusSnapshot) => void;
   transcript: (event: TranscriptEvent) => void;
+  // Late speaker labels for a finalized sequence already delivered through
+  // `transcript`. Matches `applySpeakersUpdate` in the content store.
+  speakersUpdate: (update: SpeakersUpdateInput) => void;
   latency: (sample: LatencySample) => void;
   joinError: (error: JoinError | null) => void;
   /**
@@ -577,6 +581,13 @@ export class ClientSessionService extends EventEmitter<ClientSessionServiceEvent
           this.emit('transcript', {
             final: msg.final,
             inProgress: msg.inProgress,
+          });
+          break;
+        case TranscriptionStreamServerMessageType.SPEAKERS_UPDATE:
+          this.emit('speakersUpdate', {
+            sequenceId: msg.sequenceId,
+            speakers: msg.speakers,
+            settled: msg.settled,
           });
           break;
         case TranscriptionStreamServerMessageType.SESSION_STATUS:

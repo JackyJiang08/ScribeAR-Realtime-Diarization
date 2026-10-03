@@ -5,6 +5,7 @@ Public exports for TranscriptionProviderInterface
 from .audio_stages import STAGE_ASR_INPUT, STAGE_INGRESS, STAGE_VAD
 from .job_counters import JobCounterCollector, TranscriptionJobCounter
 from .provider_health import ProviderHealth, ProviderKind, ProviderStatus
+from .speaker_label_update import SpeakerLabelUpdate
 from .transcription_client_error import (
     AT_CAPACITY_REASON,
     TranscriptionCapacityError,

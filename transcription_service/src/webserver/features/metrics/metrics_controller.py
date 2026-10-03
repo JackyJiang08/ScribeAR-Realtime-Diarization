@@ -242,6 +242,40 @@ class MetricsController:
                 "repeatedSegmentDetectedTotal": _counter_series(
                     self._metrics.repeated_segment_detected_total
                 ),
+                # Speaker diarization, from the diarization job that runs
+                # beside each caption job when the whisper-streaming
+                # provider has diarization on. Keyed by the caption
+                # provider's key. All empty when diarization is off, which
+                # is how a consumer tells "off" from "on and healthy"
+                # (runs advancing) from "on and failing" (failed advancing).
+                "diarizationRunsTotal": _counter_series(
+                    self._metrics.diarization_runs_total
+                ),
+                "diarizationSecondsTotal": _counter_series(
+                    self._metrics.diarization_seconds_total
+                ),
+                "diarizationFailedTotal": _counter_series(
+                    self._metrics.diarization_failed_total
+                ),
+                "reconcilerSecondsTotal": _counter_series(
+                    self._metrics.reconciler_seconds_total
+                ),
+                "diarizationLabelsMintedTotal": _counter_series(
+                    self._metrics.diarization_labels_minted_total
+                ),
+                "diarizationAudioSecondsTotal": _counter_series(
+                    self._metrics.diarization_audio_seconds_total
+                ),
+                # The two back-pressure counters. Audio the job skipped to
+                # catch up (its words stay unlabelled) and periods it never
+                # ran in; both rise as labels fall behind, while captions and
+                # every asr_* series stay exactly as they were.
+                "diarizationUncoveredSecondsTotal": _counter_series(
+                    self._metrics.diarization_uncovered_seconds_total
+                ),
+                "diarizationDroppedPeriodsTotal": _counter_series(
+                    self._metrics.diarization_dropped_periods_total
+                ),
             },
             "histograms": {
                 "asrSchedulingDelayMs": _histogram_series(
@@ -256,5 +290,18 @@ class MetricsController:
                 # hardware, which is the capacity question the plan has been
                 # approximating with a period-utilization proxy.
                 "asrRtf": _histogram_series(self._metrics.asr_rtf),
+                # Diarization: per-pass cost, how old the newest labelled
+                # audio was when its labels were ready (the label lag an
+                # operator should watch), and cost per second of audio
+                # received.
+                "diarizationExecutionMs": _histogram_series(
+                    self._metrics.diarization_execution_ms
+                ),
+                "diarizationLagMs": _histogram_series(
+                    self._metrics.diarization_lag_ms
+                ),
+                "diarizationRtf": _histogram_series(
+                    self._metrics.diarization_rtf
+                ),
             },
         }

@@ -92,17 +92,23 @@ class TranscriptionJobCounter(StrEnum):
     #: above cannot see. A hallucination risk signal, not a fatal error.
     REPEATED_SEGMENT_DETECTED = "repeated_segment_detected"
 
-    #: Diarization passes run over the transcribe window. One per execution
-    #: when the pyannote context is enabled and the buffer held audio.
+    # ------------------------------------------------------------------
+    # Speaker diarization. Reported by the diarization job, which runs in its
+    # own worker process beside the caption job (see DiarizationJob); the
+    # metrics registry keeps them out of the caption series by the job's
+    # label suffix, so nothing below can move an `asr_*` number.
+
+    #: Diarization passes run over the newest window. One per execution when
+    #: new audio had arrived since the previous pass.
     DIARIZATION_RUNS = "diarization_runs"
 
     #: Wall-clock seconds those passes took. Divided by DIARIZATION_RUNS on
-    #: the dashboard this is the per-pass diarization latency, the number
-    #: that decides whether diarization fits the job period next to Whisper.
+    #: the dashboard this is the per-pass diarization cost, the number that
+    #: decides whether labels keep up with the audio.
     DIARIZATION_SECONDS = "diarization_seconds"
 
-    #: Passes that raised inside the diarization pipeline. The transcript is
-    #: still returned, without speaker labels for that pass - the counter is
+    #: Passes that raised inside the diarization pipeline. Captions are
+    #: unaffected; the pass's audio simply gets no labels - the counter is
     #: what keeps a broken pipeline from failing silently.
     DIARIZATION_FAILED = "diarization_failed"
 
@@ -115,6 +121,24 @@ class TranscriptionJobCounter(StrEnum):
     #: above the number of people in the room means labels are drifting
     #: rather than sticking to voices.
     DIARIZATION_LABELS_MINTED = "diarization_labels_minted"
+
+    #: Seconds of audio the diarization job received. The denominator of the
+    #: diarization real-time factor, counted on *received* audio so a job that
+    #: skips audio to catch up cannot flatter its own RTF.
+    DIARIZATION_AUDIO_SECONDS = "diarization_audio_seconds"
+
+    #: Age, at the end of a pass, of the newest audio that pass labelled:
+    #: wall-clock seconds from the chunk's arrival at the service to the
+    #: labels being ready. One value per execution; the registry records it as
+    #: the diarization lag histogram.
+    DIARIZATION_LAG_SECONDS = "diarization_lag_seconds"
+
+    #: Seconds of audio that arrived but were never inside any diarized
+    #: window, because the job fell behind and skipped ahead to the newest
+    #: window rather than queueing. Those words keep a neutral label forever.
+    #: The back-pressure signal: it rises as the job falls behind, while
+    #: per-pass cost may look perfectly healthy.
+    DIARIZATION_UNCOVERED_SECONDS = "diarization_uncovered_seconds"
 
 
 class JobCounterCollector:

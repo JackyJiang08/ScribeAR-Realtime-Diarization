@@ -8,11 +8,16 @@
     "settings added on top: the pyannote context and diarization_detector.",
     "The crisper_whisper, lumen_granite and debug providers of the template",
     "are omitted because they load models the benchmark never exercises.",
-    "The benchmark harness toggles diarization_detector (and removes the",
-    "pyannote context) for its diarization-off runs, so the off run is",
-    "exactly upstream's shipped configuration."
+    "The benchmark harness toggles diarization_detector (removes the",
+    "pyannote context and its worker) for its diarization-off runs, so the",
+    "off run is exactly upstream's shipped configuration: one worker.",
+    "Phase 2a: diarization is its own worker-pool job on its own worker",
+    "(worker 1), fed the same audio; captions on worker 0 never wait for it.",
+    "The diarization window, period, pyannote thread cap, nice and",
+    "segmentation step below are the Phase 2a defaults chosen by the window",
+    "sweep (docs/speaker_diarization.md, 'Choosing the window')."
   ],
-  "num_workers": 1,
+  "num_workers": 2,
   "contexts": [
     {
       "context_uid": "faster-whisper",
@@ -31,12 +36,15 @@
     },
     {
       "context_uid": "pyannote-diarization",
-      "worker_ids": [0],
+      "worker_ids": [1],
       "tags": ["pyannote_diarization"],
       "context_config": {
         "model": "pyannote/speaker-diarization-community-1",
         "device": "cpu",
-        "token_env_var": "HUGGINGFACE_ACCESS_TOKEN"
+        "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+        "num_threads": 1,
+        "nice": 10,
+        "segmentation_step": null
       }
     }
   ],
@@ -50,7 +58,11 @@
         "max_buffer_len_sec": 30,
         "local_agree_dim": 2,
         "diarization_detector": true,
-        "diarization_context_tag": "pyannote_diarization"
+        "diarization_context_tag": "pyannote_diarization",
+        "diarization_period_ms": 5000,
+        "diarization_window_sec": 10,
+        "diarization_edge_margin_sec": 0.5,
+        "diarization_label_timeout_sec": 15
       }
     }
   }

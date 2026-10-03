@@ -105,13 +105,25 @@ async def print_transcripts(websocket) -> None:
         if isinstance(message, bytes):
             continue
         payload = json.loads(message)
+        if payload.get("type") == "speakers_update":
+            # Late labels for a finalized line already printed, by the
+            # sequence_id that line carried; nulls are words still unlabelled
+            # (or never labelled once settled).
+            print(
+                f"labels     | {payload.get('sequence_id')} "
+                f"{payload.get('speakers')}"
+                f"{' (settled)' if payload.get('settled') else ''}"
+            )
+            continue
         if payload.get("type") != "transcript":
             print(f"<- {payload}")
             continue
         final = payload.get("final")
         in_progress = payload.get("in_progress")
         if final:
-            print(f"FINAL      | {format_sequence(final)}")
+            sequence_id = final.get("sequence_id")
+            prefix = f"FINAL {sequence_id:>4}" if sequence_id else "FINAL     "
+            print(f"{prefix} | {format_sequence(final)}")
         if in_progress:
             print(f"in progress| {format_sequence(in_progress)}")
 

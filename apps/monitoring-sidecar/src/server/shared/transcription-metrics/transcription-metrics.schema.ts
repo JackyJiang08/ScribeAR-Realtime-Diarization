@@ -183,11 +183,43 @@ export const TRANSCRIPTION_METRICS_BODY_SCHEMA = Type.Object({
      * `malformed` poll to enforce a field with a working fallback.
      */
     asrDroppedPeriodsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    /**
+     * Speaker diarization, from the diarization job the whisper-streaming
+     * provider runs beside each caption job (on its own worker). Keyed by the
+     * caption provider's key. All eight are optional, for the rolling-upgrade
+     * reason every later field here is: a transcription-service that predates
+     * diarization must still produce a healthy poll. The poller publishes
+     * `scribear_diarization_supported` so a rule can tell "not reported" from
+     * "reported as zero" - the same guard `asrDroppedPeriodsSupported`
+     * provides, and for the same reason.
+     *
+     * `diarizationUncoveredSecondsTotal` and `diarizationDroppedPeriodsTotal`
+     * are the back-pressure counters: audio the job skipped to catch up (its
+     * words stay unlabelled) and periods it never ran in. Both rise as labels
+     * fall behind while every `asr*` series stays untouched, which is the
+     * design: captions never wait for labels.
+     */
+    diarizationRunsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    diarizationSecondsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    diarizationFailedTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    reconcilerSecondsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    diarizationLabelsMintedTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    diarizationAudioSecondsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    diarizationUncoveredSecondsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
+    diarizationDroppedPeriodsTotal: Type.Optional(Type.Array(COUNTER_SERIES)),
   }),
   histograms: Type.Object({
     asrSchedulingDelayMs: Type.Array(HISTOGRAM_SERIES),
     asrExecutionMs: Type.Array(HISTOGRAM_SERIES),
     asrTotalMs: Type.Array(HISTOGRAM_SERIES),
     asrRtf: Type.Array(HISTOGRAM_SERIES),
+    /**
+     * Diarization per-pass cost, the age of the newest labelled audio when
+     * its labels were ready (the lag an operator should watch), and cost per
+     * second of audio received. Optional like the counters above.
+     */
+    diarizationExecutionMs: Type.Optional(Type.Array(HISTOGRAM_SERIES)),
+    diarizationLagMs: Type.Optional(Type.Array(HISTOGRAM_SERIES)),
+    diarizationRtf: Type.Optional(Type.Array(HISTOGRAM_SERIES)),
   }),
 });

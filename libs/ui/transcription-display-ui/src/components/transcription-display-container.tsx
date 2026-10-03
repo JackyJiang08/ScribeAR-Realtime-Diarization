@@ -9,6 +9,7 @@ import {
   type ActiveSection,
   type TranscriptionSection,
   type TranscriptionSequence,
+  isAwaitingSpeakers,
   wordsToSpeakerRuns,
 } from '@scribear/transcription-content-store';
 
@@ -17,6 +18,7 @@ import { useAutoScroll } from '#src/hooks/use-auto-scroll.js';
 import { useContainerHeight } from '#src/hooks/use-container-height.js';
 
 import { JumpToBottomButton } from './jump-to-bottom-button.js';
+import { SpeakerLabelSlot } from './speaker-label-slot.js';
 import { SpeakerRunsText } from './speaker-runs-text.js';
 
 /**
@@ -57,24 +59,72 @@ interface ActiveSequenceTextProps {
   sequence: TranscriptionSequence;
   // Last attributed speaker before this sequence, for label suppression.
   previousSpeaker: string | null;
+  // Whether this sequence is the first content of the active section.
+  isFirst: boolean;
   // Background color transcription is rendered on, for readable speaker labels.
   backgroundColor: string;
 }
 
+/**
+ * First attributed (non-null) speaker in a sequence, or `null`.
+ */
+const firstAttributedSpeaker = (
+  sequence: TranscriptionSequence,
+): string | null => {
+  for (const speaker of sequence.speakers ?? []) {
+    if (speaker !== null) return speaker;
+  }
+  return null;
+};
+
 // Memoized so appending sequences to the active section never re-renders
-// existing ones; sequences are immutable once appended.
+// existing ones. A sequence from a diarizing provider (one carrying a
+// `sequenceId`) is the exception: its labels may arrive after its text, so it
+// re-renders when they do - inside a fixed-width slot, so nothing moves.
 const ActiveSequenceText = memo(
-  ({ sequence, previousSpeaker, backgroundColor }: ActiveSequenceTextProps) => {
+  ({
+    sequence,
+    previousSpeaker,
+    isFirst,
+    backgroundColor,
+  }: ActiveSequenceTextProps) => {
     const runs = useMemo(
       () => wordsToSpeakerRuns(sequence.text, sequence.speakers),
       [sequence],
     );
+    const labelAware =
+      sequence.sequenceId !== undefined && sequence.sequenceId !== null;
+    if (!labelAware) {
+      return (
+        <SpeakerRunsText
+          runs={runs}
+          previousSpeaker={previousSpeaker}
+          backgroundColor={backgroundColor}
+        />
+      );
+    }
+    // A label-aware sequence always starts its own line with a label slot,
+    // decided the moment the text appears - before the label is known - so
+    // the label can be filled in later without inserting a line break or
+    // shifting any text. The slot shows the first speaker of the sequence
+    // (or the pending placeholder); speaker changes inside the sequence are
+    // labelled inline by SpeakerRunsText as before.
+    const speaker = firstAttributedSpeaker(sequence);
     return (
-      <SpeakerRunsText
-        runs={runs}
-        previousSpeaker={previousSpeaker}
-        backgroundColor={backgroundColor}
-      />
+      <>
+        {!isFirst && <br />}
+        <SpeakerLabelSlot
+          speaker={speaker}
+          pending={isAwaitingSpeakers(sequence)}
+          continuation={speaker !== null && speaker === previousSpeaker}
+          backgroundColor={backgroundColor}
+        />
+        <SpeakerRunsText
+          runs={runs}
+          previousSpeaker={speaker ?? previousSpeaker}
+          backgroundColor={backgroundColor}
+        />
+      </>
     );
   },
 );
@@ -101,14 +151,19 @@ const lastAttributedSpeaker = (
  */
 const buildActiveSequenceItems = (
   sequences: TranscriptionSequence[],
-): { sequence: TranscriptionSequence; previousSpeaker: string | null }[] => {
+): {
+  sequence: TranscriptionSequence;
+  previousSpeaker: string | null;
+  isFirst: boolean;
+}[] => {
   const items: {
     sequence: TranscriptionSequence;
     previousSpeaker: string | null;
+    isFirst: boolean;
   }[] = [];
   let previousSpeaker: string | null = null;
   for (const sequence of sequences) {
-    items.push({ sequence, previousSpeaker });
+    items.push({ sequence, previousSpeaker, isFirst: items.length === 0 });
     previousSpeaker = lastAttributedSpeaker(sequence, previousSpeaker);
   }
   return items;
@@ -287,6 +342,7 @@ export const TranscriptionDisplayContainer = ({
                   key={item.sequence.id}
                   sequence={item.sequence}
                   previousSpeaker={item.previousSpeaker}
+                  isFirst={item.isFirst}
                   backgroundColor={backgroundColor}
                 />
               ))}

@@ -17,7 +17,11 @@ class TranscriptionSequence:
         ends    - List of timestamps relative to transcription session initialization
                     representing the timestamp of end of the word
         speakers - List of speaker labels, None entries mean no speaker
-                    could be attributed for that word
+                    could be attributed for that word (yet)
+        sequence_id - Session-unique id a finalized sequence is sent with
+                    when speaker labels may still arrive for it later
+                    (see SpeakerLabelUpdate). None for in-progress
+                    sequences and whenever diarization is off.
 
     If defined, each element of starts, ends, and speakers arrays should
         correspond to an element of text array
@@ -27,6 +31,7 @@ class TranscriptionSequence:
     starts: list[float] | None = None
     ends: list[float] | None = None
     speakers: list[str | None] | None = None
+    sequence_id: str | None = None
 
     def __str__(self):
         transcription = "".join(self.text)

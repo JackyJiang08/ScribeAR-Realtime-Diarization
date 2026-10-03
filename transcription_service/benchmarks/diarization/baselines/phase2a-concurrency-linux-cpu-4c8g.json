@@ -1,0 +1,2347 @@
+{
+  "label": "phase2a concurrency linux 4c8g",
+  "generated_at": "2026-10-03T09:07:59+0000",
+  "code_revision": "3d7db81",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "resource_limits": {
+    "runner": "docker",
+    "requested_cpus": 4.0,
+    "requested_memory_gb": 8.0,
+    "cgroup_cpus": 4.0,
+    "cgroup_memory_gb": 8.0,
+    "host_cpus": 8,
+    "host_memory_gb": 7.65,
+    "effective_cpus": 4.0,
+    "effective_memory_gb": 8.0
+  },
+  "hygiene": {
+    "before": {
+      "state": {
+        "taken_at": "2026-10-03T09:07:59+0000",
+        "free_memory_mb": 7059,
+        "swap_used_mb": 0,
+        "load_1m": 0.74,
+        "load_5m": 1.05,
+        "load_15m": 1.42
+      },
+      "warnings": [],
+      "clean": true
+    },
+    "after": {
+      "taken_at": "2026-10-03T09:26:13+0000",
+      "free_memory_mb": 6675,
+      "swap_used_mb": 0,
+      "load_1m": 2.93,
+      "load_5m": 2.79,
+      "load_15m": 2.1
+    },
+    "clean": true,
+    "warnings": []
+  },
+  "config": {
+    "reference_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "diarization": {
+      "window_sec": 10.0,
+      "period_ms": 5000,
+      "segmentation_step": null
+    },
+    "dev_vad_config": null,
+    "data": "benchmarks/diarization/data/ami",
+    "suffix": "_10min",
+    "files": null,
+    "stream_sec": 120.0,
+    "skip_offline": false,
+    "caption_audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+    "caption_seconds": 180.0,
+    "chunk_ms": 500,
+    "sessions_sweep": [
+      2,
+      3,
+      4
+    ],
+    "steps": [
+      "caption",
+      "concurrency"
+    ]
+  },
+  "logs": "<outside>/diarization_suite_fojcnbwy",
+  "caption_latency": {
+    "reference": {
+      "on": {
+        "label": "phase2a concurrency linux 4c8g [caption_reference_on]",
+        "generated_at": "2026-10-03T09:11:27+0000",
+        "code_revision": "3d7db81",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "on",
+          "sessions": 1,
+          "provider_overrides": [],
+          "context_overrides": [],
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": true,
+            "diarization_context_tag": "pyannote_diarization",
+            "diarization_period_ms": 5000,
+            "diarization_window_sec": 10,
+            "diarization_edge_margin_sec": 0.5,
+            "diarization_label_timeout_sec": 15
+          },
+          "num_workers": 2,
+          "contexts": [
+            {
+              "uid": "faster-whisper",
+              "worker_ids": [
+                0
+              ],
+              "config": {
+                "model": "base",
+                "device": "cpu"
+              }
+            },
+            {
+              "uid": "silero-vad",
+              "worker_ids": [
+                0
+              ],
+              "config": {}
+            },
+            {
+              "uid": "pyannote-diarization",
+              "worker_ids": [
+                1
+              ],
+              "config": {
+                "model": "pyannote/speaker-diarization-community-1",
+                "device": "cpu",
+                "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+                "num_threads": 1,
+                "nice": 10,
+                "segmentation_step": null
+              }
+            }
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 5.6,
+          "exited_during_run": null,
+          "log": "<outside>/caption_reference_on.service.log",
+          "rss_mb_after_ready": 1540.4,
+          "rss_mb_end": 1900.9,
+          "rss_mb_peak": 2067.4,
+          "rss_mb_growth_during_stream": 360.5,
+          "rss_samples": 205,
+          "workers": [
+            {
+              "pid": 39,
+              "rss_max_mb": 1020.4,
+              "cpu_sec": 238.57,
+              "wall_sec": 199.6,
+              "cores": 1.195,
+              "worker": 0
+            },
+            {
+              "pid": 62,
+              "rss_max_mb": 866.3,
+              "cpu_sec": 50.42,
+              "wall_sec": 199.6,
+              "cores": 0.253,
+              "worker": 1
+            }
+          ]
+        },
+        "diarization_cost": {
+          "rtf_from_counters": 0.278,
+          "pass_cost_mean_sec": 1.389,
+          "runs": 36.0,
+          "audio_seconds": 180.0,
+          "uncovered_seconds": 0,
+          "dropped_periods": 0,
+          "failed_passes": 0,
+          "labels_minted": 5.0,
+          "worker_cores_mean": 0.253,
+          "worker_cpu_sec": 50.42,
+          "worker_rss_max_mb": 866.3,
+          "wall_sec": 199.6
+        },
+        "stream": {
+          "sessions": 1,
+          "wall_sec": 199.6,
+          "per_session": [
+            {
+              "late_sends": 0,
+              "max_send_lateness_sec": 0.0,
+              "chunks_sent": 360,
+              "streamed_sec": 180.0
+            }
+          ]
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 18,
+              "mean": 11.474,
+              "p50": 8.066,
+              "p95": 41.617,
+              "max": 41.617
+            },
+            "final": {
+              "count": 13,
+              "mean": 39.275,
+              "p50": 38.709,
+              "p95": 64.111,
+              "max": 64.111
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 474,
+              "mean": 20.789,
+              "p50": 19.625,
+              "p95": 38.014,
+              "max": 45.779
+            },
+            "finalized": {
+              "count": 235,
+              "mean": 41.707,
+              "p50": 42.843,
+              "p95": 49.786,
+              "max": 65.109
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 214,
+              "mean": 0.039,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 8.345
+            },
+            "after_finalized": {
+              "count": 214,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "transcript_messages": 21,
+          "transcript_messages_with_text": 19,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 13,
+          "final_sequences_settled": 0,
+          "final_words": 235,
+          "final_words_labelled": 214,
+          "final_words_labelled_fraction": 0.911,
+          "speaker_labels_seen": [
+            "spk_1",
+            "spk_2",
+            "spk_4"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        "per_session_latency": null,
+        "service_counters_delta": {
+          "jobsCompletedTotal": 21.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 175.0,
+          "asrDroppedPeriodsTotal": 17.0,
+          "audioDroppedBufferFullTotal": 10.0,
+          "audioDroppedBufferFullSecondsTotal": 5.0,
+          "bufferOverflowTotal": 14.0,
+          "bufferOverflowSecondsTotal": 139.68,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 3.0,
+          "temperatureFallbackTotal": 2.0,
+          "repeatedSegmentDetectedTotal": 0,
+          "diarizationRunsTotal": 36.0,
+          "diarizationSecondsTotal": 49.993,
+          "diarizationFailedTotal": 0,
+          "reconcilerSecondsTotal": 0.0,
+          "diarizationLabelsMintedTotal": 5.0,
+          "diarizationAudioSecondsTotal": 180.0,
+          "diarizationUncoveredSecondsTotal": 0,
+          "diarizationDroppedPeriodsTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 21,
+            "sampleCount": 11,
+            "mean": 8611.005890090908,
+            "p50": 5985.29817,
+            "p95": 34088.397057,
+            "p99": 34088.397057,
+            "max": 34088.397057
+          },
+          "asrSchedulingDelayMs": {
+            "count": 21,
+            "sampleCount": 11,
+            "mean": 5.0090496363636365,
+            "p50": 3.735052,
+            "p95": 12.760253,
+            "p99": 12.760253,
+            "max": 12.760253
+          },
+          "asrRtf": {
+            "count": 20,
+            "sampleCount": 10,
+            "mean": 1.420190841311579,
+            "p50": 0.7106004211,
+            "p95": 6.8176794114,
+            "p99": 6.8176794114,
+            "max": 6.8176794114
+          },
+          "diarizationExecutionMs": {
+            "count": 39,
+            "sampleCount": 24,
+            "mean": 1345.1207836666667,
+            "p50": 1670.754875,
+            "p95": 1706.570167,
+            "p99": 1731.216418,
+            "max": 1731.216418
+          },
+          "diarizationLagMs": {
+            "count": 36,
+            "sampleCount": 21,
+            "mean": 1612.6441274370466,
+            "p50": 1724.2157459259033,
+            "p95": 1780.6155681610107,
+            "p99": 2212.6736640930176,
+            "max": 2212.6736640930176
+          },
+          "diarizationRtf": {
+            "count": 36,
+            "sampleCount": 21,
+            "mean": 0.3092149823365079,
+            "p50": 0.3351848168,
+            "p95": 0.3462432836,
+            "p99": 0.36938684266666666,
+            "max": 0.36938684266666666
+          }
+        }
+      },
+      "off": {
+        "label": "phase2a concurrency linux 4c8g [caption_reference_off]",
+        "generated_at": "2026-10-03T09:14:51+0000",
+        "code_revision": "3d7db81",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "off",
+          "sessions": 1,
+          "provider_overrides": [],
+          "context_overrides": [],
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": false
+          },
+          "num_workers": 1,
+          "contexts": [
+            {
+              "uid": "faster-whisper",
+              "worker_ids": [
+                0
+              ],
+              "config": {
+                "model": "base",
+                "device": "cpu"
+              }
+            },
+            {
+              "uid": "silero-vad",
+              "worker_ids": [
+                0
+              ],
+              "config": {}
+            }
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 2.1,
+          "exited_during_run": null,
+          "log": "<outside>/caption_reference_off.service.log",
+          "rss_mb_after_ready": 895.8,
+          "rss_mb_end": 1155.5,
+          "rss_mb_peak": 1321.2,
+          "rss_mb_growth_during_stream": 259.7,
+          "rss_samples": 201,
+          "workers": [
+            {
+              "pid": 124,
+              "rss_max_mb": 1026.5,
+              "cpu_sec": 237.37,
+              "wall_sec": 199.5,
+              "cores": 1.19,
+              "worker": 0
+            }
+          ]
+        },
+        "diarization_cost": null,
+        "stream": {
+          "sessions": 1,
+          "wall_sec": 199.5,
+          "per_session": [
+            {
+              "late_sends": 0,
+              "max_send_lateness_sec": 0.0,
+              "chunks_sent": 360,
+              "streamed_sec": 180.0
+            }
+          ]
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 21,
+              "mean": 9.392,
+              "p50": 7.371,
+              "p95": 21.58,
+              "max": 29.529
+            },
+            "final": {
+              "count": 12,
+              "mean": 32.523,
+              "p50": 33.699,
+              "p95": 43.031,
+              "max": 43.031
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 568,
+              "mean": 16.538,
+              "p50": 15.203,
+              "p95": 31.779,
+              "max": 44.031
+            },
+            "finalized": {
+              "count": 246,
+              "mean": 34.985,
+              "p50": 36.084,
+              "p95": 47.024,
+              "max": 49.592
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 26,
+          "transcript_messages_with_text": 22,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 246,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": 0.0,
+          "speaker_labels_seen": [],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        "per_session_latency": null,
+        "service_counters_delta": {
+          "jobsCompletedTotal": 26.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 180.0,
+          "asrDroppedPeriodsTotal": 13.0,
+          "audioDroppedBufferFullTotal": 0,
+          "audioDroppedBufferFullSecondsTotal": 0,
+          "bufferOverflowTotal": 17.0,
+          "bufferOverflowSecondsTotal": 136.2,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 5.0,
+          "temperatureFallbackTotal": 3.0,
+          "repeatedSegmentDetectedTotal": 0,
+          "diarizationRunsTotal": 0,
+          "diarizationSecondsTotal": 0,
+          "diarizationFailedTotal": 0,
+          "reconcilerSecondsTotal": 0,
+          "diarizationLabelsMintedTotal": 0,
+          "diarizationAudioSecondsTotal": 0,
+          "diarizationUncoveredSecondsTotal": 0,
+          "diarizationDroppedPeriodsTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 26,
+            "sampleCount": 15,
+            "mean": 6162.032014066667,
+            "p50": 4089.281085,
+            "p95": 27254.298222,
+            "p99": 27254.298222,
+            "max": 27254.298222
+          },
+          "asrSchedulingDelayMs": {
+            "count": 26,
+            "sampleCount": 15,
+            "mean": 6.3298764,
+            "p50": 7.36271,
+            "p95": 11.072108,
+            "p99": 11.072108,
+            "max": 11.072108
+          },
+          "asrRtf": {
+            "count": 24,
+            "sampleCount": 13,
+            "mean": 1.1533375927871794,
+            "p50": 0.7955724961999999,
+            "p95": 5.4508596443999995,
+            "p99": 5.4508596443999995,
+            "max": 5.4508596443999995
+          }
+        }
+      }
+    }
+  },
+  "concurrency": {
+    "2": {
+      "label": "phase2a concurrency linux 4c8g [concurrency_2]",
+      "generated_at": "2026-10-03T09:18:38+0000",
+      "code_revision": "3d7db81",
+      "code_dirty": null,
+      "environment": {
+        "machine": "aarch64",
+        "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+        "python": "3.12.11",
+        "device": "cpu",
+        "omp_num_threads": "1",
+        "openblas_num_threads": "1",
+        "resource_limits": {
+          "runner": "docker",
+          "requested_cpus": 4.0,
+          "requested_memory_gb": 8.0,
+          "cgroup_cpus": 4.0,
+          "cgroup_memory_gb": 8.0,
+          "host_cpus": 8,
+          "host_memory_gb": 7.65,
+          "effective_cpus": 4.0,
+          "effective_memory_gb": 8.0
+        },
+        "baseline_key": "linux-cpu-4c8g",
+        "torch": "2.13.0+cpu",
+        "torch_threads": 1,
+        "pyannote_audio": "4.0.7",
+        "faster_whisper": "1.2.1"
+      },
+      "hygiene": null,
+      "config": {
+        "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+        "provider": "whisper",
+        "diarization": "on",
+        "sessions": 2,
+        "provider_overrides": [],
+        "context_overrides": [],
+        "effective_provider_config": {
+          "whisper_context_tag": "whisper_context",
+          "silero_context_tag": "silero_vad",
+          "job_period_ms": 5000,
+          "max_buffer_len_sec": 30,
+          "local_agree_dim": 2,
+          "diarization_detector": true,
+          "diarization_context_tag": "pyannote_diarization",
+          "diarization_period_ms": 5000,
+          "diarization_window_sec": 10,
+          "diarization_edge_margin_sec": 0.5,
+          "diarization_label_timeout_sec": 15
+        },
+        "num_workers": 2,
+        "contexts": [
+          {
+            "uid": "faster-whisper",
+            "worker_ids": [
+              0
+            ],
+            "config": {
+              "model": "base",
+              "device": "cpu"
+            }
+          },
+          {
+            "uid": "silero-vad",
+            "worker_ids": [
+              0
+            ],
+            "config": {}
+          },
+          {
+            "uid": "pyannote-diarization",
+            "worker_ids": [
+              1
+            ],
+            "config": {
+              "model": "pyannote/speaker-diarization-community-1",
+              "device": "cpu",
+              "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+              "num_threads": 1,
+              "nice": 10,
+              "segmentation_step": null
+            }
+          }
+        ],
+        "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+        "chunk_ms": 500,
+        "seconds": 180.0,
+        "linger_sec": 20.0
+      },
+      "service": {
+        "ready_after_sec": 4.6,
+        "exited_during_run": null,
+        "log": "<outside>/concurrency_2.service.log",
+        "rss_mb_after_ready": 1542.4,
+        "rss_mb_end": 1955.2,
+        "rss_mb_peak": 2092.4,
+        "rss_mb_growth_during_stream": 412.8,
+        "rss_samples": 204,
+        "workers": [
+          {
+            "pid": 195,
+            "rss_max_mb": 1030.1,
+            "cpu_sec": 314.17,
+            "wall_sec": 199.5,
+            "cores": 1.575,
+            "worker": 0
+          },
+          {
+            "pid": 203,
+            "rss_max_mb": 867.0,
+            "cpu_sec": 96.27,
+            "wall_sec": 199.5,
+            "cores": 0.482,
+            "worker": 1
+          }
+        ]
+      },
+      "diarization_cost": {
+        "rtf_from_counters": 0.266,
+        "pass_cost_mean_sec": 1.332,
+        "runs": 72.0,
+        "audio_seconds": 360.0,
+        "uncovered_seconds": 0,
+        "dropped_periods": 0,
+        "failed_passes": 0,
+        "labels_minted": 8.0,
+        "worker_cores_mean": 0.482,
+        "worker_cpu_sec": 96.27,
+        "worker_rss_max_mb": 867.0,
+        "wall_sec": 199.5
+      },
+      "stream": {
+        "sessions": 2,
+        "wall_sec": 199.5,
+        "per_session": [
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          },
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          }
+        ]
+      },
+      "latency": {
+        "chunk_id_method": {
+          "in_progress": {
+            "count": 29,
+            "mean": 23.986,
+            "p50": 21.399,
+            "p95": 54.131,
+            "max": 56.303
+          },
+          "final": {
+            "count": 19,
+            "mean": 48.315,
+            "p50": 44.539,
+            "p95": 83.631,
+            "max": 83.631
+          }
+        },
+        "word_method": {
+          "first_shown": {
+            "count": 619,
+            "mean": 37.286,
+            "p50": 34.907,
+            "p95": 67.341,
+            "max": 95.343
+          },
+          "finalized": {
+            "count": 156,
+            "mean": 60.354,
+            "p50": 63.523,
+            "p95": 75.77,
+            "max": 97.834
+          }
+        },
+        "label_latency": {
+          "after_text_shown": {
+            "count": 146,
+            "mean": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          },
+          "after_finalized": {
+            "count": 146,
+            "mean": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          }
+        },
+        "transcript_messages": 34,
+        "transcript_messages_with_text": 30,
+        "speakers_update_messages": 0,
+        "speakers_updates_for_unknown_sequence": 0,
+        "final_sequences_with_id": 19,
+        "final_sequences_settled": 0,
+        "final_words": 156,
+        "final_words_labelled": 146,
+        "final_words_labelled_fraction": 0.936,
+        "speaker_labels_seen": [
+          "spk_0",
+          "spk_1",
+          "spk_2",
+          "spk_4"
+        ],
+        "label_changes_before_final": 0,
+        "label_changes_before_final_fraction": 0.0,
+        "label_changes_after_sent": 0
+      },
+      "per_session_latency": [
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 17,
+              "mean": 23.548,
+              "p50": 21.003,
+              "p95": 56.303,
+              "max": 56.303
+            },
+            "final": {
+              "count": 12,
+              "mean": 46.29,
+              "p50": 43.324,
+              "p95": 83.631,
+              "max": 83.631
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 312,
+              "mean": 30.65,
+              "p50": 26.761,
+              "p95": 61.78,
+              "max": 82.631
+            },
+            "finalized": {
+              "count": 81,
+              "mean": 54.14,
+              "p50": 52.66,
+              "p95": 71.78,
+              "max": 89.131
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 75,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            },
+            "after_finalized": {
+              "count": 75,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "transcript_messages": 19,
+          "transcript_messages_with_text": 17,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 12,
+          "final_sequences_settled": 0,
+          "final_words": 81,
+          "final_words_labelled": 75,
+          "final_words_labelled_fraction": 0.926,
+          "speaker_labels_seen": [
+            "spk_1",
+            "spk_4"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 12,
+              "mean": 24.608,
+              "p50": 21.399,
+              "p95": 51.402,
+              "max": 51.402
+            },
+            "final": {
+              "count": 7,
+              "mean": 51.786,
+              "p50": 48.399,
+              "p95": 78.342,
+              "max": 78.342
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 307,
+              "mean": 44.029,
+              "p50": 41.729,
+              "p95": 69.838,
+              "max": 95.343
+            },
+            "finalized": {
+              "count": 75,
+              "mean": 67.066,
+              "p50": 67.406,
+              "p95": 75.77,
+              "max": 97.834
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 71,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            },
+            "after_finalized": {
+              "count": 71,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "transcript_messages": 15,
+          "transcript_messages_with_text": 13,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 7,
+          "final_sequences_settled": 0,
+          "final_words": 75,
+          "final_words_labelled": 71,
+          "final_words_labelled_fraction": 0.947,
+          "speaker_labels_seen": [
+            "spk_0",
+            "spk_2"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        }
+      ],
+      "service_counters_delta": {
+        "jobsCompletedTotal": 34.0,
+        "jobsFailedTotal": 0,
+        "asrAudioSecondsTotal": 265.14,
+        "asrDroppedPeriodsTotal": 37.0,
+        "audioDroppedBufferFullTotal": 41.0,
+        "audioDroppedBufferFullSecondsTotal": 20.36,
+        "bufferOverflowTotal": 20.0,
+        "bufferOverflowSecondsTotal": 149.86,
+        "vadNoSpeechTotal": 0,
+        "noWordsTotal": 5.0,
+        "temperatureFallbackTotal": 8.0,
+        "repeatedSegmentDetectedTotal": 0,
+        "diarizationRunsTotal": 72.0,
+        "diarizationSecondsTotal": 95.9,
+        "diarizationFailedTotal": 0,
+        "reconcilerSecondsTotal": 0.001,
+        "diarizationLabelsMintedTotal": 8.0,
+        "diarizationAudioSecondsTotal": 360.0,
+        "diarizationUncoveredSecondsTotal": 0,
+        "diarizationDroppedPeriodsTotal": 0
+      },
+      "service_histograms_end": {
+        "asrExecutionMs": {
+          "count": 34,
+          "sampleCount": 22,
+          "mean": 5325.696258090909,
+          "p50": 4255.567169,
+          "p95": 11037.994005,
+          "p99": 14552.380673,
+          "max": 14552.380673
+        },
+        "asrSchedulingDelayMs": {
+          "count": 34,
+          "sampleCount": 22,
+          "mean": 3121.2009035909086,
+          "p50": 2373.203985,
+          "p95": 8339.41921,
+          "p99": 10816.734628,
+          "max": 10816.734628
+        },
+        "asrRtf": {
+          "count": 34,
+          "sampleCount": 22,
+          "mean": 1.5512439104863467,
+          "p50": 1.439407734,
+          "p95": 4.415197602,
+          "p99": 5.8209522692,
+          "max": 5.8209522692
+        },
+        "diarizationExecutionMs": {
+          "count": 78,
+          "sampleCount": 48,
+          "mean": 1336.7215249791668,
+          "p50": 1651.621251,
+          "p95": 1699.396792,
+          "p99": 1752.719459,
+          "max": 1752.719459
+        },
+        "diarizationLagMs": {
+          "count": 72,
+          "sampleCount": 42,
+          "mean": 1930.1303795405797,
+          "p50": 1744.3726062774658,
+          "p95": 2427.3529052734375,
+          "p99": 3948.134660720825,
+          "max": 3948.134660720825
+        },
+        "diarizationRtf": {
+          "count": 72,
+          "sampleCount": 42,
+          "mean": 0.30870363948452895,
+          "p50": 0.3314988834,
+          "p95": 0.3676803148888889,
+          "p99": 0.4855419405714286,
+          "max": 0.4855419405714286
+        }
+      }
+    },
+    "3": {
+      "label": "phase2a concurrency linux 4c8g [concurrency_3]",
+      "generated_at": "2026-10-03T09:22:24+0000",
+      "code_revision": "3d7db81",
+      "code_dirty": null,
+      "environment": {
+        "machine": "aarch64",
+        "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+        "python": "3.12.11",
+        "device": "cpu",
+        "omp_num_threads": "1",
+        "openblas_num_threads": "1",
+        "resource_limits": {
+          "runner": "docker",
+          "requested_cpus": 4.0,
+          "requested_memory_gb": 8.0,
+          "cgroup_cpus": 4.0,
+          "cgroup_memory_gb": 8.0,
+          "host_cpus": 8,
+          "host_memory_gb": 7.65,
+          "effective_cpus": 4.0,
+          "effective_memory_gb": 8.0
+        },
+        "baseline_key": "linux-cpu-4c8g",
+        "torch": "2.13.0+cpu",
+        "torch_threads": 1,
+        "pyannote_audio": "4.0.7",
+        "faster_whisper": "1.2.1"
+      },
+      "hygiene": null,
+      "config": {
+        "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+        "provider": "whisper",
+        "diarization": "on",
+        "sessions": 3,
+        "provider_overrides": [],
+        "context_overrides": [],
+        "effective_provider_config": {
+          "whisper_context_tag": "whisper_context",
+          "silero_context_tag": "silero_vad",
+          "job_period_ms": 5000,
+          "max_buffer_len_sec": 30,
+          "local_agree_dim": 2,
+          "diarization_detector": true,
+          "diarization_context_tag": "pyannote_diarization",
+          "diarization_period_ms": 5000,
+          "diarization_window_sec": 10,
+          "diarization_edge_margin_sec": 0.5,
+          "diarization_label_timeout_sec": 15
+        },
+        "num_workers": 2,
+        "contexts": [
+          {
+            "uid": "faster-whisper",
+            "worker_ids": [
+              0
+            ],
+            "config": {
+              "model": "base",
+              "device": "cpu"
+            }
+          },
+          {
+            "uid": "silero-vad",
+            "worker_ids": [
+              0
+            ],
+            "config": {}
+          },
+          {
+            "uid": "pyannote-diarization",
+            "worker_ids": [
+              1
+            ],
+            "config": {
+              "model": "pyannote/speaker-diarization-community-1",
+              "device": "cpu",
+              "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+              "num_threads": 1,
+              "nice": 10,
+              "segmentation_step": null
+            }
+          }
+        ],
+        "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+        "chunk_ms": 500,
+        "seconds": 180.0,
+        "linger_sec": 20.0
+      },
+      "service": {
+        "ready_after_sec": 4.6,
+        "exited_during_run": null,
+        "log": "<outside>/concurrency_3.service.log",
+        "rss_mb_after_ready": 1541.1,
+        "rss_mb_end": 1969.8,
+        "rss_mb_peak": 2215.0,
+        "rss_mb_growth_during_stream": 428.7,
+        "rss_samples": 204,
+        "workers": [
+          {
+            "pid": 279,
+            "rss_max_mb": 1037.0,
+            "cpu_sec": 322.77,
+            "wall_sec": 199.5,
+            "cores": 1.618,
+            "worker": 0
+          },
+          {
+            "pid": 287,
+            "rss_max_mb": 874.8,
+            "cpu_sec": 134.28,
+            "wall_sec": 199.5,
+            "cores": 0.673,
+            "worker": 1
+          }
+        ]
+      },
+      "diarization_cost": {
+        "rtf_from_counters": 0.248,
+        "pass_cost_mean_sec": 1.287,
+        "runs": 104.0,
+        "audio_seconds": 540.0,
+        "uncovered_seconds": 0.5,
+        "dropped_periods": 4.0,
+        "failed_passes": 0,
+        "labels_minted": 13.0,
+        "worker_cores_mean": 0.673,
+        "worker_cpu_sec": 134.28,
+        "worker_rss_max_mb": 874.8,
+        "wall_sec": 199.5
+      },
+      "stream": {
+        "sessions": 3,
+        "wall_sec": 199.5,
+        "per_session": [
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          },
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          },
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          }
+        ]
+      },
+      "latency": {
+        "chunk_id_method": {
+          "in_progress": {
+            "count": 27,
+            "mean": 88.622,
+            "p50": 92.389,
+            "p95": 160.793,
+            "max": 168.377
+          },
+          "final": {
+            "count": 1,
+            "mean": 184.82,
+            "p50": 184.82,
+            "p95": 184.82,
+            "max": 184.82
+          }
+        },
+        "word_method": {
+          "first_shown": {
+            "count": 410,
+            "mean": 100.441,
+            "p50": 107.324,
+            "p95": 169.291,
+            "max": 185.377
+          },
+          "finalized": {
+            "count": 2,
+            "mean": 184.82,
+            "p50": 184.82,
+            "p95": 184.82,
+            "max": 184.82
+          }
+        },
+        "label_latency": {
+          "after_text_shown": {
+            "count": 0,
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "after_finalized": {
+            "count": 0,
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "transcript_messages": 31,
+        "transcript_messages_with_text": 27,
+        "speakers_update_messages": 0,
+        "speakers_updates_for_unknown_sequence": 0,
+        "final_sequences_with_id": 1,
+        "final_sequences_settled": 0,
+        "final_words": 2,
+        "final_words_labelled": 0,
+        "final_words_labelled_fraction": 0.0,
+        "speaker_labels_seen": [
+          "spk_0",
+          "spk_1"
+        ],
+        "label_changes_before_final": 0,
+        "label_changes_before_final_fraction": 0.0,
+        "label_changes_after_sent": 0
+      },
+      "per_session_latency": [
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 9,
+              "mean": 95.685,
+              "p50": 94.561,
+              "p95": 168.377,
+              "max": 168.377
+            },
+            "final": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 140,
+              "mean": 104.129,
+              "p50": 109.249,
+              "p95": 169.431,
+              "max": 185.377
+            },
+            "finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 11,
+          "transcript_messages_with_text": 9,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 0,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": null,
+          "speaker_labels_seen": [
+            "spk_1"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": null,
+          "label_changes_after_sent": 0
+        },
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 9,
+              "mean": 82.448,
+              "p50": 82.083,
+              "p95": 154.318,
+              "max": 154.318
+            },
+            "final": {
+              "count": 1,
+              "mean": 184.82,
+              "p50": 184.82,
+              "p95": 184.82,
+              "max": 184.82
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 129,
+              "mean": 94.965,
+              "p50": 102.057,
+              "p95": 167.825,
+              "max": 171.816
+            },
+            "finalized": {
+              "count": 2,
+              "mean": 184.82,
+              "p50": 184.82,
+              "p95": 184.82,
+              "max": 184.82
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 10,
+          "transcript_messages_with_text": 9,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 1,
+          "final_sequences_settled": 0,
+          "final_words": 2,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": 0.0,
+          "speaker_labels_seen": [
+            "spk_0",
+            "spk_1"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 9,
+              "mean": 87.733,
+              "p50": 92.389,
+              "p95": 160.793,
+              "max": 160.793
+            },
+            "final": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 141,
+              "mean": 101.787,
+              "p50": 107.823,
+              "p95": 168.293,
+              "max": 178.784
+            },
+            "finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 10,
+          "transcript_messages_with_text": 9,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 0,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": null,
+          "speaker_labels_seen": [
+            "spk_0",
+            "spk_1"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": null,
+          "label_changes_after_sent": 0
+        }
+      ],
+      "service_counters_delta": {
+        "jobsCompletedTotal": 31.0,
+        "jobsFailedTotal": 0,
+        "asrAudioSecondsTotal": 100.5,
+        "asrDroppedPeriodsTotal": 73.0,
+        "audioDroppedBufferFullTotal": 0,
+        "audioDroppedBufferFullSecondsTotal": 0,
+        "bufferOverflowTotal": 5.0,
+        "bufferOverflowSecondsTotal": 10.5,
+        "vadNoSpeechTotal": 0,
+        "noWordsTotal": 4.0,
+        "temperatureFallbackTotal": 20.0,
+        "repeatedSegmentDetectedTotal": 0,
+        "diarizationRunsTotal": 104.0,
+        "diarizationSecondsTotal": 133.849,
+        "diarizationFailedTotal": 0,
+        "reconcilerSecondsTotal": 0.001,
+        "diarizationLabelsMintedTotal": 13.0,
+        "diarizationAudioSecondsTotal": 540.0,
+        "diarizationUncoveredSecondsTotal": 0.5,
+        "diarizationDroppedPeriodsTotal": 4.0
+      },
+      "service_histograms_end": {
+        "asrExecutionMs": {
+          "count": 31,
+          "sampleCount": 18,
+          "mean": 6684.167824944444,
+          "p50": 3623.77346,
+          "p95": 18135.933175,
+          "p99": 18135.933175,
+          "max": 18135.933175
+        },
+        "asrSchedulingDelayMs": {
+          "count": 31,
+          "sampleCount": 18,
+          "mean": 11176.818201333333,
+          "p50": 11512.043432,
+          "p95": 18541.644338,
+          "p99": 18541.644338,
+          "max": 18541.644338
+        },
+        "asrRtf": {
+          "count": 31,
+          "sampleCount": 18,
+          "mean": 2.5762289561666667,
+          "p50": 1.449509384,
+          "p95": 7.25437327,
+          "p99": 7.25437327,
+          "max": 7.25437327
+        },
+        "diarizationExecutionMs": {
+          "count": 113,
+          "sampleCount": 69,
+          "mean": 1322.331864173913,
+          "p50": 1653.768417,
+          "p95": 1699.211126,
+          "p99": 1811.361084,
+          "max": 1811.361084
+        },
+        "diarizationLagMs": {
+          "count": 104,
+          "sampleCount": 60,
+          "mean": 2571.0697213808694,
+          "p50": 2375.2927780151367,
+          "p95": 4925.339460372925,
+          "p99": 5530.196666717529,
+          "max": 5530.196666717529
+        },
+        "diarizationRtf": {
+          "count": 104,
+          "sampleCount": 60,
+          "mean": 0.3228075785173717,
+          "p50": 0.3307019418,
+          "p95": 0.6742297836,
+          "p99": 0.7245444336,
+          "max": 0.7245444336
+        }
+      }
+    },
+    "4": {
+      "label": "phase2a concurrency linux 4c8g [concurrency_4]",
+      "generated_at": "2026-10-03T09:26:11+0000",
+      "code_revision": "3d7db81",
+      "code_dirty": null,
+      "environment": {
+        "machine": "aarch64",
+        "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+        "python": "3.12.11",
+        "device": "cpu",
+        "omp_num_threads": "1",
+        "openblas_num_threads": "1",
+        "resource_limits": {
+          "runner": "docker",
+          "requested_cpus": 4.0,
+          "requested_memory_gb": 8.0,
+          "cgroup_cpus": 4.0,
+          "cgroup_memory_gb": 8.0,
+          "host_cpus": 8,
+          "host_memory_gb": 7.65,
+          "effective_cpus": 4.0,
+          "effective_memory_gb": 8.0
+        },
+        "baseline_key": "linux-cpu-4c8g",
+        "torch": "2.13.0+cpu",
+        "torch_threads": 1,
+        "pyannote_audio": "4.0.7",
+        "faster_whisper": "1.2.1"
+      },
+      "hygiene": null,
+      "config": {
+        "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+        "provider": "whisper",
+        "diarization": "on",
+        "sessions": 4,
+        "provider_overrides": [],
+        "context_overrides": [],
+        "effective_provider_config": {
+          "whisper_context_tag": "whisper_context",
+          "silero_context_tag": "silero_vad",
+          "job_period_ms": 5000,
+          "max_buffer_len_sec": 30,
+          "local_agree_dim": 2,
+          "diarization_detector": true,
+          "diarization_context_tag": "pyannote_diarization",
+          "diarization_period_ms": 5000,
+          "diarization_window_sec": 10,
+          "diarization_edge_margin_sec": 0.5,
+          "diarization_label_timeout_sec": 15
+        },
+        "num_workers": 2,
+        "contexts": [
+          {
+            "uid": "faster-whisper",
+            "worker_ids": [
+              0
+            ],
+            "config": {
+              "model": "base",
+              "device": "cpu"
+            }
+          },
+          {
+            "uid": "silero-vad",
+            "worker_ids": [
+              0
+            ],
+            "config": {}
+          },
+          {
+            "uid": "pyannote-diarization",
+            "worker_ids": [
+              1
+            ],
+            "config": {
+              "model": "pyannote/speaker-diarization-community-1",
+              "device": "cpu",
+              "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+              "num_threads": 1,
+              "nice": 10,
+              "segmentation_step": null
+            }
+          }
+        ],
+        "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+        "chunk_ms": 500,
+        "seconds": 180.0,
+        "linger_sec": 20.0
+      },
+      "service": {
+        "ready_after_sec": 5.1,
+        "exited_during_run": null,
+        "log": "<outside>/concurrency_4.service.log",
+        "rss_mb_after_ready": 1540.9,
+        "rss_mb_end": 2088.0,
+        "rss_mb_peak": 2109.6,
+        "rss_mb_growth_during_stream": 547.1,
+        "rss_samples": 204,
+        "workers": [
+          {
+            "pid": 356,
+            "rss_max_mb": 1029.7,
+            "cpu_sec": 324.77,
+            "wall_sec": 199.5,
+            "cores": 1.628,
+            "worker": 0
+          },
+          {
+            "pid": 364,
+            "rss_max_mb": 870.6,
+            "cpu_sec": 159.09,
+            "wall_sec": 199.5,
+            "cores": 0.797,
+            "worker": 1
+          }
+        ]
+      },
+      "diarization_cost": {
+        "rtf_from_counters": 0.275,
+        "pass_cost_mean_sec": 1.254,
+        "runs": 126.0,
+        "audio_seconds": 574.5,
+        "uncovered_seconds": 61.0,
+        "dropped_periods": 27.0,
+        "failed_passes": 0,
+        "labels_minted": 19.0,
+        "worker_cores_mean": 0.797,
+        "worker_cpu_sec": 159.09,
+        "worker_rss_max_mb": 870.6,
+        "wall_sec": 199.5
+      },
+      "stream": {
+        "sessions": 4,
+        "wall_sec": 199.5,
+        "per_session": [
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          },
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          },
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          },
+          {
+            "late_sends": 0,
+            "max_send_lateness_sec": 0.0,
+            "chunks_sent": 360,
+            "streamed_sec": 180.0
+          }
+        ]
+      },
+      "latency": {
+        "chunk_id_method": {
+          "in_progress": {
+            "count": 26,
+            "mean": 92.754,
+            "p50": 90.964,
+            "p95": 162.936,
+            "max": 165.186
+          },
+          "final": {
+            "count": 0,
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "word_method": {
+          "first_shown": {
+            "count": 390,
+            "mean": 111.692,
+            "p50": 127.777,
+            "p95": 170.191,
+            "max": 180.186
+          },
+          "finalized": {
+            "count": 0,
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "label_latency": {
+          "after_text_shown": {
+            "count": 0,
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "after_finalized": {
+            "count": 0,
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "transcript_messages": 32,
+        "transcript_messages_with_text": 26,
+        "speakers_update_messages": 0,
+        "speakers_updates_for_unknown_sequence": 0,
+        "final_sequences_with_id": 0,
+        "final_sequences_settled": 0,
+        "final_words": 0,
+        "final_words_labelled": 0,
+        "final_words_labelled_fraction": null,
+        "speaker_labels_seen": [
+          "spk_0",
+          "spk_1"
+        ],
+        "label_changes_before_final": 0,
+        "label_changes_before_final_fraction": null,
+        "label_changes_after_sent": 0
+      },
+      "per_session_latency": [
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 6,
+              "mean": 87.704,
+              "p50": 71.153,
+              "p95": 156.176,
+              "max": 156.176
+            },
+            "final": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 90,
+              "mean": 100.414,
+              "p50": 106.607,
+              "p95": 163.176,
+              "max": 170.173
+            },
+            "finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 8,
+          "transcript_messages_with_text": 6,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 0,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": null,
+          "speaker_labels_seen": [
+            "spk_1"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": null,
+          "label_changes_after_sent": 0
+        },
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 6,
+              "mean": 96.95,
+              "p50": 76.37,
+              "p95": 159.316,
+              "max": 159.316
+            },
+            "final": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 100,
+              "mean": 109.788,
+              "p50": 125.768,
+              "p95": 166.816,
+              "max": 173.814
+            },
+            "finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 8,
+          "transcript_messages_with_text": 6,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 0,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": null,
+          "speaker_labels_seen": [
+            "spk_0"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": null,
+          "label_changes_after_sent": 0
+        },
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 7,
+              "mean": 90.356,
+              "p50": 90.964,
+              "p95": 162.936,
+              "max": 162.936
+            },
+            "final": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 96,
+              "mean": 114.271,
+              "p50": 128.042,
+              "p95": 173.931,
+              "max": 176.432
+            },
+            "finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 8,
+          "transcript_messages_with_text": 7,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 0,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": null,
+          "speaker_labels_seen": [
+            "spk_0"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": null,
+          "label_changes_after_sent": 0
+        },
+        {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 7,
+              "mean": 95.885,
+              "p50": 97.168,
+              "p95": 165.186,
+              "max": 165.186
+            },
+            "final": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 104,
+              "mean": 120.902,
+              "p50": 130.616,
+              "p95": 170.691,
+              "max": 180.186
+            },
+            "finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 8,
+          "transcript_messages_with_text": 7,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 0,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": null,
+          "speaker_labels_seen": [
+            "spk_0",
+            "spk_1"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": null,
+          "label_changes_after_sent": 0
+        }
+      ],
+      "service_counters_delta": {
+        "jobsCompletedTotal": 32.0,
+        "jobsFailedTotal": 0,
+        "asrAudioSecondsTotal": 110.5,
+        "asrDroppedPeriodsTotal": 103.0,
+        "audioDroppedBufferFullTotal": 0,
+        "audioDroppedBufferFullSecondsTotal": 0,
+        "bufferOverflowTotal": 0,
+        "bufferOverflowSecondsTotal": 0,
+        "vadNoSpeechTotal": 0,
+        "noWordsTotal": 6.0,
+        "temperatureFallbackTotal": 21.0,
+        "repeatedSegmentDetectedTotal": 0,
+        "diarizationRunsTotal": 126.0,
+        "diarizationSecondsTotal": 157.975,
+        "diarizationFailedTotal": 0,
+        "reconcilerSecondsTotal": 0.001,
+        "diarizationLabelsMintedTotal": 19.0,
+        "diarizationAudioSecondsTotal": 574.5,
+        "diarizationUncoveredSecondsTotal": 61.0,
+        "diarizationDroppedPeriodsTotal": 27.0
+      },
+      "service_histograms_end": {
+        "asrExecutionMs": {
+          "count": 32,
+          "sampleCount": 17,
+          "mean": 6935.243890352941,
+          "p50": 6069.98117,
+          "p95": 19660.413425,
+          "p99": 19660.413425,
+          "max": 19660.413425
+        },
+        "asrSchedulingDelayMs": {
+          "count": 32,
+          "sampleCount": 17,
+          "mean": 18686.23209982353,
+          "p50": 17642.87495,
+          "p95": 31237.176815,
+          "p99": 31237.176815,
+          "max": 31237.176815
+        },
+        "asrRtf": {
+          "count": 32,
+          "sampleCount": 17,
+          "mean": 2.6469891823882357,
+          "p50": 2.0233270566666666,
+          "p95": 7.86416537,
+          "p99": 7.86416537,
+          "max": 7.86416537
+        },
+        "diarizationExecutionMs": {
+          "count": 126,
+          "sampleCount": 73,
+          "mean": 1512.7800486027397,
+          "p50": 1670.543793,
+          "p95": 1704.368626,
+          "p99": 1753.567209,
+          "max": 1753.567209
+        },
+        "diarizationLagMs": {
+          "count": 126,
+          "sampleCount": 73,
+          "mean": 21523.15516994424,
+          "p50": 17451.56240463257,
+          "p95": 51322.577476501465,
+          "p99": 54333.2154750824,
+          "max": 54333.2154750824
+        },
+        "diarizationRtf": {
+          "count": 126,
+          "sampleCount": 73,
+          "mean": 0.5807769660109026,
+          "p50": 0.65801325,
+          "p95": 1.116332778,
+          "p99": 1.1350633053333332,
+          "max": 1.1350633053333332
+        }
+      }
+    }
+  },
+  "durations_sec": {
+    "caption_reference_on": 207.9,
+    "caption_reference_off": 204.3,
+    "concurrency_2": 226.6,
+    "concurrency_3": 226.5,
+    "concurrency_4": 227.0
+  },
+  "suite_wall_sec": 1094.7,
+  "key_metrics": {
+    "caption.on.chunk_id.in_progress.p50": 8.066,
+    "caption.on.chunk_id.in_progress.p95": 41.617,
+    "caption.on.chunk_id.in_progress.mean": 11.474,
+    "caption.on.chunk_id.final.p50": 38.709,
+    "caption.on.chunk_id.final.p95": 64.111,
+    "caption.on.chunk_id.final.mean": 39.275,
+    "caption.on.word.first_shown.p50": 19.625,
+    "caption.on.word.first_shown.p95": 38.014,
+    "caption.on.word.first_shown.mean": 20.789,
+    "caption.on.word.finalized.p50": 42.843,
+    "caption.on.word.finalized.p95": 49.786,
+    "caption.on.word.finalized.mean": 41.707,
+    "caption.on.label.after_text_shown.p50": 0.0,
+    "caption.on.label.after_text_shown.p95": 0.0,
+    "caption.on.label.after_text_shown.mean": 0.039,
+    "caption.on.label.after_finalized.p50": 0.0,
+    "caption.on.label.after_finalized.p95": 0.0,
+    "caption.on.label.after_finalized.mean": 0.0,
+    "caption.on.transcript_messages": 21,
+    "caption.on.speakers_update_messages": 0,
+    "caption.on.final_words": 235,
+    "caption.on.final_words_labelled_fraction": 0.911,
+    "caption.on.speaker_labels_seen": 3,
+    "caption.on.label_changes_before_final": 0,
+    "caption.on.label_changes_before_final_fraction": 0.0,
+    "caption.on.label_changes_after_sent": 0,
+    "caption.on.dropped_periods": 17.0,
+    "caption.on.audio_dropped_buffer_full_sec": 5.0,
+    "caption.on.buffer_overflow_sec": 139.68,
+    "caption.on.jobs_completed": 21.0,
+    "caption.on.rss_peak_mb": 2067.4,
+    "caption.on.rss_growth_mb": 360.5,
+    "caption.on.exec_ms_p95": 34088.397057,
+    "caption.on.exec_ms_max": 34088.397057,
+    "caption.on.worker0.cores": 1.195,
+    "caption.on.worker0.rss_max_mb": 1020.4,
+    "caption.on.worker1.cores": 0.253,
+    "caption.on.worker1.rss_max_mb": 866.3,
+    "caption.on.diarization.rtf": 0.278,
+    "caption.on.diarization.pass_cost_mean_sec": 1.389,
+    "caption.on.diarization.runs": 36.0,
+    "caption.on.diarization.uncovered_sec": 0,
+    "caption.on.diarization.dropped_periods": 0,
+    "caption.on.diarization.failed_passes": 0,
+    "caption.on.diarization.worker_cores": 0.253,
+    "caption.on.diarization.worker_rss_max_mb": 866.3,
+    "caption.on.diarization.lag_ms_p95": 1780.6155681610107,
+    "caption.on.diarization.exec_ms_p95": 1706.570167,
+    "caption.off.chunk_id.in_progress.p50": 7.371,
+    "caption.off.chunk_id.in_progress.p95": 21.58,
+    "caption.off.chunk_id.in_progress.mean": 9.392,
+    "caption.off.chunk_id.final.p50": 33.699,
+    "caption.off.chunk_id.final.p95": 43.031,
+    "caption.off.chunk_id.final.mean": 32.523,
+    "caption.off.word.first_shown.p50": 15.203,
+    "caption.off.word.first_shown.p95": 31.779,
+    "caption.off.word.first_shown.mean": 16.538,
+    "caption.off.word.finalized.p50": 36.084,
+    "caption.off.word.finalized.p95": 47.024,
+    "caption.off.word.finalized.mean": 34.985,
+    "caption.off.label.after_text_shown.p50": null,
+    "caption.off.label.after_text_shown.p95": null,
+    "caption.off.label.after_text_shown.mean": null,
+    "caption.off.label.after_finalized.p50": null,
+    "caption.off.label.after_finalized.p95": null,
+    "caption.off.label.after_finalized.mean": null,
+    "caption.off.transcript_messages": 26,
+    "caption.off.speakers_update_messages": 0,
+    "caption.off.final_words": 246,
+    "caption.off.final_words_labelled_fraction": 0.0,
+    "caption.off.speaker_labels_seen": 0,
+    "caption.off.label_changes_before_final": 0,
+    "caption.off.label_changes_before_final_fraction": 0.0,
+    "caption.off.label_changes_after_sent": 0,
+    "caption.off.dropped_periods": 13.0,
+    "caption.off.audio_dropped_buffer_full_sec": 0,
+    "caption.off.buffer_overflow_sec": 136.2,
+    "caption.off.jobs_completed": 26.0,
+    "caption.off.rss_peak_mb": 1321.2,
+    "caption.off.rss_growth_mb": 259.7,
+    "caption.off.exec_ms_p95": 27254.298222,
+    "caption.off.exec_ms_max": 27254.298222,
+    "caption.off.worker0.cores": 1.19,
+    "caption.off.worker0.rss_max_mb": 1026.5,
+    "concurrency.2.chunk_id.in_progress.p50": 21.399,
+    "concurrency.2.chunk_id.in_progress.p95": 54.131,
+    "concurrency.2.chunk_id.in_progress.mean": 23.986,
+    "concurrency.2.chunk_id.final.p50": 44.539,
+    "concurrency.2.chunk_id.final.p95": 83.631,
+    "concurrency.2.chunk_id.final.mean": 48.315,
+    "concurrency.2.word.first_shown.p50": 34.907,
+    "concurrency.2.word.first_shown.p95": 67.341,
+    "concurrency.2.word.first_shown.mean": 37.286,
+    "concurrency.2.word.finalized.p50": 63.523,
+    "concurrency.2.word.finalized.p95": 75.77,
+    "concurrency.2.word.finalized.mean": 60.354,
+    "concurrency.2.label.after_text_shown.p50": 0.0,
+    "concurrency.2.label.after_text_shown.p95": 0.0,
+    "concurrency.2.label.after_text_shown.mean": 0.0,
+    "concurrency.2.label.after_finalized.p50": 0.0,
+    "concurrency.2.label.after_finalized.p95": 0.0,
+    "concurrency.2.label.after_finalized.mean": 0.0,
+    "concurrency.2.transcript_messages": 34,
+    "concurrency.2.speakers_update_messages": 0,
+    "concurrency.2.final_words": 156,
+    "concurrency.2.final_words_labelled_fraction": 0.936,
+    "concurrency.2.speaker_labels_seen": 4,
+    "concurrency.2.label_changes_before_final": 0,
+    "concurrency.2.label_changes_before_final_fraction": 0.0,
+    "concurrency.2.label_changes_after_sent": 0,
+    "concurrency.2.dropped_periods": 37.0,
+    "concurrency.2.audio_dropped_buffer_full_sec": 20.36,
+    "concurrency.2.buffer_overflow_sec": 149.86,
+    "concurrency.2.jobs_completed": 34.0,
+    "concurrency.2.rss_peak_mb": 2092.4,
+    "concurrency.2.rss_growth_mb": 412.8,
+    "concurrency.2.exec_ms_p95": 11037.994005,
+    "concurrency.2.exec_ms_max": 14552.380673,
+    "concurrency.2.worker0.cores": 1.575,
+    "concurrency.2.worker0.rss_max_mb": 1030.1,
+    "concurrency.2.worker1.cores": 0.482,
+    "concurrency.2.worker1.rss_max_mb": 867.0,
+    "concurrency.2.diarization.rtf": 0.266,
+    "concurrency.2.diarization.pass_cost_mean_sec": 1.332,
+    "concurrency.2.diarization.runs": 72.0,
+    "concurrency.2.diarization.uncovered_sec": 0,
+    "concurrency.2.diarization.dropped_periods": 0,
+    "concurrency.2.diarization.failed_passes": 0,
+    "concurrency.2.diarization.worker_cores": 0.482,
+    "concurrency.2.diarization.worker_rss_max_mb": 867.0,
+    "concurrency.2.diarization.lag_ms_p95": 2427.3529052734375,
+    "concurrency.2.diarization.exec_ms_p95": 1699.396792,
+    "concurrency.2.sustained": false,
+    "concurrency.3.chunk_id.in_progress.p50": 92.389,
+    "concurrency.3.chunk_id.in_progress.p95": 160.793,
+    "concurrency.3.chunk_id.in_progress.mean": 88.622,
+    "concurrency.3.chunk_id.final.p50": 184.82,
+    "concurrency.3.chunk_id.final.p95": 184.82,
+    "concurrency.3.chunk_id.final.mean": 184.82,
+    "concurrency.3.word.first_shown.p50": 107.324,
+    "concurrency.3.word.first_shown.p95": 169.291,
+    "concurrency.3.word.first_shown.mean": 100.441,
+    "concurrency.3.word.finalized.p50": 184.82,
+    "concurrency.3.word.finalized.p95": 184.82,
+    "concurrency.3.word.finalized.mean": 184.82,
+    "concurrency.3.label.after_text_shown.p50": null,
+    "concurrency.3.label.after_text_shown.p95": null,
+    "concurrency.3.label.after_text_shown.mean": null,
+    "concurrency.3.label.after_finalized.p50": null,
+    "concurrency.3.label.after_finalized.p95": null,
+    "concurrency.3.label.after_finalized.mean": null,
+    "concurrency.3.transcript_messages": 31,
+    "concurrency.3.speakers_update_messages": 0,
+    "concurrency.3.final_words": 2,
+    "concurrency.3.final_words_labelled_fraction": 0.0,
+    "concurrency.3.speaker_labels_seen": 2,
+    "concurrency.3.label_changes_before_final": 0,
+    "concurrency.3.label_changes_before_final_fraction": 0.0,
+    "concurrency.3.label_changes_after_sent": 0,
+    "concurrency.3.dropped_periods": 73.0,
+    "concurrency.3.audio_dropped_buffer_full_sec": 0,
+    "concurrency.3.buffer_overflow_sec": 10.5,
+    "concurrency.3.jobs_completed": 31.0,
+    "concurrency.3.rss_peak_mb": 2215.0,
+    "concurrency.3.rss_growth_mb": 428.7,
+    "concurrency.3.exec_ms_p95": 18135.933175,
+    "concurrency.3.exec_ms_max": 18135.933175,
+    "concurrency.3.worker0.cores": 1.618,
+    "concurrency.3.worker0.rss_max_mb": 1037.0,
+    "concurrency.3.worker1.cores": 0.673,
+    "concurrency.3.worker1.rss_max_mb": 874.8,
+    "concurrency.3.diarization.rtf": 0.248,
+    "concurrency.3.diarization.pass_cost_mean_sec": 1.287,
+    "concurrency.3.diarization.runs": 104.0,
+    "concurrency.3.diarization.uncovered_sec": 0.5,
+    "concurrency.3.diarization.dropped_periods": 4.0,
+    "concurrency.3.diarization.failed_passes": 0,
+    "concurrency.3.diarization.worker_cores": 0.673,
+    "concurrency.3.diarization.worker_rss_max_mb": 874.8,
+    "concurrency.3.diarization.lag_ms_p95": 4925.339460372925,
+    "concurrency.3.diarization.exec_ms_p95": 1699.211126,
+    "concurrency.3.sustained": false,
+    "concurrency.4.chunk_id.in_progress.p50": 90.964,
+    "concurrency.4.chunk_id.in_progress.p95": 162.936,
+    "concurrency.4.chunk_id.in_progress.mean": 92.754,
+    "concurrency.4.chunk_id.final.p50": null,
+    "concurrency.4.chunk_id.final.p95": null,
+    "concurrency.4.chunk_id.final.mean": null,
+    "concurrency.4.word.first_shown.p50": 127.777,
+    "concurrency.4.word.first_shown.p95": 170.191,
+    "concurrency.4.word.first_shown.mean": 111.692,
+    "concurrency.4.word.finalized.p50": null,
+    "concurrency.4.word.finalized.p95": null,
+    "concurrency.4.word.finalized.mean": null,
+    "concurrency.4.label.after_text_shown.p50": null,
+    "concurrency.4.label.after_text_shown.p95": null,
+    "concurrency.4.label.after_text_shown.mean": null,
+    "concurrency.4.label.after_finalized.p50": null,
+    "concurrency.4.label.after_finalized.p95": null,
+    "concurrency.4.label.after_finalized.mean": null,
+    "concurrency.4.transcript_messages": 32,
+    "concurrency.4.speakers_update_messages": 0,
+    "concurrency.4.final_words": 0,
+    "concurrency.4.final_words_labelled_fraction": null,
+    "concurrency.4.speaker_labels_seen": 2,
+    "concurrency.4.label_changes_before_final": 0,
+    "concurrency.4.label_changes_before_final_fraction": null,
+    "concurrency.4.label_changes_after_sent": 0,
+    "concurrency.4.dropped_periods": 103.0,
+    "concurrency.4.audio_dropped_buffer_full_sec": 0,
+    "concurrency.4.buffer_overflow_sec": 0,
+    "concurrency.4.jobs_completed": 32.0,
+    "concurrency.4.rss_peak_mb": 2109.6,
+    "concurrency.4.rss_growth_mb": 547.1,
+    "concurrency.4.exec_ms_p95": 19660.413425,
+    "concurrency.4.exec_ms_max": 19660.413425,
+    "concurrency.4.worker0.cores": 1.628,
+    "concurrency.4.worker0.rss_max_mb": 1029.7,
+    "concurrency.4.worker1.cores": 0.797,
+    "concurrency.4.worker1.rss_max_mb": 870.6,
+    "concurrency.4.diarization.rtf": 0.275,
+    "concurrency.4.diarization.pass_cost_mean_sec": 1.254,
+    "concurrency.4.diarization.runs": 126.0,
+    "concurrency.4.diarization.uncovered_sec": 61.0,
+    "concurrency.4.diarization.dropped_periods": 27.0,
+    "concurrency.4.diarization.failed_passes": 0,
+    "concurrency.4.diarization.worker_cores": 0.797,
+    "concurrency.4.diarization.worker_rss_max_mb": 870.6,
+    "concurrency.4.diarization.lag_ms_p95": 51322.577476501465,
+    "concurrency.4.diarization.exec_ms_p95": 1704.368626,
+    "concurrency.4.sustained": false,
+    "concurrency.sessions_sustained": 0
+  }
+}

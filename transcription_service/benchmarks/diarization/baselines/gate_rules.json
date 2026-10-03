@@ -7,7 +7,8 @@
     "the audit measured single-tick outliers of 2x on a loaded laptop, and",
     "the gate must not fail on machine noise. Tighten them once the Linux",
     "container runs are the only gated environment.",
-    "replay.memory_growth_mb_total is deliberately not gated: over a 120 s replay it mostly measures the rolling window filling from 5 s to 30 s, and natively the preceding offline pass is still releasing memory, so the number can even be negative. Peak RSS is gated; leaks are the soak harness's job (benchmark_diarization_soak)."
+    "replay.memory_growth_mb_total is deliberately not gated: over a 120 s replay it mostly measures the rolling window filling from 5 s to 30 s, and natively the preceding offline pass is still releasing memory, so the number can even be negative. Peak RSS is gated; leaks are the soak harness's job (benchmark_diarization_soak).",
+    "Phase 2a adds the label-latency and diarization-cost metrics (caption.on.label.*, caption.on.diarization.*). They are gated against the baseline once a Phase 2a baseline is committed; before that they are SKIPPED (missing on the baseline side) and acceptance.py checks their absolute targets."
   ],
   "rules": {
     "replay.offline.der": {
@@ -173,6 +174,51 @@
     "caption.off.rss_peak_mb": {
       "direction": "lower",
       "rel": 0.1
+    },
+    "caption.on.label.after_text_shown.p50": {
+      "direction": "lower",
+      "abs": 0.5,
+      "rel": 0.2
+    },
+    "caption.on.label.after_text_shown.p95": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.on.final_words_labelled_fraction": {
+      "direction": "higher",
+      "abs": 0.05
+    },
+    "caption.on.label_changes_after_sent": {
+      "direction": "lower",
+      "abs": 0
+    },
+    "caption.on.label_changes_before_final_fraction": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "caption.on.diarization.rtf": {
+      "direction": "lower",
+      "abs": 0.05,
+      "rel": 0.2
+    },
+    "caption.on.diarization.worker_cores": {
+      "direction": "lower",
+      "abs": 0.1,
+      "rel": 0.2
+    },
+    "caption.on.diarization.worker_rss_max_mb": {
+      "direction": "lower",
+      "rel": 0.1
+    },
+    "caption.on.diarization.uncovered_sec": {
+      "direction": "lower",
+      "abs": 1.0
+    },
+    "caption.on.diarization.lag_ms_p95": {
+      "direction": "lower",
+      "abs": 500,
+      "rel": 0.2
     }
   }
 }

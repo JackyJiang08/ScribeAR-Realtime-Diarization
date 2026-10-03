@@ -33,6 +33,7 @@ import {
 } from '@scribear/session-manager-schema';
 import type {
   LatencySample,
+  SpeakersUpdateInput,
   TranscriptionSequenceInput,
 } from '@scribear/transcription-content-store';
 
@@ -125,6 +126,9 @@ interface KioskServiceEvents {
   connectionStatus: (status: SessionConnectionStatus) => void;
   sessionStatus: (status: SessionStatusSnapshot) => void;
   transcript: (event: TranscriptEvent) => void;
+  // Late speaker labels for a finalized sequence already delivered through
+  // `transcript`. Matches `applySpeakersUpdate` in the content store.
+  speakersUpdate: (update: SpeakersUpdateInput) => void;
   latency: (sample: LatencySample) => void;
   joinCode: (
     codes: { current: JoinCodeEntry; next: JoinCodeEntry | null } | null,
@@ -1209,6 +1213,13 @@ export class KioskService extends EventEmitter<KioskServiceEvents> {
           this.emit('transcript', {
             final: msg.final,
             inProgress: msg.inProgress,
+          });
+          break;
+        case TranscriptionStreamServerMessageType.SPEAKERS_UPDATE:
+          this.emit('speakersUpdate', {
+            sequenceId: msg.sequenceId,
+            speakers: msg.speakers,
+            settled: msg.settled,
           });
           break;
         case TranscriptionStreamServerMessageType.SESSION_STATUS:

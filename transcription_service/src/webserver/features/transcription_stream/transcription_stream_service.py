@@ -10,6 +10,7 @@ from typing import Any
 from src.shared.logger import Logger
 from src.shared.utils.event_emitter import Event, EventEmitter
 from src.transcription_provider_interface import (
+    SpeakerLabelUpdate,
     TranscriptionClientError,
     TranscriptionResult,
     TranscriptionSessionInterface,
@@ -40,6 +41,10 @@ class TranscriptionStreamService(EventEmitter):
     TranscriptionErrorEvent = Event[TranscriptionClientError | Exception](
         "TRANSCRIPTION_ERROR"
     )
+    # Late speaker labels for a finalized sequence already forwarded. Only a
+    # diarizing session emits them; forwarded like results, and dropped
+    # once the service is closed for the same reason.
+    SpeakerLabelsEvent = Event[SpeakerLabelUpdate]("SPEAKER_LABELS")
 
     def __init__(
         self,
@@ -107,6 +112,9 @@ class TranscriptionStreamService(EventEmitter):
         self._session.on(
             self._session.TranscriptionErrorEvent, self._handle_session_error
         )
+        self._session.on(
+            self._session.SpeakerLabelsEvent, self._handle_session_speakers
+        )
         self._session.start_session()
 
     def handle_audio_chunk(self, chunk_id: str, chunk: bytes):
@@ -151,6 +159,11 @@ class TranscriptionStreamService(EventEmitter):
         if self._closed:
             return
         self.emit(self.TranscriptionResultEvent, result)
+
+    def _handle_session_speakers(self, update: SpeakerLabelUpdate):
+        if self._closed:
+            return
+        self.emit(self.SpeakerLabelsEvent, update)
 
     def _handle_session_error(
         self, error: TranscriptionClientError | Exception

@@ -11,7 +11,7 @@
 #   BENCH_CPUS       CPU limit passed to docker --cpus          (default 4)
 #   BENCH_MEMORY_GB  memory limit passed to docker --memory     (default 8)
 #   BENCH_SCRIPT     script under benchmarks/diarization/       (default run_suite.py)
-#   BENCH_REBUILD=1  force rebuilding both images
+#   (both images are always built; the layer cache makes an unchanged build fast)
 #   HUGGINGFACE_ACCESS_TOKEN or HF_TOKEN  gated pyannote model access
 #
 # Audio data, results and the HuggingFace / torch hub caches are bind-mounted
@@ -52,10 +52,12 @@ if [ "$VM_CPUS" -gt 0 ] && [ "$VM_CPUS" -lt "$CPUS" ]; then
   echo "WARNING: docker VM has ${VM_CPUS} CPUs; the ${CPUS} CPU limit cannot be honoured" >&2
 fi
 
-if [ "${BENCH_REBUILD:-0}" = "1" ] || ! docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
-  echo "--- building $BASE_IMAGE from Dockerfile_CPU (upstream's production CPU image)"
-  docker build -f "$SERVICE/Dockerfile_CPU" -t "$BASE_IMAGE" "$SERVICE"
-fi
+# Always built: the base image carries the service's `src`, and a benchmark
+# that silently ran yesterday's service against today's config is a wasted
+# hour (it happened). Docker's layer cache makes an unchanged rebuild take
+# seconds; only a changed `src` re-runs the final `uv sync`.
+echo "--- building $BASE_IMAGE from Dockerfile_CPU (upstream's production CPU image)"
+docker build -f "$SERVICE/Dockerfile_CPU" -t "$BASE_IMAGE" "$SERVICE"
 echo "--- building $BENCH_IMAGE (base + pyannote extra + benchmark sources)"
 docker build -f "$HERE/Dockerfile" --build-arg BASE_IMAGE="$BASE_IMAGE" \
   -t "$BENCH_IMAGE" "$SERVICE"

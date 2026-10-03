@@ -200,6 +200,70 @@
       }
     },
     {
+      "id": 9,
+      "title": "Speaker diarization: pass cost and label lag (p95)",
+      "description": "scribear_diarization_execution_ms{quantile=p95} (how long one diarization pass over the newest window takes) and scribear_diarization_lag_ms{quantile=p95} (how old the newest labelled audio was when its labels were ready), by provider. Diarization runs beside the caption job, never in front of it, so nothing on the caption panels moves when it struggles; this is where that shows. Empty when diarization is off (scribear_diarization_supported = 0).",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 30, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "scribear_diarization_execution_ms{quantile=\"p95\"}",
+          "legendFormat": "{{providerKey}} pass p95"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "scribear_diarization_lag_ms{quantile=\"p95\"}",
+          "legendFormat": "{{providerKey}} label lag p95"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "scribear_asr_job_period_ms",
+          "legendFormat": "{{providerKey}} job period"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "min": 0, "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Speaker diarization: audio skipped, dropped periods, failed passes",
+      "description": "rate(scribear_diarization_uncovered_seconds_total) - seconds of audio per second that no diarization pass covered because the job fell behind and skipped ahead (those captions keep their \"Speaker ?\" placeholder); rate(scribear_diarization_dropped_periods_total) - diarization job periods skipped because the previous pass overran; rate(scribear_diarization_failed_total) - passes that raised. All three rise as labels fall behind while every caption counter stays flat. The sidecar's diarization-behind alert fires on the skipped share.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(scribear_diarization_uncovered_seconds_total[5m])",
+          "legendFormat": "{{providerKey}} audio skipped s/s"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(scribear_diarization_dropped_periods_total[5m])",
+          "legendFormat": "{{providerKey}} dropped periods/s"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(scribear_diarization_failed_total[5m])",
+          "legendFormat": "{{providerKey}} failed passes/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "min": 0, "custom": { "drawStyle": "bars", "fillOpacity": 30 } },
+        "overrides": []
+      }
+    },
+    {
       "id": 7,
       "title": "Canary",
       "description": "scribear_canary_up - whether the last synthetic end-to-end probe delivered captions. Held at 1 when idle (no canary room configured), so this is not a false outage signal on a box with no canary set up.",

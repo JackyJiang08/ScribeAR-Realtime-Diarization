@@ -8,6 +8,25 @@ unless it cites `benchmarks/diarization/results/post_merge_baseline.json`.
 Severity scale: **P0** blocks a release to real customers, **P1** serious,
 **P2** polish. Effort is a rough engineering estimate including tests.
 
+> **Status after Phase 2a (2026-10-03).** The P0 of section 2 is closed:
+> diarization no longer runs on the caption path. It is a separate
+> worker-pool job on its own worker (`DiarizationJob`), the newest 10 s per
+> 5 s period, with labels attached to already-shown captions through a
+> `speakers_update` message and a session-side `SpeakerLabelAttacher`
+> (never holding a caption). Section 2's P1 (Silero's thread count applying
+> to pyannote) is closed by the context's own `num_threads`; section 7.1
+> (counters never exported) is closed, with lag, skipped audio and dropped
+> periods added, a sidecar rule and two Grafana panels; section 7.3's
+> fail-fast tag check and speaker-bound validation are in; section 4's
+> "unlabelled words read as the previous speaker" is replaced by an explicit
+> `Speaker ?` slot. The upstream-side items (section 1, Whisper per-range
+> calls and `silence_threshold`) are written up as issue drafts in
+> `docs/upstream_issue_drafts.md`, not changed in the fork. The measured
+> outcome against the Phase 2a acceptance criteria, including the accuracy
+> cost of the 10 s window, is in `transcription_service/docs/speaker_diarization.md`
+> ("Phase 2a results"). Sections 3 (accuracy) and 5 (robustness) remain
+> Phase 2b and 2c work.
+
 ## Executive summary
 
 1. **The 26.8 s caption latency with diarization off is upstream's streaming

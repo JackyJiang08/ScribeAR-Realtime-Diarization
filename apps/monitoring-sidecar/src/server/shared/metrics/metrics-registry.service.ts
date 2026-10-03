@@ -522,6 +522,102 @@ export class MetricsRegistry {
     'Whether the polled transcription-service reports the dropped-period counter (1) or the sidecar must fall back to the reported p99 RTF (0).',
   );
 
+  // --- Speaker diarization ------------------------------------------------
+  //
+  // From transcription-service's diarization job, which runs beside each
+  // caption job on its own worker so captions never wait for labels. Keyed by
+  // the caption provider's key. None of these ever moves an `asr_*` series:
+  // the service folds the two jobs apart by the diarization job's label.
+
+  /**
+   * 1 when the polled transcription-service reports the diarization series
+   * (diarization is on), 0 when it reports none (off, or too old to have it).
+   * The guard that lets a rule distinguish "labels stopped" from "no labels
+   * were ever expected" - without it an idle, off, or old service all look
+   * like a stalled diarization job.
+   */
+  readonly diarizationSupported = new Gauge(
+    'scribear_diarization_supported',
+    'Whether the polled transcription-service reports diarization metrics (1) or not (0).',
+  );
+
+  /** Diarization passes run over the newest window, by provider. */
+  readonly diarizationRunsTotal = new Counter(
+    'scribear_diarization_runs_total',
+    'Diarization passes run, by provider.',
+  );
+
+  /** Wall-clock seconds spent in those passes; seconds / runs is the per-pass cost. */
+  readonly diarizationSecondsTotal = new Counter(
+    'scribear_diarization_seconds_total',
+    'Wall-clock seconds spent in diarization passes, by provider.',
+  );
+
+  /** Passes that raised; captions continue, that audio gets no labels. */
+  readonly diarizationFailedTotal = new Counter(
+    'scribear_diarization_failed_total',
+    'Diarization passes that failed and produced no labels, by provider.',
+  );
+
+  /** Seconds the reconciler spent mapping raw labels onto session labels. */
+  readonly diarizationReconcilerSecondsTotal = new Counter(
+    'scribear_diarization_reconciler_seconds_total',
+    'Wall-clock seconds spent reconciling diarization labels, by provider.',
+  );
+
+  /** Session labels minted; far above the people in the room means drift. */
+  readonly diarizationLabelsMintedTotal = new Counter(
+    'scribear_diarization_labels_minted_total',
+    'Session-wide speaker labels minted by the reconciler, by provider.',
+  );
+
+  /** Seconds of audio the diarization job received: the RTF denominator. */
+  readonly diarizationAudioSecondsTotal = new Counter(
+    'scribear_diarization_audio_seconds_total',
+    'Seconds of audio received by diarization jobs, by provider.',
+  );
+
+  /**
+   * **Audio no diarization pass covered**, because the job fell behind and
+   * skipped ahead to the newest window instead of queueing. Those words keep
+   * a neutral label forever. The back-pressure signal with the right slope:
+   * it *rises* as the job falls behind, where per-pass cost can stay flat and
+   * the run counter merely slows.
+   */
+  readonly diarizationUncoveredSecondsTotal = new Counter(
+    'scribear_diarization_uncovered_seconds_total',
+    'Seconds of audio no diarization pass covered because the job fell behind, by provider.',
+  );
+
+  /** Diarization job periods in which no pass ran because the previous one overran. */
+  readonly diarizationDroppedPeriodsTotal = new Counter(
+    'scribear_diarization_dropped_periods_total',
+    'Diarization job periods skipped because the previous pass overran, by provider.',
+  );
+
+  /** Diarization pass execution time, by quantile. */
+  readonly diarizationExecutionMs = new Gauge(
+    'scribear_diarization_execution_ms',
+    'Diarization pass execution time, by quantile.',
+  );
+
+  /**
+   * Age of the newest audio a pass labelled when its labels were ready: the
+   * time between a word being spoken and its label existing, before the
+   * caption path's own latency. The operator-facing number for "labels are
+   * late".
+   */
+  readonly diarizationLagMs = new Gauge(
+    'scribear_diarization_lag_ms',
+    'Age of the newest audio a diarization pass labelled when its labels were ready, by quantile.',
+  );
+
+  /** Diarization execution seconds per second of audio received, by quantile. */
+  readonly diarizationRtf = new Gauge(
+    'scribear_diarization_rtf',
+    'Diarization real-time factor (execution seconds per second of audio received), by quantile.',
+  );
+
   /** Jobs whose buffer filled and were force-finalized (§3 T2). */
   readonly asrBufferOverflowTotal = new Counter(
     'scribear_asr_buffer_overflow_total',
@@ -759,6 +855,14 @@ export class MetricsRegistry {
       this.asrNoSpeechTotal,
       this.asrBinaryDroppedBeforeAuthTotal,
       this.asrBinaryDroppedBeforeConfigTotal,
+      this.diarizationRunsTotal,
+      this.diarizationSecondsTotal,
+      this.diarizationFailedTotal,
+      this.diarizationReconcilerSecondsTotal,
+      this.diarizationLabelsMintedTotal,
+      this.diarizationAudioSecondsTotal,
+      this.diarizationUncoveredSecondsTotal,
+      this.diarizationDroppedPeriodsTotal,
       this.probeTransitionsTotal,
       this.canaryRunsTotal,
       this.canaryTranscriptsTotal,
@@ -780,6 +884,10 @@ export class MetricsRegistry {
       this.asrPeriodUtilization,
       this.asrJobPeriodMs,
       this.asrDroppedPeriodsSupported,
+      this.diarizationSupported,
+      this.diarizationExecutionMs,
+      this.diarizationLagMs,
+      this.diarizationRtf,
       this.asrWorkers,
       this.asrWorkerUtilization,
       this.asrWorkerAlive,

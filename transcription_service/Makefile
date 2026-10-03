@@ -130,3 +130,38 @@ benchmark_diarization_soak:
 	uv run python $(BENCH_DIR)/prepare_soak.py --minutes $(SOAK_MINUTES)
 	uv run python $(BENCH_DIR)/soak.py --minutes $(SOAK_MINUTES) --label "$(LABEL)" \
 		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_soak_$(SOAK_MINUTES)min.json,$(RESULT))
+
+# Phase 2a acceptance: absolute targets (baselines/phase2a_acceptance.json)
+# checked against a suite report; the Linux container run is the one that
+# decides. RESULT=path picks the report (default: today's suite report).
+benchmark_diarization_acceptance:
+	uv run python $(BENCH_DIR)/acceptance.py --report $(RESULT)
+
+# Concurrency: the suite plus N concurrent sessions with diarization on
+# (SESSIONS="2 3 4"), reporting how many the environment sustains.
+SESSIONS ?= 2 3 4
+benchmark_diarization_concurrency: benchmark_diarization_data
+	uv run python $(BENCH_DIR)/run_suite.py \
+		--only caption concurrency --sessions-sweep $(SESSIONS) \
+		--caption-seconds $(CAPTION_SEC) --label "$(LABEL)" \
+		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_concurrency.json,$(RESULT)) $(SUITE_ARGS)
+
+benchmark_diarization_concurrency_docker: benchmark_diarization_data
+	$(BENCH_DIR)/docker/run_in_docker.sh \
+		--only caption concurrency --sessions-sweep $(SESSIONS) \
+		--caption-seconds $(CAPTION_SEC) --label "$(LABEL)" \
+		--out $(subst $(BENCH_DIR)/,/app/$(BENCH_DIR)/,$(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_concurrency.json,$(RESULT))) $(SUITE_ARGS)
+
+# Window / segmentation-step sweep (Phase 2a): the numbers the defaults were
+# chosen from. WINDOWS="8 10 12 15 20" STEPS="0.1 0.25 0.5".
+WINDOWS ?= 8 10 12 15 20
+STEPS ?= 0.1 0.25 0.5
+benchmark_diarization_window_sweep: benchmark_diarization_data
+	uv run python $(BENCH_DIR)/window_sweep.py --windows $(WINDOWS) --steps $(STEPS) \
+		--threads 1 --label "$(LABEL)" \
+		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_window_sweep.json,$(RESULT))
+
+benchmark_diarization_window_sweep_docker: benchmark_diarization_data
+	BENCH_SCRIPT=window_sweep.py $(BENCH_DIR)/docker/run_in_docker.sh --windows $(WINDOWS) --steps $(STEPS) \
+		--threads 1 --label "$(LABEL)" \
+		--out $(subst $(BENCH_DIR)/,/app/$(BENCH_DIR)/,$(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_window_sweep.json,$(RESULT)))

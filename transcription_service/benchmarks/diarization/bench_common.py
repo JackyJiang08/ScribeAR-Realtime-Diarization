@@ -404,6 +404,62 @@ def process_tree_rss_mb(pid: int) -> dict:
     return {"total_mb": round(total, 1), "per_pid": per_pid}
 
 
+def _parse_ps_cputime(text: str) -> float:
+    """`[DD-]HH:MM:SS[.cc]` or `MM:SS.cc` (macOS) to seconds."""
+    text = text.strip()
+    days = 0
+    if "-" in text:
+        day_part, text = text.split("-", 1)
+        days = int(day_part)
+    parts = text.split(":")
+    seconds = 0.0
+    for part in parts:
+        seconds = seconds * 60 + float(part)
+    return days * 86400 + seconds
+
+
+def process_cpu_seconds(pid: int) -> float:
+    """User plus system CPU seconds a process has consumed so far."""
+    if sys.platform != "darwin":
+        stat = _read_first(f"/proc/{pid}/stat")
+        if not stat:
+            return 0.0
+        after = stat[stat.rfind(")") + 2 :].split()
+        try:
+            ticks = int(after[11]) + int(after[12])
+            return ticks / os.sysconf("SC_CLK_TCK")
+        except (IndexError, ValueError, OSError):
+            return 0.0
+    try:
+        out = subprocess.check_output(
+            ["ps", "-o", "cputime=", "-p", str(pid)], text=True
+        )
+        return _parse_ps_cputime(out) if out.strip() else 0.0
+    except (subprocess.CalledProcessError, OSError, ValueError):
+        return 0.0
+
+
+def process_tree_stats(pid: int) -> dict:
+    """RSS and CPU seconds of a process and all of its descendants."""
+    total = 0.0
+    per_pid: dict[int, dict] = {}
+    stack = [pid]
+    seen: set[int] = set()
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        rss = current_rss_mb(current)
+        per_pid[current] = {
+            "rss_mb": round(rss, 1),
+            "cpu_sec": round(process_cpu_seconds(current), 2),
+        }
+        total += rss
+        stack.extend(child_pids(current))
+    return {"total_mb": round(total, 1), "per_pid": per_pid}
+
+
 # --------------------------------------------------------- environment ---
 
 

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from src.shared.logger import Logger
 from src.shared.utils.event_emitter import Event, EventEmitter
 
+from .speaker_label_update import SpeakerLabelUpdate
 from .transcription_client_error import TranscriptionClientError
 from .transcription_result import TranscriptionResult
 
@@ -34,6 +35,10 @@ class TranscriptionSessionInterface(ABC, EventEmitter):
     TranscriptionErrorEvent = Event[TranscriptionClientError | Exception](
         "TRANSCRIPTION_ERROR"
     )
+    # Speaker labels for a finalized sequence that was already emitted.
+    # Only a provider that runs diarization ever emits this; the others never
+    # do, and a consumer that ignores it still gets every caption.
+    SpeakerLabelsEvent = Event[SpeakerLabelUpdate]("SPEAKER_LABELS")
 
     # Opaque identifiers passed into create_session(), stored uniformly here
     # rather than left to each implementation to invent its own attribute

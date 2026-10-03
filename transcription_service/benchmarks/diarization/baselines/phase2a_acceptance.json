@@ -1,0 +1,71 @@
+{
+  "_comment": [
+    "Phase 2a acceptance targets, checked by acceptance.py against a",
+    "run_suite.py report. They are absolute (or relative to the",
+    "diarization-off run of the same report, or to the committed Phase 2",
+    "baseline), measured in the Linux CPU reference container (4 CPUs,",
+    "8 GB). Production hardware is unknown, so capacity is defined per",
+    "session; the concurrency step reports how many sessions the container",
+    "sustains. A missed target is reported by how much, never relaxed here."
+  ],
+  "targets": {
+    "caption p50 within 10% of diarization off": {
+      "metric": "caption.on.chunk_id.in_progress.p50",
+      "max_relative_to": "caption.off.chunk_id.in_progress.p50",
+      "ratio": 1.1,
+      "note": "chunk-id method, in-progress captions; captions must never wait for diarization"
+    },
+    "caption p95 within 10% of diarization off": {
+      "metric": "caption.on.chunk_id.in_progress.p95",
+      "max_relative_to": "caption.off.chunk_id.in_progress.p95",
+      "ratio": 1.1,
+      "note": "chunk-id method, in-progress captions"
+    },
+    "no caption periods dropped because of diarization": {
+      "metric": "caption.on.dropped_periods",
+      "max_relative_to": "caption.off.dropped_periods",
+      "ratio": 1.0,
+      "note": "dropped periods with diarization on must not exceed the off run in the same environment"
+    },
+    "diarization CPU at most 1 core per session": {
+      "metric": "caption.on.diarization.worker_cores",
+      "max": 1.0,
+      "note": "mean cores of the diarization worker over the streamed window"
+    },
+    "diarization extra RAM at most 1 GB per session": {
+      "metric": "caption.on.diarization.worker_rss_max_mb",
+      "max": 1024,
+      "note": "peak RSS of the diarization worker (model plus one window)"
+    },
+    "diarization real-time factor at most 0.3": {
+      "metric": "caption.on.diarization.rtf",
+      "max": 0.3,
+      "note": "diarization compute seconds per second of audio received, from the service counters"
+    },
+    "speaker label at most 2 s after caption text (p50)": {
+      "metric": "caption.on.label.after_text_shown.p50",
+      "max": 2.0,
+      "note": "per finalized word, from the message that first showed it to the message that labelled it"
+    },
+    "speaker label at most 4 s after caption text (p95)": {
+      "metric": "caption.on.label.after_text_shown.p95",
+      "max": 4.0
+    },
+    "labels never change after being sent": {
+      "metric": "caption.on.label_changes_after_sent",
+      "max": 0,
+      "note": "a speakers_update disagreeing with a label already sent"
+    },
+    "label corrections before finalization at most 5%": {
+      "metric": "caption.on.label_changes_before_final_fraction",
+      "max": 0.05,
+      "note": "words whose in-progress label differed from their finalized label"
+    },
+    "streaming settled DER no worse than the Phase 2 baseline": {
+      "metric": "replay.settled.der",
+      "max_vs_baseline": "replay.settled.der",
+      "abs": 0.02,
+      "note": "accuracy targets are Phase 2b's job; this only guards against a regression"
+    }
+  }
+}

@@ -21,17 +21,21 @@ interface Options {
  * Renders caption UI inside the MUI theme + the display-height context both the
  * container and the bounded preference controls depend on.
  */
-export function renderWithProviders(
+export function withProviders(
   ui: ReactNode,
   { containerHeightPx = 600 }: Options = {},
 ) {
-  return render(
+  return (
     <ThemeProvider theme={testTheme}>
       <TranscriptionDisplayHeightContext.Provider
         value={{ containerHeightPx, setContainerHeightPx: () => {} }}
       >
         {ui}
       </TranscriptionDisplayHeightContext.Provider>
-    </ThemeProvider>,
+    </ThemeProvider>
   );
+}
+
+export function renderWithProviders(ui: ReactNode, options: Options = {}) {
+  return render(withProviders(ui, options));
 }

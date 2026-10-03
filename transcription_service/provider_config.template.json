@@ -1,5 +1,5 @@
 {
-    "num_workers": 1,
+    "num_workers": 2,
     "contexts": [
         {
             "context_uid": "faster-whisper",
@@ -28,12 +28,14 @@
         },
         {
             "context_uid": "pyannote-diarization",
-            "worker_ids": [0],
+            "worker_ids": [1],
             "tags": ["pyannote_diarization"],
             "context_config": {
                 "model": "pyannote/speaker-diarization-community-1",
                 "device": "cpu",
-                "token_env_var": "HUGGINGFACE_ACCESS_TOKEN"
+                "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+                "num_threads": 1,
+                "nice": 10
             }
         }
     ],
@@ -54,7 +56,8 @@
                 "max_buffer_len_sec": 30,
                 "local_agree_dim": 2,
                 "diarization_detector": false,
-                "diarization_context_tag": "pyannote_diarization"
+                "diarization_context_tag": "pyannote_diarization",
+                "diarization_window_sec": 10
             }
         },
         "lumen_granite": {

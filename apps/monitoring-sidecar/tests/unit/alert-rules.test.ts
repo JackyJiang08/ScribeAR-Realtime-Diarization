@@ -12,6 +12,7 @@ import {
   canaryQualityRule,
   clockSkewRule,
   decodeDropRule,
+  diarizationBehindRule,
   pendingChunkEvictionRule,
   probeDownRule,
   statusPollUnavailableRule,
@@ -1568,5 +1569,89 @@ describe('alert rules', () => {
       // Assert
       expect(alerts).toHaveLength(0);
     });
+  });
+});
+
+describe('speaker diarization falling behind', (it) => {
+  const labels = providerLabels();
+  const service = { service: 'transcription-service' };
+
+  /** The poller's view of a diarizing provider over a few polls. */
+  function observeDiarization(
+    metrics: MetricsRegistry,
+    options: { audioSec: number; runs: number; uncoveredSec?: number },
+  ): void {
+    metrics.diarizationSupported.set(service, 1);
+    metrics.diarizationAudioSecondsTotal.inc(labels, options.audioSec, NOW);
+    metrics.diarizationRunsTotal.inc(labels, options.runs, NOW);
+    if (options.uncoveredSec !== undefined) {
+      metrics.diarizationUncoveredSecondsTotal.inc(
+        labels,
+        options.uncoveredSec,
+        NOW,
+      );
+    }
+  }
+
+  it('stays silent while every pass covers its audio', () => {
+    const metrics = new MetricsRegistry();
+    observeDiarization(metrics, { audioSec: 120, runs: 24, uncoveredSec: 0 });
+
+    expect(diarizationBehindRule(context(metrics))).toEqual([]);
+  });
+
+  it('warns when the job skipped a tenth of the audio', () => {
+    const metrics = new MetricsRegistry();
+    observeDiarization(metrics, { audioSec: 120, runs: 10, uncoveredSec: 15 });
+
+    const alerts = diarizationBehindRule(context(metrics));
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.id).toBe('diarization-behind:whisper');
+    expect(alerts[0]?.severity).toBe(AlertSeverity.WARNING);
+    expect(alerts[0]?.stage).toBe(PipelineStage.TRANSCRIPTION);
+    expect(alerts[0]?.summary).toContain('Speaker ?');
+  });
+
+  it('fires critical when audio arrives but no pass completes', () => {
+    // The hung-job case: the uncovered counter is written by the job itself,
+    // so it stops too - only the audio counter, fed by the session, keeps
+    // moving. A share-only rule would be silent exactly here.
+    const metrics = new MetricsRegistry();
+    observeDiarization(metrics, { audioSec: 120, runs: 0 });
+
+    const alerts = diarizationBehindRule(context(metrics));
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.id).toBe('diarization-stalled:whisper');
+    expect(alerts[0]?.severity).toBe(AlertSeverity.CRITICAL);
+  });
+
+  it('warns on a high p95 label lag even when nothing was skipped', () => {
+    const metrics = new MetricsRegistry();
+    observeDiarization(metrics, { audioSec: 120, runs: 24, uncoveredSec: 0 });
+    metrics.diarizationLagMs.set({ ...labels, quantile: 'p95' }, 12_000);
+
+    const alerts = diarizationBehindRule(context(metrics));
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.id).toBe('diarization-lagging:whisper');
+    expect(alerts[0]?.value).toBe(12_000);
+  });
+
+  it('needs a minute of audio before it believes the share', () => {
+    const metrics = new MetricsRegistry();
+    observeDiarization(metrics, { audioSec: 30, runs: 0, uncoveredSec: 20 });
+
+    expect(diarizationBehindRule(context(metrics))).toEqual([]);
+  });
+
+  it('is silent for a service that reports no diarization at all', () => {
+    // Diarization off, or an older service: no series is not a stall.
+    const metrics = new MetricsRegistry();
+    metrics.diarizationSupported.set(service, 0);
+    metrics.diarizationAudioSecondsTotal.inc(labels, 120, NOW);
+
+    expect(diarizationBehindRule(context(metrics))).toEqual([]);
   });
 });

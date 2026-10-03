@@ -6,6 +6,7 @@ import { AudioFrameChannel } from '#src/server/features/transcription-stream/eve
 import { LatencyChannel } from '#src/server/features/transcription-stream/events/latency.events.js';
 import { SessionEndedChannel } from '#src/server/features/transcription-stream/events/session-ended.events.js';
 import { SessionStatusChannel } from '#src/server/features/transcription-stream/events/session-status.events.js';
+import { SpeakersUpdateChannel } from '#src/server/features/transcription-stream/events/speakers-update.events.js';
 import { TranscriptChannel } from '#src/server/features/transcription-stream/events/transcript.events.js';
 import { SessionAlreadyEndedError } from '#src/server/features/transcription-stream/transcription-orchestrator.service.js';
 import { TranscriptionStreamService } from '#src/server/features/transcription-stream/transcription-stream.service.js';
@@ -746,5 +747,46 @@ describe('TranscriptionStreamService', () => {
         h.sent.find((m) => (m as { type: string }).type === 'transcript'),
       ).toBeUndefined();
     });
+  });
+});
+
+describe('speaker label updates', (it) => {
+  it('emits a speakersUpdate send message when the bus publishes one', async () => {
+    // Arrange
+    const h = makeHarness('client');
+    await h.service.start();
+    h.service.onAuthAcknowledged();
+
+    // Act
+    h.bus.publish(
+      SpeakersUpdateChannel,
+      { sequenceId: 's3', speakers: ['spk_0', null], settled: false },
+      SESSION_UID,
+    );
+
+    // Assert
+    expect(h.sent).toContainEqual({
+      type: 'speakersUpdate',
+      sequenceId: 's3',
+      speakers: ['spk_0', null],
+      settled: false,
+    });
+  });
+
+  it('drops a speakersUpdate that arrives before authOk, like a transcript', async () => {
+    // Arrange - an update for a fragment this connection never received is
+    // worthless to it, and nothing replays either.
+    const h = makeHarness('client');
+    await h.service.start();
+
+    // Act
+    h.bus.publish(
+      SpeakersUpdateChannel,
+      { sequenceId: 's3', speakers: ['spk_0'], settled: true },
+      SESSION_UID,
+    );
+
+    // Assert
+    expect(h.sent).toEqual([]);
   });
 });

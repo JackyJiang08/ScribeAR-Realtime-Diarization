@@ -166,6 +166,85 @@ export class TranscriptionMetricsPollerService extends AbsoluteStatusPoller<Tran
     this._applyWorkerGauges(body);
     this._applyQuantileGauges(body);
     this._applyProviderDevices(body);
+    this._applyDiarization(body);
+  }
+
+  /** Providers with live diarization quantile series, so stale ones go. */
+  private _knownDiarizationProviders = new Set<string>();
+
+  /**
+   * Folds the diarization counters and histograms into their own series.
+   *
+   * Reported-or-not is published as `scribear_diarization_supported`, the
+   * same guard the dropped-period counter has and for the same reason: a
+   * service with diarization off, or too old to have it, sends empty arrays
+   * or nothing, and neither creates a series here, so without the gauge "no
+   * diarization series" could mean healthy-and-idle, off, or an old service.
+   * The alert rule needs the first two told apart from the third.
+   */
+  private _applyDiarization(body: TranscriptionMetricsBody): void {
+    const service = this._config.service;
+    const c = body.counters;
+    const h = body.histograms;
+    const reported = c.diarizationRunsTotal !== undefined;
+    this._metrics.diarizationSupported.set({ service }, reported ? 1 : 0);
+    if (!reported) return;
+
+    const folds: [CounterSeries | undefined, Counter][] = [
+      [c.diarizationRunsTotal, this._metrics.diarizationRunsTotal],
+      [c.diarizationSecondsTotal, this._metrics.diarizationSecondsTotal],
+      [c.diarizationFailedTotal, this._metrics.diarizationFailedTotal],
+      [
+        c.reconcilerSecondsTotal,
+        this._metrics.diarizationReconcilerSecondsTotal,
+      ],
+      [
+        c.diarizationLabelsMintedTotal,
+        this._metrics.diarizationLabelsMintedTotal,
+      ],
+      [
+        c.diarizationAudioSecondsTotal,
+        this._metrics.diarizationAudioSecondsTotal,
+      ],
+      [
+        c.diarizationUncoveredSecondsTotal,
+        this._metrics.diarizationUncoveredSecondsTotal,
+      ],
+      [
+        c.diarizationDroppedPeriodsTotal,
+        this._metrics.diarizationDroppedPeriodsTotal,
+      ],
+    ];
+    for (const [series, counter] of folds) {
+      if (series !== undefined) this._foldProvider(series, counter);
+    }
+
+    const seen = new Set<string>();
+    this._setQuantiles(
+      h.diarizationExecutionMs ?? [],
+      this._metrics.diarizationExecutionMs,
+      seen,
+    );
+    this._setQuantiles(
+      h.diarizationLagMs ?? [],
+      this._metrics.diarizationLagMs,
+      seen,
+    );
+    this._setQuantiles(
+      h.diarizationRtf ?? [],
+      this._metrics.diarizationRtf,
+      seen,
+    );
+    for (const providerKey of this._knownDiarizationProviders) {
+      if (seen.has(providerKey)) continue;
+      for (const quantile of QUANTILES) {
+        const labels = { service, providerKey, quantile };
+        this._metrics.diarizationExecutionMs.delete(labels);
+        this._metrics.diarizationLagMs.delete(labels);
+        this._metrics.diarizationRtf.delete(labels);
+      }
+    }
+    this._knownDiarizationProviders = seen;
   }
 
   /**

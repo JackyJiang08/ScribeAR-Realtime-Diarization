@@ -79,3 +79,59 @@ def test_job_period_equal_to_max_buffer_len_sec_is_allowed():
     )
 
     assert config.job_period_ms == 5000
+
+
+class TestDiarizationFields:
+    """
+    The diarization settings are validated only when diarization is on, so
+    a config that never mentions them is accepted exactly as upstream
+    accepts it.
+    """
+
+    @staticmethod
+    def _config(**overrides) -> dict:
+        config = {
+            "whisper_context_tag": "w",
+            "silero_context_tag": "s",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": True,
+        }
+        config.update(overrides)
+        return config
+
+    def test_period_defaults_to_the_caption_period(self):
+        """Unset, the diarization job runs on the caption cadence."""
+        config = WhisperStreamingProviderConfig(**self._config())
+        assert config.diarization_period_ms == 5000
+        assert config.diarization_window_sec == 10.0
+
+    def test_window_must_exceed_the_period(self):
+        """Non-overlapping windows cannot carry speaker identity across."""
+        with pytest.raises(ValueError, match="diarization_window_sec"):
+            WhisperStreamingProviderConfig(
+                **self._config(diarization_window_sec=5.0)
+            )
+
+    def test_speaker_bounds_must_be_positive_and_ordered(self):
+        """A zero or inverted speaker bound is a configuration error."""
+        with pytest.raises(ValueError, match="at least 1"):
+            WhisperStreamingProviderConfig(
+                **self._config(diarization_min_speakers=0)
+            )
+        with pytest.raises(ValueError, match="must not exceed"):
+            WhisperStreamingProviderConfig(
+                **self._config(
+                    diarization_min_speakers=3, diarization_max_speakers=2
+                )
+            )
+
+    def test_diarization_off_skips_the_diarization_checks(self):
+        """Off: even a bad window is irrelevant and accepted."""
+        config = WhisperStreamingProviderConfig(
+            **self._config(
+                diarization_detector=False, diarization_window_sec=1.0
+            )
+        )
+        assert config.diarization_detector is False
