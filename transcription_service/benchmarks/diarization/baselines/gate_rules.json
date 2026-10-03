@@ -1,0 +1,178 @@
+{
+  "_comment": [
+    "Regression gate rules for compare_baseline.py. A metric regresses when",
+    "it moves in the bad direction by more than max(abs, rel * |baseline|).",
+    "Metrics not listed here are reported but never fail the gate.",
+    "Timing tolerances are deliberately wider than accuracy tolerances:",
+    "the audit measured single-tick outliers of 2x on a loaded laptop, and",
+    "the gate must not fail on machine noise. Tighten them once the Linux",
+    "container runs are the only gated environment.",
+    "replay.memory_growth_mb_total is deliberately not gated: over a 120 s replay it mostly measures the rolling window filling from 5 s to 30 s, and natively the preceding offline pass is still releasing memory, so the number can even be negative. Peak RSS is gated; leaks are the soak harness's job (benchmark_diarization_soak)."
+  ],
+  "rules": {
+    "replay.offline.der": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.offline.jer": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.offline.speaker_count_abs_error_mean": {
+      "direction": "lower",
+      "abs": 0.5
+    },
+    "replay.first_seen.der": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.first_seen.jer": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.settled.der": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.settled.jer": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "replay.speaker_count_abs_error_mean": {
+      "direction": "lower",
+      "abs": 0.5
+    },
+    "replay.label_latency_p50_sec": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.15
+    },
+    "replay.label_latency_p95_sec": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.15
+    },
+    "replay.onsets_never_labelled": {
+      "direction": "lower",
+      "abs": 1
+    },
+    "replay.label_flip_rate_after_first_shown": {
+      "direction": "lower",
+      "abs": 0.05
+    },
+    "replay.labels_minted_per_reference_speaker": {
+      "direction": "lower",
+      "abs": 0.25
+    },
+    "replay.tick_cost_p95_sec": {
+      "direction": "lower",
+      "abs": 0.5,
+      "rel": 0.15
+    },
+    "replay.lag_behind_realtime_p95_sec": {
+      "direction": "lower",
+      "abs": 0.5,
+      "rel": 0.15
+    },
+    "replay.ticks_skipped_fraction": {
+      "direction": "lower",
+      "abs": 0.05
+    },
+    "replay.peak_rss_mb": {
+      "direction": "lower",
+      "rel": 0.1
+    },
+    "caption.on.chunk_id.in_progress.p50": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.on.chunk_id.in_progress.p95": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.on.chunk_id.final.p50": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.on.chunk_id.final.p95": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.on.word.first_shown.p50": {
+      "direction": "lower",
+      "abs": 2.0,
+      "rel": 0.2
+    },
+    "caption.on.word.first_shown.p95": {
+      "direction": "lower",
+      "abs": 2.0,
+      "rel": 0.2
+    },
+    "caption.on.dropped_periods": {
+      "direction": "lower",
+      "abs": 2
+    },
+    "caption.on.audio_dropped_buffer_full_sec": {
+      "direction": "lower",
+      "abs": 2.0
+    },
+    "caption.on.transcript_messages": {
+      "direction": "higher",
+      "rel": 0.2
+    },
+    "caption.on.rss_peak_mb": {
+      "direction": "lower",
+      "rel": 0.1
+    },
+    "caption.off.chunk_id.in_progress.p50": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.off.chunk_id.in_progress.p95": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.off.chunk_id.final.p50": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.off.chunk_id.final.p95": {
+      "direction": "lower",
+      "abs": 1.0,
+      "rel": 0.2
+    },
+    "caption.off.word.first_shown.p50": {
+      "direction": "lower",
+      "abs": 2.0,
+      "rel": 0.2
+    },
+    "caption.off.word.first_shown.p95": {
+      "direction": "lower",
+      "abs": 2.0,
+      "rel": 0.2
+    },
+    "caption.off.dropped_periods": {
+      "direction": "lower",
+      "abs": 2
+    },
+    "caption.off.audio_dropped_buffer_full_sec": {
+      "direction": "lower",
+      "abs": 2.0
+    },
+    "caption.off.transcript_messages": {
+      "direction": "higher",
+      "rel": 0.2
+    },
+    "caption.off.rss_peak_mb": {
+      "direction": "lower",
+      "rel": 0.1
+    }
+  }
+}

@@ -1,0 +1,1434 @@
+{
+  "label": "Phase 2 starting baseline, Linux CPU reference (upstream CPU image, 4 CPUs, 8 GB)",
+  "generated_at": "2026-10-03T00:08:34+0000",
+  "code_revision": "0b7d1f3",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "resource_limits": {
+    "runner": "docker",
+    "requested_cpus": 4.0,
+    "requested_memory_gb": 8.0,
+    "cgroup_cpus": 4.0,
+    "cgroup_memory_gb": 8.0,
+    "host_cpus": 8,
+    "host_memory_gb": 7.65,
+    "effective_cpus": 4.0,
+    "effective_memory_gb": 8.0
+  },
+  "hygiene": {
+    "before": {
+      "state": {
+        "taken_at": "2026-10-03T00:08:34+0000",
+        "free_memory_mb": 7360,
+        "swap_used_mb": 0,
+        "load_1m": 0.24,
+        "load_5m": 0.05,
+        "load_15m": 0.02
+      },
+      "warnings": [],
+      "clean": true
+    },
+    "after": {
+      "taken_at": "2026-10-03T01:37:34+0000",
+      "free_memory_mb": 6849,
+      "swap_used_mb": 0,
+      "load_1m": 1.38,
+      "load_5m": 1.23,
+      "load_15m": 1.41
+    },
+    "clean": true,
+    "warnings": []
+  },
+  "config": {
+    "reference_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "dev_vad_config": "benchmarks/diarization/configs/dev_vad_provider_config.json",
+    "data": "benchmarks/diarization/data/ami",
+    "suffix": "_10min",
+    "files": null,
+    "stream_sec": 120.0,
+    "skip_offline": false,
+    "caption_audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+    "caption_seconds": 180.0,
+    "chunk_ms": 500,
+    "steps": [
+      "caption",
+      "replay",
+      "warmup"
+    ]
+  },
+  "logs": "benchmarks/diarization/results/linux_logs",
+  "warmup": {
+    "whisper_load_sec": 0.48,
+    "whisper_pass_sec": 1.22,
+    "silero_load_sec": 0.2,
+    "pyannote_load_sec": 2.2,
+    "pyannote_pass_sec": 0.26
+  },
+  "replay": {
+    "label": "Phase 2 starting baseline, Linux CPU reference (upstream CPU image, 4 CPUs, 8 GB)",
+    "generated_at": "2026-10-03T01:23:07+0000",
+    "code_revision": "0b7d1f3",
+    "code_dirty": null,
+    "environment": {
+      "machine": "aarch64",
+      "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+      "python": "3.12.11",
+      "device": "cpu",
+      "omp_num_threads": "1",
+      "openblas_num_threads": "1",
+      "resource_limits": {
+        "runner": "docker",
+        "requested_cpus": 4.0,
+        "requested_memory_gb": 8.0,
+        "cgroup_cpus": 4.0,
+        "cgroup_memory_gb": 8.0,
+        "host_cpus": 8,
+        "host_memory_gb": 7.65,
+        "effective_cpus": 4.0,
+        "effective_memory_gb": 8.0
+      },
+      "baseline_key": "linux-cpu-4c8g",
+      "torch": "2.13.0+cpu",
+      "torch_threads": 8,
+      "pyannote_audio": "4.0.7",
+      "faster_whisper": "1.2.1",
+      "cpu_threads": 8
+    },
+    "hygiene": null,
+    "config": {
+      "model": "pyannote/speaker-diarization-community-1",
+      "tick_sec": 5.0,
+      "max_buffer_sec": 30.0,
+      "stream_sec": 120.0,
+      "der_convention": "pyannote default: no collar, overlap scored",
+      "data": "benchmarks/diarization/data/ami",
+      "suffix": "_10min"
+    },
+    "model_load_sec": 1.9,
+    "warmup_pass_sec": 0.14,
+    "peak_rss_mb": 2615.0,
+    "aggregate": {
+      "offline": {
+        "der": {
+          "value": 0.2599,
+          "reference_speech_sec": 1409.58,
+          "missed_detection": 0.1877,
+          "false_alarm": 0.0379,
+          "confusion": 0.0344
+        },
+        "der_collar_0.25": {
+          "value": 0.2193,
+          "reference_speech_sec": 1251.96,
+          "missed_detection": 0.1617,
+          "false_alarm": 0.0295,
+          "confusion": 0.028
+        },
+        "jer": {
+          "value": 0.522
+        },
+        "speaker_count_abs_error_mean": 1.0,
+        "rtf_mean": 1.4547
+      },
+      "streaming_first_seen": {
+        "der": {
+          "value": 0.4623,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.2172,
+          "false_alarm": 0.1119,
+          "confusion": 0.1332
+        },
+        "der_collar_0.25": {
+          "value": 0.4261,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1888,
+          "false_alarm": 0.1054,
+          "confusion": 0.1318
+        },
+        "jer": {
+          "value": 0.6782
+        }
+      },
+      "streaming_settled": {
+        "der": {
+          "value": 0.4084,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.2075,
+          "false_alarm": 0.1061,
+          "confusion": 0.0948
+        },
+        "der_collar_0.25": {
+          "value": 0.3717,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1823,
+          "false_alarm": 0.0997,
+          "confusion": 0.0897
+        },
+        "jer": {
+          "value": 0.6198
+        }
+      },
+      "streaming": {
+        "tick_cost_mean_sec": 25.59,
+        "tick_cost_p95_sec": 32.411,
+        "tick_cost_worst_sec": 32.941,
+        "lag_behind_realtime_p50_sec": 15.765,
+        "lag_behind_realtime_p95_sec": 32.616,
+        "ticks_skipped_fraction": 0.708,
+        "label_latency_p50_sec": 34.16,
+        "label_latency_p95_sec": 60.15,
+        "onsets_never_labelled": 6,
+        "label_flips_per_min": 3.0,
+        "label_flip_rate_after_first_shown": 0.19,
+        "labels_minted_per_reference_speaker": 1.22,
+        "speaker_count_abs_error_mean": 2.667,
+        "stage_cost_sec": {
+          "total": {
+            "mean": 25.589,
+            "max": 32.939,
+            "count": 72
+          },
+          "segmentation": {
+            "mean": 0.963,
+            "max": 2.829,
+            "count": 72
+          },
+          "embeddings": {
+            "mean": 27.688,
+            "max": 31.978,
+            "count": 64
+          },
+          "clustering_and_other": {
+            "mean": 0.015,
+            "max": 0.103,
+            "count": 72
+          }
+        },
+        "reconciler_cost_mean_sec": 0.000126,
+        "memory_growth_mb_total": 756.0
+      }
+    },
+    "files": [
+      {
+        "file": "ES2004a_10min.wav",
+        "audio_sec": 600.0,
+        "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 851.8,
+          "rtf": 1.4197,
+          "stage_cost_sec": {
+            "total": 851.837,
+            "segmentation": 22.241,
+            "embeddings": 829.237,
+            "clustering_and_other": 0.359
+          },
+          "der": {
+            "value": 0.374,
+            "reference_speech_sec": 420.92,
+            "missed_detection": 0.2882,
+            "false_alarm": 0.0535,
+            "confusion": 0.0323
+          },
+          "der_collar_0.25": {
+            "value": 0.3346,
+            "reference_speech_sec": 362.4,
+            "missed_detection": 0.2572,
+            "false_alarm": 0.0497,
+            "confusion": 0.0277
+          },
+          "jer": {
+            "value": 0.3937
+          }
+        },
+        "streaming": {
+          "streamed_sec": 120.0,
+          "ticks": 24,
+          "tick_cost_sec": {
+            "count": 24,
+            "mean": 24.768,
+            "p50": 29.817,
+            "p95": 30.939,
+            "max": 32.794,
+            "worst": 32.794,
+            "budget": 5.0,
+            "fits_budget": false
+          },
+          "reconciler_cost_sec": {
+            "count": 24,
+            "mean": 6.8e-05,
+            "p50": 5.9e-05,
+            "p95": 9.5e-05,
+            "max": 0.000388
+          },
+          "stage_cost_sec": {
+            "total": {
+              "count": 24,
+              "mean": 24.768,
+              "p50": 29.817,
+              "p95": 30.939,
+              "max": 32.793
+            },
+            "segmentation": {
+              "count": 24,
+              "mean": 0.848,
+              "p50": 0.909,
+              "p95": 1.096,
+              "max": 1.45
+            },
+            "embeddings": {
+              "count": 22,
+              "mean": 26.077,
+              "p50": 28.934,
+              "p95": 29.946,
+              "max": 31.326
+            },
+            "clustering_and_other": {
+              "count": 24,
+              "mean": 0.016,
+              "p50": 0.012,
+              "p95": 0.024,
+              "max": 0.103
+            }
+          },
+          "schedule": {
+            "lag_behind_realtime_sec": {
+              "count": 7,
+              "mean": 17.702,
+              "p50": 22.918,
+              "p95": 30.93,
+              "max": 30.93
+            },
+            "ticks_skipped": 17,
+            "ticks_skipped_fraction": 0.708
+          },
+          "label_latency_sec": {
+            "mean": 37.42,
+            "p50": 34.86,
+            "p95": 60.15,
+            "onsets_scored": 16,
+            "onsets_never_labelled": 4
+          },
+          "label_flips_per_min": 3.0,
+          "label_flip_rate_after_first_shown": 0.158,
+          "regions_labelled": 19,
+          "session_labels_minted": 5,
+          "session_labels_used": 5,
+          "reference_speakers_streamed": 3,
+          "labels_minted_per_reference_speaker": 1.67,
+          "speaker_count_error": 2,
+          "memory": {
+            "rss_after_first_tick_mb": 767.4,
+            "rss_end_mb": 1042.7,
+            "rss_min_mb": 691.3,
+            "rss_max_mb": 1045.7,
+            "growth_mb": 275.3
+          },
+          "first_seen": {
+            "der": {
+              "value": 0.6346,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.2833,
+              "false_alarm": 0.2335,
+              "confusion": 0.1178
+            },
+            "der_collar_0.25": {
+              "value": 0.5883,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.2409,
+              "false_alarm": 0.2373,
+              "confusion": 0.1102
+            },
+            "jer": {
+              "value": 0.6766
+            }
+          },
+          "settled": {
+            "der": {
+              "value": 0.5769,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.2929,
+              "false_alarm": 0.1999,
+              "confusion": 0.0842
+            },
+            "der_collar_0.25": {
+              "value": 0.5408,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.2602,
+              "false_alarm": 0.2019,
+              "confusion": 0.0786
+            },
+            "jer": {
+              "value": 0.696
+            }
+          }
+        }
+      },
+      {
+        "file": "IS1009a_10min.wav",
+        "audio_sec": 600.0,
+        "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 872.5,
+          "rtf": 1.4541,
+          "stage_cost_sec": {
+            "total": 872.472,
+            "segmentation": 24.885,
+            "embeddings": 847.392,
+            "clustering_and_other": 0.196
+          },
+          "der": {
+            "value": 0.2668,
+            "reference_speech_sec": 481.67,
+            "missed_detection": 0.1586,
+            "false_alarm": 0.0461,
+            "confusion": 0.062
+          },
+          "der_collar_0.25": {
+            "value": 0.213,
+            "reference_speech_sec": 410.9,
+            "missed_detection": 0.1279,
+            "false_alarm": 0.0331,
+            "confusion": 0.0521
+          },
+          "jer": {
+            "value": 0.3884
+          }
+        },
+        "streaming": {
+          "streamed_sec": 120.0,
+          "ticks": 24,
+          "tick_cost_sec": {
+            "count": 24,
+            "mean": 25.674,
+            "p50": 30.35,
+            "p95": 32.399,
+            "max": 32.941,
+            "worst": 32.941,
+            "budget": 5.0,
+            "fits_budget": false
+          },
+          "reconciler_cost_sec": {
+            "count": 24,
+            "mean": 5.7e-05,
+            "p50": 6e-05,
+            "p95": 8.8e-05,
+            "max": 0.000101
+          },
+          "stage_cost_sec": {
+            "total": {
+              "count": 24,
+              "mean": 25.673,
+              "p50": 30.349,
+              "p95": 32.399,
+              "max": 32.939
+            },
+            "segmentation": {
+              "count": 24,
+              "mean": 1.083,
+              "p50": 0.945,
+              "p95": 2.085,
+              "max": 2.829
+            },
+            "clustering_and_other": {
+              "count": 24,
+              "mean": 0.013,
+              "p50": 0.014,
+              "p95": 0.023,
+              "max": 0.03
+            },
+            "embeddings": {
+              "count": 20,
+              "mean": 29.492,
+              "p50": 29.439,
+              "p95": 31.213,
+              "max": 31.978
+            }
+          },
+          "schedule": {
+            "lag_behind_realtime_sec": {
+              "count": 7,
+              "mean": 12.794,
+              "p50": 1.314,
+              "p95": 30.578,
+              "max": 30.578
+            },
+            "ticks_skipped": 17,
+            "ticks_skipped_fraction": 0.708
+          },
+          "label_latency_sec": {
+            "mean": 34.05,
+            "p50": 33.74,
+            "p95": 36.9,
+            "onsets_scored": 17,
+            "onsets_never_labelled": 0
+          },
+          "label_flips_per_min": 5.0,
+          "label_flip_rate_after_first_shown": 0.412,
+          "regions_labelled": 17,
+          "session_labels_minted": 7,
+          "session_labels_used": 7,
+          "reference_speakers_streamed": 4,
+          "labels_minted_per_reference_speaker": 1.75,
+          "speaker_count_error": 3,
+          "memory": {
+            "rss_after_first_tick_mb": 793.2,
+            "rss_end_mb": 1033.4,
+            "rss_min_mb": 687.0,
+            "rss_max_mb": 1036.8,
+            "growth_mb": 240.2
+          },
+          "first_seen": {
+            "der": {
+              "value": 0.5308,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0491,
+              "false_alarm": 0.1463,
+              "confusion": 0.3355
+            },
+            "der_collar_0.25": {
+              "value": 0.499,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.029,
+              "false_alarm": 0.1259,
+              "confusion": 0.344
+            },
+            "jer": {
+              "value": 0.5462
+            }
+          },
+          "settled": {
+            "der": {
+              "value": 0.4396,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0416,
+              "false_alarm": 0.1595,
+              "confusion": 0.2384
+            },
+            "der_collar_0.25": {
+              "value": 0.3929,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.0209,
+              "false_alarm": 0.1413,
+              "confusion": 0.2307
+            },
+            "jer": {
+              "value": 0.3776
+            }
+          }
+        }
+      },
+      {
+        "file": "TS3003a_10min.wav",
+        "audio_sec": 600.0,
+        "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 1,
+          "speaker_count_error": -3,
+          "wall_sec": 894.2,
+          "rtf": 1.4903,
+          "stage_cost_sec": {
+            "total": 894.208,
+            "segmentation": 27.474,
+            "embeddings": 866.504,
+            "clustering_and_other": 0.23
+          },
+          "der": {
+            "value": 0.1587,
+            "reference_speech_sec": 506.99,
+            "missed_detection": 0.132,
+            "false_alarm": 0.017,
+            "confusion": 0.0097
+          },
+          "der_collar_0.25": {
+            "value": 0.1373,
+            "reference_speech_sec": 478.66,
+            "missed_detection": 0.1184,
+            "false_alarm": 0.0113,
+            "confusion": 0.0077
+          },
+          "jer": {
+            "value": 0.7839
+          }
+        },
+        "streaming": {
+          "streamed_sec": 120.0,
+          "ticks": 24,
+          "tick_cost_sec": {
+            "count": 24,
+            "mean": 26.327,
+            "p50": 30.376,
+            "p95": 32.411,
+            "max": 32.616,
+            "worst": 32.616,
+            "budget": 5.0,
+            "fits_budget": false
+          },
+          "reconciler_cost_sec": {
+            "count": 24,
+            "mean": 0.000253,
+            "p50": 6.5e-05,
+            "p95": 0.000195,
+            "max": 0.004486
+          },
+          "stage_cost_sec": {
+            "total": {
+              "count": 24,
+              "mean": 26.327,
+              "p50": 30.376,
+              "p95": 32.411,
+              "max": 32.614
+            },
+            "segmentation": {
+              "count": 24,
+              "mean": 0.957,
+              "p50": 0.943,
+              "p95": 1.683,
+              "max": 1.842
+            },
+            "clustering_and_other": {
+              "count": 24,
+              "mean": 0.016,
+              "p50": 0.015,
+              "p95": 0.032,
+              "max": 0.047
+            },
+            "embeddings": {
+              "count": 22,
+              "mean": 27.659,
+              "p50": 29.373,
+              "p95": 30.721,
+              "max": 31.6
+            }
+          },
+          "schedule": {
+            "lag_behind_realtime_sec": {
+              "count": 7,
+              "mean": 17.966,
+              "p50": 23.064,
+              "p95": 32.616,
+              "max": 32.616
+            },
+            "ticks_skipped": 17,
+            "ticks_skipped_fraction": 0.708
+          },
+          "label_latency_sec": {
+            "mean": 31.09,
+            "p50": 33.89,
+            "p95": 42.49,
+            "onsets_scored": 14,
+            "onsets_never_labelled": 2
+          },
+          "label_flips_per_min": 1.0,
+          "label_flip_rate_after_first_shown": 0.0,
+          "regions_labelled": 21,
+          "session_labels_minted": 1,
+          "session_labels_used": 1,
+          "reference_speakers_streamed": 4,
+          "labels_minted_per_reference_speaker": 0.25,
+          "speaker_count_error": -3,
+          "memory": {
+            "rss_after_first_tick_mb": 794.6,
+            "rss_end_mb": 1035.1,
+            "rss_min_mb": 690.7,
+            "rss_max_mb": 1063.9,
+            "growth_mb": 240.5
+          },
+          "first_seen": {
+            "der": {
+              "value": 0.291,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.29,
+              "false_alarm": 0.001,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.2633,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.2633,
+              "false_alarm": 0.0,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.8114
+            }
+          },
+          "settled": {
+            "der": {
+              "value": 0.2665,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.265,
+              "false_alarm": 0.0015,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.2401,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.2401,
+              "false_alarm": 0.0,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.8048
+            }
+          }
+        }
+      }
+    ]
+  },
+  "caption_latency": {
+    "reference": {
+      "on": {
+        "label": "Phase 2 starting baseline, Linux CPU reference (upstream CPU image, 4 CPUs, 8 GB) [reference diarization on]",
+        "generated_at": "2026-10-03T01:26:55+0000",
+        "code_revision": "0b7d1f3",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "on",
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": true,
+            "diarization_context_tag": "pyannote_diarization"
+          },
+          "contexts": [
+            "faster-whisper",
+            "silero-vad",
+            "pyannote-diarization"
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 6.7,
+          "exited_during_run": null,
+          "log": "benchmarks/diarization/results/linux_logs/caption_reference_on.service.log",
+          "rss_mb_after_ready": 1262.8,
+          "rss_mb_end": 1907.7,
+          "rss_mb_peak": 3249.5,
+          "rss_mb_growth_during_stream": 644.9,
+          "rss_samples": 205
+        },
+        "stream": {
+          "late_sends": 0,
+          "max_send_lateness_sec": 0.0,
+          "chunks_sent": 360,
+          "streamed_sec": 180.0,
+          "wall_sec": 199.6
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 5,
+              "mean": 43.667,
+              "p50": 39.379,
+              "p95": 72.31,
+              "max": 72.31
+            },
+            "final": {
+              "count": 2,
+              "mean": 72.293,
+              "p50": 72.275,
+              "p95": 72.31,
+              "max": 72.31
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 113,
+              "mean": 50.943,
+              "p50": 51.73,
+              "p95": 78.774,
+              "max": 81.274
+            },
+            "finalized": {
+              "count": 75,
+              "mean": 86.475,
+              "p50": 86.814,
+              "p95": 97.774,
+              "max": 101.777
+            }
+          },
+          "transcript_messages": 7,
+          "transcript_messages_with_text": 5,
+          "final_words": 75,
+          "final_words_labelled": 58,
+          "final_words_labelled_fraction": 0.773,
+          "speaker_labels_seen": [
+            "spk_1",
+            "spk_3"
+          ],
+          "label_changes_before_final": 0
+        },
+        "service_counters_delta": {
+          "jobsCompletedTotal": 7.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 120.5,
+          "asrDroppedPeriodsTotal": 21.0,
+          "audioDroppedBufferFullTotal": 40.0,
+          "audioDroppedBufferFullSecondsTotal": 20.0,
+          "bufferOverflowTotal": 4.0,
+          "bufferOverflowSecondsTotal": 90.5,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 3.0,
+          "temperatureFallbackTotal": 0,
+          "repeatedSegmentDetectedTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 7,
+            "sampleCount": 3,
+            "mean": 32955.05151533333,
+            "p50": 32277.306015,
+            "p95": 34347.095391,
+            "p99": 34347.095391,
+            "max": 34347.095391
+          },
+          "asrSchedulingDelayMs": {
+            "count": 7,
+            "sampleCount": 3,
+            "mean": 4.444464333333333,
+            "p50": 4.736032,
+            "p95": 5.624605,
+            "p99": 5.624605,
+            "max": 5.624605
+          },
+          "asrRtf": {
+            "count": 7,
+            "sampleCount": 3,
+            "mean": 1.098501717177778,
+            "p50": 1.0759102005,
+            "p95": 1.1449031797000002,
+            "p99": 1.1449031797000002,
+            "max": 1.1449031797000002
+          }
+        }
+      },
+      "off": {
+        "label": "Phase 2 starting baseline, Linux CPU reference (upstream CPU image, 4 CPUs, 8 GB) [reference diarization off]",
+        "generated_at": "2026-10-03T01:30:20+0000",
+        "code_revision": "0b7d1f3",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "off",
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": false,
+            "diarization_context_tag": "pyannote_diarization"
+          },
+          "contexts": [
+            "faster-whisper",
+            "silero-vad"
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 2.6,
+          "exited_during_run": null,
+          "log": "benchmarks/diarization/results/linux_logs/caption_reference_off.service.log",
+          "rss_mb_after_ready": 894.4,
+          "rss_mb_end": 1154.1,
+          "rss_mb_peak": 1320.6,
+          "rss_mb_growth_during_stream": 259.7,
+          "rss_samples": 201
+        },
+        "stream": {
+          "late_sends": 0,
+          "max_send_lateness_sec": 0.0,
+          "chunks_sent": 360,
+          "streamed_sec": 180.0,
+          "wall_sec": 199.6
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 24,
+              "mean": 10.114,
+              "p50": 5.994,
+              "p95": 22.741,
+              "max": 52.499
+            },
+            "final": {
+              "count": 18,
+              "mean": 36.429,
+              "p50": 33.72,
+              "p95": 60.615,
+              "max": 60.615
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 590,
+              "mean": 18.881,
+              "p50": 17.241,
+              "p95": 34.767,
+              "max": 59.0
+            },
+            "finalized": {
+              "count": 245,
+              "mean": 39.015,
+              "p50": 39.2,
+              "p95": 47.586,
+              "max": 67.116
+            }
+          },
+          "transcript_messages": 27,
+          "transcript_messages_with_text": 25,
+          "final_words": 245,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": 0.0,
+          "speaker_labels_seen": [],
+          "label_changes_before_final": 0
+        },
+        "service_counters_delta": {
+          "jobsCompletedTotal": 27.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 175.7,
+          "asrDroppedPeriodsTotal": 11.0,
+          "audioDroppedBufferFullTotal": 9.0,
+          "audioDroppedBufferFullSecondsTotal": 4.3,
+          "bufferOverflowTotal": 20.0,
+          "bufferOverflowSecondsTotal": 139.92,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 3.0,
+          "temperatureFallbackTotal": 3.0,
+          "repeatedSegmentDetectedTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 27,
+            "sampleCount": 16,
+            "mean": 6010.27914875,
+            "p50": 4175.520836,
+            "p95": 31461.228306,
+            "p99": 31461.228306,
+            "max": 31461.228306
+          },
+          "asrSchedulingDelayMs": {
+            "count": 27,
+            "sampleCount": 16,
+            "mean": 5.6198384375,
+            "p50": 5.197858,
+            "p95": 15.595962,
+            "p99": 15.595962,
+            "max": 15.595962
+          },
+          "asrRtf": {
+            "count": 26,
+            "sampleCount": 15,
+            "mean": 1.0887864590594716,
+            "p50": 0.7731426504,
+            "p95": 6.2922456612,
+            "p99": 6.2922456612,
+            "max": 6.2922456612
+          }
+        }
+      }
+    },
+    "secondary_dev_vad": {
+      "on": {
+        "label": "Phase 2 starting baseline, Linux CPU reference (upstream CPU image, 4 CPUs, 8 GB) [secondary_dev_vad diarization on]",
+        "generated_at": "2026-10-03T01:34:06+0000",
+        "code_revision": "0b7d1f3",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/dev_vad_provider_config.json",
+          "provider": "whisper",
+          "diarization": "on",
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": true,
+            "diarization_context_tag": "pyannote_diarization",
+            "vad_detector": true
+          },
+          "contexts": [
+            "faster-whisper",
+            "silero-vad",
+            "pyannote-diarization"
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 4.1,
+          "exited_during_run": null,
+          "log": "benchmarks/diarization/results/linux_logs/caption_secondary_dev_vad_on.service.log",
+          "rss_mb_after_ready": 1262.9,
+          "rss_mb_end": 1890.7,
+          "rss_mb_peak": 3430.7,
+          "rss_mb_growth_during_stream": 627.8,
+          "rss_samples": 203
+        },
+        "stream": {
+          "late_sends": 0,
+          "max_send_lateness_sec": 0.0,
+          "chunks_sent": 360,
+          "streamed_sec": 180.0,
+          "wall_sec": 199.5
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 2,
+              "mean": 65.156,
+              "p50": 48.289,
+              "p95": 82.023,
+              "max": 82.023
+            },
+            "final": {
+              "count": 1,
+              "mean": 82.023,
+              "p50": 82.023,
+              "p95": 82.023,
+              "max": 82.023
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 13,
+              "mean": 54.794,
+              "p50": 52.795,
+              "p95": 59.795,
+              "max": 59.795
+            },
+            "finalized": {
+              "count": 13,
+              "mean": 88.528,
+              "p50": 86.529,
+              "p95": 93.53,
+              "max": 93.53
+            }
+          },
+          "transcript_messages": 5,
+          "transcript_messages_with_text": 2,
+          "final_words": 13,
+          "final_words_labelled": 3,
+          "final_words_labelled_fraction": 0.231,
+          "speaker_labels_seen": [
+            "spk_1"
+          ],
+          "label_changes_before_final": 0
+        },
+        "service_counters_delta": {
+          "jobsCompletedTotal": 5.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 60.5,
+          "asrDroppedPeriodsTotal": 11.0,
+          "audioDroppedBufferFullTotal": 40.0,
+          "audioDroppedBufferFullSecondsTotal": 20.0,
+          "bufferOverflowTotal": 2.0,
+          "bufferOverflowSecondsTotal": 30.5,
+          "vadNoSpeechTotal": 2.0,
+          "noWordsTotal": 4.0,
+          "temperatureFallbackTotal": 2.0,
+          "repeatedSegmentDetectedTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 5,
+            "sampleCount": 1,
+            "mean": 31968.254557,
+            "p50": 31968.254557,
+            "p95": 31968.254557,
+            "p99": 31968.254557,
+            "max": 31968.254557
+          },
+          "asrSchedulingDelayMs": {
+            "count": 5,
+            "sampleCount": 1,
+            "mean": 5.963161,
+            "p50": 5.963161,
+            "p95": 5.963161,
+            "p99": 5.963161,
+            "max": 5.963161
+          },
+          "asrRtf": {
+            "count": 5,
+            "sampleCount": 1,
+            "mean": 1.0656084852333334,
+            "p50": 1.0656084852333334,
+            "p95": 1.0656084852333334,
+            "p99": 1.0656084852333334,
+            "max": 1.0656084852333334
+          }
+        }
+      },
+      "off": {
+        "label": "Phase 2 starting baseline, Linux CPU reference (upstream CPU image, 4 CPUs, 8 GB) [secondary_dev_vad diarization off]",
+        "generated_at": "2026-10-03T01:37:31+0000",
+        "code_revision": "0b7d1f3",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/dev_vad_provider_config.json",
+          "provider": "whisper",
+          "diarization": "off",
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": false,
+            "diarization_context_tag": "pyannote_diarization",
+            "vad_detector": true
+          },
+          "contexts": [
+            "faster-whisper",
+            "silero-vad"
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 2.6,
+          "exited_during_run": null,
+          "log": "benchmarks/diarization/results/linux_logs/caption_secondary_dev_vad_off.service.log",
+          "rss_mb_after_ready": 894.4,
+          "rss_mb_end": 1172.8,
+          "rss_mb_peak": 1309.1,
+          "rss_mb_growth_during_stream": 278.4,
+          "rss_samples": 202
+        },
+        "stream": {
+          "late_sends": 0,
+          "max_send_lateness_sec": 0.0,
+          "chunks_sent": 360,
+          "streamed_sec": 180.0,
+          "wall_sec": 199.5
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 7,
+              "mean": 21.947,
+              "p50": 20.767,
+              "p95": 37.489,
+              "max": 37.489
+            },
+            "final": {
+              "count": 4,
+              "mean": 50.767,
+              "p50": 46.678,
+              "p95": 67.876,
+              "max": 67.876
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 165,
+              "mean": 34.625,
+              "p50": 36.868,
+              "p95": 49.871,
+              "max": 54.375
+            },
+            "finalized": {
+              "count": 95,
+              "mean": 61.334,
+              "p50": 61.773,
+              "p95": 74.875,
+              "max": 75.375
+            }
+          },
+          "transcript_messages": 14,
+          "transcript_messages_with_text": 8,
+          "final_words": 95,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": 0.0,
+          "speaker_labels_seen": [],
+          "label_changes_before_final": 0
+        },
+        "service_counters_delta": {
+          "jobsCompletedTotal": 14.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 170.5,
+          "asrDroppedPeriodsTotal": 20.0,
+          "audioDroppedBufferFullTotal": 0,
+          "audioDroppedBufferFullSecondsTotal": 0,
+          "bufferOverflowTotal": 9.0,
+          "bufferOverflowSecondsTotal": 121.35,
+          "vadNoSpeechTotal": 5.0,
+          "noWordsTotal": 7.0,
+          "temperatureFallbackTotal": 1.0,
+          "repeatedSegmentDetectedTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 14,
+            "sampleCount": 6,
+            "mean": 15512.304514333335,
+            "p50": 9933.175005,
+            "p95": 36143.3921,
+            "p99": 36143.3921,
+            "max": 36143.3921
+          },
+          "asrSchedulingDelayMs": {
+            "count": 14,
+            "sampleCount": 6,
+            "mean": 4.757995,
+            "p50": 3.355897,
+            "p95": 9.385588,
+            "p99": 9.385588,
+            "max": 9.385588
+          },
+          "asrRtf": {
+            "count": 14,
+            "sampleCount": 6,
+            "mean": 1.1960590768347223,
+            "p50": 0.6078494850333332,
+            "p95": 3.61433921,
+            "p99": 3.61433921,
+            "max": 3.61433921
+          }
+        }
+      }
+    }
+  },
+  "durations_sec": {
+    "warmup": 5.6,
+    "replay": 4465.4,
+    "caption_reference_on": 228.8,
+    "caption_reference_off": 205.0,
+    "caption_secondary_dev_vad_on": 226.4,
+    "caption_secondary_dev_vad_off": 205.3
+  },
+  "suite_wall_sec": 5339.7,
+  "key_metrics": {
+    "replay.offline.der": 0.2599,
+    "replay.offline.der_missed": 0.1877,
+    "replay.offline.der_false_alarm": 0.0379,
+    "replay.offline.der_confusion": 0.0344,
+    "replay.offline.jer": 0.522,
+    "replay.offline.speaker_count_abs_error_mean": 1.0,
+    "replay.offline.rtf_mean": 1.4547,
+    "replay.first_seen.der": 0.4623,
+    "replay.first_seen.der_missed": 0.2172,
+    "replay.first_seen.der_false_alarm": 0.1119,
+    "replay.first_seen.der_confusion": 0.1332,
+    "replay.first_seen.jer": 0.6782,
+    "replay.settled.der": 0.4084,
+    "replay.settled.der_missed": 0.2075,
+    "replay.settled.der_false_alarm": 0.1061,
+    "replay.settled.der_confusion": 0.0948,
+    "replay.settled.jer": 0.6198,
+    "replay.tick_cost_mean_sec": 25.59,
+    "replay.tick_cost_p95_sec": 32.411,
+    "replay.tick_cost_worst_sec": 32.941,
+    "replay.lag_behind_realtime_p50_sec": 15.765,
+    "replay.lag_behind_realtime_p95_sec": 32.616,
+    "replay.ticks_skipped_fraction": 0.708,
+    "replay.label_latency_p50_sec": 34.16,
+    "replay.label_latency_p95_sec": 60.15,
+    "replay.onsets_never_labelled": 6,
+    "replay.label_flips_per_min": 3.0,
+    "replay.label_flip_rate_after_first_shown": 0.19,
+    "replay.labels_minted_per_reference_speaker": 1.22,
+    "replay.speaker_count_abs_error_mean": 2.667,
+    "replay.reconciler_cost_mean_sec": 0.000126,
+    "replay.memory_growth_mb_total": 756.0,
+    "replay.stage.total_mean_sec": 25.589,
+    "replay.stage.segmentation_mean_sec": 0.963,
+    "replay.stage.embeddings_mean_sec": 27.688,
+    "replay.stage.clustering_and_other_mean_sec": 0.015,
+    "replay.peak_rss_mb": 2615.0,
+    "replay.model_load_sec": 1.9,
+    "caption.on.chunk_id.in_progress.p50": 39.379,
+    "caption.on.chunk_id.in_progress.p95": 72.31,
+    "caption.on.chunk_id.in_progress.mean": 43.667,
+    "caption.on.chunk_id.final.p50": 72.275,
+    "caption.on.chunk_id.final.p95": 72.31,
+    "caption.on.chunk_id.final.mean": 72.293,
+    "caption.on.word.first_shown.p50": 51.73,
+    "caption.on.word.first_shown.p95": 78.774,
+    "caption.on.word.first_shown.mean": 50.943,
+    "caption.on.word.finalized.p50": 86.814,
+    "caption.on.word.finalized.p95": 97.774,
+    "caption.on.word.finalized.mean": 86.475,
+    "caption.on.transcript_messages": 7,
+    "caption.on.final_words": 75,
+    "caption.on.final_words_labelled_fraction": 0.773,
+    "caption.on.speaker_labels_seen": 2,
+    "caption.on.label_changes_before_final": 0,
+    "caption.on.dropped_periods": 21.0,
+    "caption.on.audio_dropped_buffer_full_sec": 20.0,
+    "caption.on.buffer_overflow_sec": 90.5,
+    "caption.on.jobs_completed": 7.0,
+    "caption.on.rss_peak_mb": 3249.5,
+    "caption.on.rss_growth_mb": 644.9,
+    "caption.on.exec_ms_p95": 34347.095391,
+    "caption.on.exec_ms_max": 34347.095391,
+    "caption.off.chunk_id.in_progress.p50": 5.994,
+    "caption.off.chunk_id.in_progress.p95": 22.741,
+    "caption.off.chunk_id.in_progress.mean": 10.114,
+    "caption.off.chunk_id.final.p50": 33.72,
+    "caption.off.chunk_id.final.p95": 60.615,
+    "caption.off.chunk_id.final.mean": 36.429,
+    "caption.off.word.first_shown.p50": 17.241,
+    "caption.off.word.first_shown.p95": 34.767,
+    "caption.off.word.first_shown.mean": 18.881,
+    "caption.off.word.finalized.p50": 39.2,
+    "caption.off.word.finalized.p95": 47.586,
+    "caption.off.word.finalized.mean": 39.015,
+    "caption.off.transcript_messages": 27,
+    "caption.off.final_words": 245,
+    "caption.off.final_words_labelled_fraction": 0.0,
+    "caption.off.speaker_labels_seen": 0,
+    "caption.off.label_changes_before_final": 0,
+    "caption.off.dropped_periods": 11.0,
+    "caption.off.audio_dropped_buffer_full_sec": 4.3,
+    "caption.off.buffer_overflow_sec": 139.92,
+    "caption.off.jobs_completed": 27.0,
+    "caption.off.rss_peak_mb": 1320.6,
+    "caption.off.rss_growth_mb": 259.7,
+    "caption.off.exec_ms_p95": 31461.228306,
+    "caption.off.exec_ms_max": 31461.228306
+  }
+}

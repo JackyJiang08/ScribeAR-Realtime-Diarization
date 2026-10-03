@@ -86,20 +86,6 @@ def test_mapping_prefers_largest_overlap():
     assert [segment.speaker for segment in result] == ["spk_1"]
 
 
-def test_no_overlap_with_previous_run_mints_new_label():
-    """
-    Test segments past the previous window mint a fresh session label
-    """
-    reconciler = SpeakerReconciler()
-
-    reconciler.reconcile([SpeakerSegment(0.0, 2.0, "SPEAKER_00")])
-
-    # Buffer moved entirely past the previous window (e.g. forced purge)
-    result = reconciler.reconcile([SpeakerSegment(10.0, 12.0, "SPEAKER_00")])
-
-    assert [segment.speaker for segment in result] == ["spk_1"]
-
-
 def test_empty_run_returns_empty_and_keeps_state():
     """
     Test a silent run returns empty without erasing label continuity

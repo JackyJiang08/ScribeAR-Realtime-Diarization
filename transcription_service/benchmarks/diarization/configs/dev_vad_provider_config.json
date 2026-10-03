@@ -1,0 +1,54 @@
+{
+  "_comment": [
+    "SECONDARY config, not the reference. This is the fork's old local",
+    "development config: the reference config plus upstream's",
+    "`vad_detector: true` path, which calls Whisper once per Silero speech",
+    "range and costs 3 to 5x per tick (docs/diarization_production_audit.md,",
+    "section 1). Runs made with it are labelled `secondary_dev_vad` in the",
+    "suite report and are never used by the regression gate. It exists so",
+    "the audit's 26.8 s to 30 s caption-latency figures stay reproducible."
+  ],
+  "num_workers": 1,
+  "contexts": [
+    {
+      "context_uid": "faster-whisper",
+      "worker_ids": [0],
+      "tags": ["whisper_context"],
+      "context_config": {
+        "model": "base",
+        "device": "cpu"
+      }
+    },
+    {
+      "context_uid": "silero-vad",
+      "worker_ids": [0],
+      "tags": ["silero_vad"],
+      "context_config": {}
+    },
+    {
+      "context_uid": "pyannote-diarization",
+      "worker_ids": [0],
+      "tags": ["pyannote_diarization"],
+      "context_config": {
+        "model": "pyannote/speaker-diarization-community-1",
+        "device": "cpu",
+        "token_env_var": "HUGGINGFACE_ACCESS_TOKEN"
+      }
+    }
+  ],
+  "providers": {
+    "whisper": {
+      "provider_uid": "whisper-streaming",
+      "provider_config": {
+        "whisper_context_tag": "whisper_context",
+        "silero_context_tag": "silero_vad",
+        "job_period_ms": 5000,
+        "max_buffer_len_sec": 30,
+        "local_agree_dim": 2,
+        "diarization_detector": true,
+        "diarization_context_tag": "pyannote_diarization",
+        "vad_detector": true
+      }
+    }
+  }
+}

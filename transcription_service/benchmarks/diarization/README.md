@@ -1,74 +1,37 @@
-# Diarization benchmark
+# Diarization evaluation harness
 
-Measures whether candidate diarization engines keep up with ScribeAR's
-5-second streaming job tick. Run it on the hardware that matters: the
-CPU-only production target, and optionally a GPU machine (e.g. a university
-cluster JupyterLab session) for comparison.
+Everything that judges a Phase 2 diarization change lives here. The full
+guide, including what every metric means and how to read a report, is in
+[`../../docs/speaker_diarization.md`](../../docs/speaker_diarization.md)
+(section "Evaluation harness"). This file is the map.
 
-The decision this benchmark feeds: whether `pyannote-diarization` can be
-enabled on CPU deployments (see `../../docs/speaker_diarization.md`), and
-how it compares against NVIDIA Streaming Sortformer when a GPU is available.
+| file | purpose |
+|---|---|
+| `configs/reference_provider_config.json` | **Reference config** for every run: upstream's shipped deployment defaults (whisper `base`, no VAD, 5 s period, 30 s buffer) plus the pyannote context and `diarization_detector: true`. The harness derives the diarization-off variant (context removed) so "off" is exactly upstream as shipped. |
+| `configs/dev_vad_provider_config.json` | Secondary, clearly labelled: the fork's old dev config with `vad_detector: true`. Reproduces the audit's 27 to 30 s latency; never gated. |
+| `run_suite.py` | The standard suite: hygiene, warm-up, replay benchmark, end-to-end caption latency on/off, one JSON report with a flat `key_metrics` block. |
+| `benchmark_baseline.py` | Replay benchmark: offline + streaming DER/JER, speaker-count error, label latency, flips, labels minted, per-stage timing, modelled lag, memory. |
+| `caption_latency.py` | Runs the real service and streams audio at it: chunk-id latency (primary, node-server's method) and word latency (secondary), service counters, RSS. |
+| `compare_baseline.py` | Regression gate against `baselines/<environment>.json` with `baselines/gate_rules.json`. |
+| `baselines/` | Committed reference reports (the Phase 2 starting point) and the gate rules. |
+| `docker/` | Linux CPU reference environment: upstream's `Dockerfile_CPU` image plus the pyannote extra, run with `--cpus 4 --memory 8g` by default. |
+| `warmup.py` | One model load of whisper, Silero and pyannote before timed runs. |
+| `hard_cases.json`, `select_hard_cases.py`, `prepare_hard_cases.py` | Hard-case set (overlap, short turns, return after a long gap, four speakers, background noise), its selection method and its source documentation. |
+| `prepare_soak.py`, `soak.py` | 60 min / 2 h soak stream from consecutive AMI meetings and the harness that tracks drift, label swaps and memory growth. |
+| `prepare_ami_baseline.sh`, `ami_download.py` | Download and crop the AMI meetings and references into `data/` (gitignored). |
+| `bench_common.py` | Shared helpers: hygiene, resource limits, RSS, percentiles, loaders. |
+| `benchmark_diarization.py` | Older speed-only comparison of pyannote vs NVIDIA Sortformer. Kept for GPU experiments. |
+| `results/` | Per-run reports (gitignored except the two historical reports). |
 
-## Setup
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install soundfile numpy torch torchaudio "pyannote.audio>=4.0,<5.0"
-# Only needed for the sortformer engine (heavy install, GPU advised):
-pip install "nemo_toolkit[asr]>=2.0"
-```
-
-Authenticate with HuggingFace (the pyannote pipeline is gated — accept its
-terms at https://huggingface.co/pyannote/speaker-diarization-community-1):
-
-```bash
-export HUGGINGFACE_ACCESS_TOKEN=hf_...
-```
-
-## Test audio
-
-Use a 3–10 minute multi-speaker recording (a lecture with questions, or a
-two-person conversation). The repository's `test_audio_files` are synthetic
-tones and contain no speech. Convert to the expected format:
+Quick start (from `transcription_service/`, token exported, ffmpeg installed):
 
 ```bash
-ffmpeg -i recording.m4a -ac 1 -ar 16000 -acodec pcm_s16le sample.wav
+make benchmark_diarization_suite            # native, quick dev loop
+make benchmark_diarization_suite_docker     # Linux CPU reference, 4 CPUs / 8 GB
+make benchmark_diarization_gate             # suite + fail on regression
+make benchmark_diarization_hardcases
+make benchmark_diarization_soak SOAK_MINUTES=60
 ```
 
-## Run
-
-```bash
-python benchmark_diarization.py --audio sample.wav --engine pyannote --device cpu
-python benchmark_diarization.py --audio sample.wav --engine both --device cuda
-```
-
-## Reading the results
-
-- `Tick sim worst` is the number that matters: the slowest single
-  re-diarization of the rolling 30s buffer. Live use requires it to fit
-  well inside the 5s tick while faster-whisper shares the machine.
-- CPU pyannote fitting the tick means production can enable diarization
-  without any GPU dependency.
-- If it does not fit, live diarization becomes a GPU-only feature flag and
-  CPU deployments keep today's behavior.
-
-Record results in `results.md` alongside the hardware used, so decisions
-stay traceable.
-
-## Accuracy baseline (AMI)
-
-`benchmark_diarization.py` only measures speed. For accuracy against
-ground truth plus a replay of the real tick loop use the baseline script:
-
-```bash
-# from transcription_service/
-make benchmark_diarization_baseline            # download AMI data + run
-make benchmark_diarization_baseline STREAM_SEC=60 RESULT=results/my_run.json
-```
-
-`prepare_ami_baseline.sh` fetches the AMI meetings and reference RTTM/UEM
-files into `data/` (gitignored, never commit audio); `benchmark_baseline.py`
-scores DER/JER offline and in streaming replay and writes a JSON report to
-`results/`. `results/pre_sync_baseline.json` is the reference run captured
-before the upstream sync. See `../../docs/speaker_diarization.md` for the
-report fields.
+Never commit audio. `data/` is gitignored; every source is documented in
+`hard_cases.json`, `prepare_soak.py` and the docs.

@@ -177,3 +177,8 @@ cython_debug/
 
 # Benchmark audio and references (downloaded by prepare_ami_baseline.sh)
 benchmarks/diarization/data/
+# Benchmark reports are per-run artefacts; the committed references live in
+# benchmarks/diarization/baselines/ (plus the two historical reports below)
+benchmarks/diarization/results/*
+!benchmarks/diarization/results/pre_sync_baseline.json
+!benchmarks/diarization/results/post_merge_baseline.json
