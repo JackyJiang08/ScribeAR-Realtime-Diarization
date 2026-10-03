@@ -1,0 +1,1706 @@
+{
+  "label": "phase2b after linux 4c8g run 2",
+  "generated_at": "2026-10-03T21:11:03+0000",
+  "code_revision": "a6234f4",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "resource_limits": {
+    "runner": "docker",
+    "requested_cpus": 4.0,
+    "requested_memory_gb": 8.0,
+    "cgroup_cpus": 4.0,
+    "cgroup_memory_gb": 8.0,
+    "host_cpus": 8,
+    "host_memory_gb": 7.65,
+    "effective_cpus": 4.0,
+    "effective_memory_gb": 8.0
+  },
+  "hygiene": {
+    "before": {
+      "state": {
+        "taken_at": "2026-10-03T21:11:03+0000",
+        "free_memory_mb": 7309,
+        "swap_used_mb": 0,
+        "load_1m": 0.24,
+        "load_5m": 0.05,
+        "load_15m": 0.02
+      },
+      "warnings": [],
+      "clean": true
+    },
+    "after": {
+      "taken_at": "2026-10-03T22:02:35+0000",
+      "free_memory_mb": 6836,
+      "swap_used_mb": 0,
+      "load_1m": 1.54,
+      "load_5m": 1.52,
+      "load_15m": 1.74
+    },
+    "clean": true,
+    "warnings": []
+  },
+  "config": {
+    "reference_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "diarization": {
+      "window_sec": 10.0,
+      "period_ms": 5000,
+      "segmentation_step": null
+    },
+    "dev_vad_config": null,
+    "data": "benchmarks/diarization/data/ami",
+    "suffix": "_10min",
+    "files": null,
+    "stream_sec": 120.0,
+    "skip_offline": false,
+    "caption_audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+    "caption_seconds": 180.0,
+    "chunk_ms": 500,
+    "sessions_sweep": null,
+    "steps": [
+      "caption",
+      "replay",
+      "warmup"
+    ]
+  },
+  "logs": "<outside>/diarization_suite_04oeqcid",
+  "warmup": {
+    "whisper_load_sec": 0.54,
+    "whisper_pass_sec": 1.36,
+    "silero_load_sec": 0.35,
+    "pyannote_load_sec": 1.99,
+    "pyannote_pass_sec": 0.27
+  },
+  "replay": {
+    "label": "phase2b after linux 4c8g run 2",
+    "generated_at": "2026-10-03T21:55:37+0000",
+    "code_revision": "a6234f4",
+    "code_dirty": null,
+    "environment": {
+      "machine": "aarch64",
+      "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+      "python": "3.12.11",
+      "device": "cpu",
+      "omp_num_threads": "1",
+      "openblas_num_threads": "1",
+      "resource_limits": {
+        "runner": "docker",
+        "requested_cpus": 4.0,
+        "requested_memory_gb": 8.0,
+        "cgroup_cpus": 4.0,
+        "cgroup_memory_gb": 8.0,
+        "host_cpus": 8,
+        "host_memory_gb": 7.65,
+        "effective_cpus": 4.0,
+        "effective_memory_gb": 8.0
+      },
+      "baseline_key": "linux-cpu-4c8g",
+      "torch": "2.13.0+cpu",
+      "torch_threads": 8,
+      "pyannote_audio": "4.0.7",
+      "faster_whisper": "1.2.1",
+      "cpu_threads": 8
+    },
+    "hygiene": null,
+    "config": {
+      "model": "pyannote/speaker-diarization-community-1",
+      "tick_sec": 5.0,
+      "max_buffer_sec": 10.0,
+      "segmentation_step": null,
+      "stream_sec": 120.0,
+      "der_convention": "pyannote default: no collar, overlap scored",
+      "data": "benchmarks/diarization/data/ami",
+      "suffix": "_10min"
+    },
+    "model_load_sec": 1.9,
+    "warmup_pass_sec": 0.26,
+    "peak_rss_mb": 2605.0,
+    "aggregate": {
+      "offline": {
+        "der": {
+          "value": 0.2599,
+          "reference_speech_sec": 1409.58,
+          "missed_detection": 0.1877,
+          "false_alarm": 0.0379,
+          "confusion": 0.0344
+        },
+        "der_collar_0.25": {
+          "value": 0.2193,
+          "reference_speech_sec": 1251.96,
+          "missed_detection": 0.1617,
+          "false_alarm": 0.0295,
+          "confusion": 0.028
+        },
+        "jer": {
+          "value": 0.522
+        },
+        "speaker_count_abs_error_mean": 1.0,
+        "rtf_mean": 1.43
+      },
+      "streaming_first_seen": {
+        "der": {
+          "value": 0.3402,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.2217,
+          "false_alarm": 0.0974,
+          "confusion": 0.0211
+        },
+        "der_collar_0.25": {
+          "value": 0.2988,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1933,
+          "false_alarm": 0.0912,
+          "confusion": 0.0143
+        },
+        "jer": {
+          "value": 0.562
+        }
+      },
+      "streaming_settled": {
+        "der": {
+          "value": 0.3128,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.1524,
+          "false_alarm": 0.1393,
+          "confusion": 0.0212
+        },
+        "der_collar_0.25": {
+          "value": 0.274,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1278,
+          "false_alarm": 0.1318,
+          "confusion": 0.0143
+        },
+        "jer": {
+          "value": 0.5455
+        }
+      },
+      "streaming_end_of_stream": {
+        "der": {
+          "value": 0.3128,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.1524,
+          "false_alarm": 0.1393,
+          "confusion": 0.0212
+        },
+        "der_collar_0.25": {
+          "value": 0.274,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1278,
+          "false_alarm": 0.1318,
+          "confusion": 0.0143
+        },
+        "jer": {
+          "value": 0.5455
+        }
+      },
+      "streaming_overlap_first_seen": {
+        "der": {
+          "value": 0.3402,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.2217,
+          "false_alarm": 0.0974,
+          "confusion": 0.0211
+        },
+        "der_collar_0.25": {
+          "value": 0.2988,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1933,
+          "false_alarm": 0.0912,
+          "confusion": 0.0143
+        },
+        "jer": {
+          "value": 0.562
+        }
+      },
+      "streaming_overlap_settled": {
+        "der": {
+          "value": 0.3128,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.1524,
+          "false_alarm": 0.1393,
+          "confusion": 0.0212
+        },
+        "der_collar_0.25": {
+          "value": 0.274,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1278,
+          "false_alarm": 0.1318,
+          "confusion": 0.0143
+        },
+        "jer": {
+          "value": 0.5455
+        }
+      },
+      "streaming_overlap_end_of_stream": {
+        "der": {
+          "value": 0.3128,
+          "reference_speech_sec": 209.98,
+          "missed_detection": 0.1524,
+          "false_alarm": 0.1393,
+          "confusion": 0.0212
+        },
+        "der_collar_0.25": {
+          "value": 0.274,
+          "reference_speech_sec": 188.72,
+          "missed_detection": 0.1278,
+          "false_alarm": 0.1318,
+          "confusion": 0.0143
+        },
+        "jer": {
+          "value": 0.5455
+        }
+      },
+      "streaming": {
+        "tick_cost_mean_sec": 1.223,
+        "tick_cost_p95_sec": 1.828,
+        "tick_cost_worst_sec": 3.076,
+        "lag_behind_realtime_p50_sec": 1.484,
+        "lag_behind_realtime_p95_sec": 1.828,
+        "ticks_skipped_fraction": 0.0,
+        "label_latency_p50_sec": 5.75,
+        "label_latency_p95_sec": 11.33,
+        "onsets_never_labelled": 7,
+        "label_flips_per_min": 1.17,
+        "label_flip_rate_after_first_shown": 0.0,
+        "labels_minted_per_reference_speaker": 0.64,
+        "speaker_count_abs_error_mean": 1.333,
+        "speaker_count_within_1_fraction": 0.667,
+        "session_labels_merged": 0,
+        "revisions": 0,
+        "revised_fraction": 0.0,
+        "stage_cost_sec": {
+          "total": {
+            "mean": 1.222,
+            "max": 3.074,
+            "count": 72
+          },
+          "segmentation": {
+            "mean": 0.179,
+            "max": 1.416,
+            "count": 72
+          },
+          "embeddings": {
+            "mean": 1.387,
+            "max": 1.651,
+            "count": 54
+          },
+          "clustering_and_other": {
+            "mean": 0.003,
+            "max": 0.013,
+            "count": 72
+          }
+        },
+        "reconciler_cost_mean_sec": 6.7e-05,
+        "memory_growth_mb_total": -5.5
+      }
+    },
+    "files": [
+      {
+        "file": "ES2004a_10min.wav",
+        "audio_sec": 600.0,
+        "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 855.5,
+          "rtf": 1.4258,
+          "stage_cost_sec": {
+            "total": 855.502,
+            "segmentation": 22.659,
+            "embeddings": 832.507,
+            "clustering_and_other": 0.336
+          },
+          "der": {
+            "value": 0.374,
+            "reference_speech_sec": 420.92,
+            "missed_detection": 0.2882,
+            "false_alarm": 0.0535,
+            "confusion": 0.0323
+          },
+          "der_collar_0.25": {
+            "value": 0.3346,
+            "reference_speech_sec": 362.4,
+            "missed_detection": 0.2572,
+            "false_alarm": 0.0497,
+            "confusion": 0.0277
+          },
+          "jer": {
+            "value": 0.3937
+          }
+        },
+        "streaming": {
+          "streamed_sec": 120.0,
+          "ticks": 24,
+          "tick_cost_sec": {
+            "count": 24,
+            "mean": 1.011,
+            "p50": 1.422,
+            "p95": 1.489,
+            "max": 1.495,
+            "worst": 1.495,
+            "budget": 5.0,
+            "fits_budget": true
+          },
+          "reconciler_cost_sec": {
+            "count": 24,
+            "mean": 3.9e-05,
+            "p50": 3.4e-05,
+            "p95": 0.000102,
+            "max": 0.000169
+          },
+          "stage_cost_sec": {
+            "total": {
+              "count": 24,
+              "mean": 1.01,
+              "p50": 1.42,
+              "p95": 1.488,
+              "max": 1.493
+            },
+            "segmentation": {
+              "count": 24,
+              "mean": 0.128,
+              "p50": 0.121,
+              "p95": 0.176,
+              "max": 0.178
+            },
+            "embeddings": {
+              "count": 16,
+              "mean": 1.321,
+              "p50": 1.314,
+              "p95": 1.362,
+              "max": 1.362
+            },
+            "clustering_and_other": {
+              "count": 24,
+              "mean": 0.002,
+              "p50": 0.002,
+              "p95": 0.003,
+              "max": 0.013
+            }
+          },
+          "schedule": {
+            "lag_behind_realtime_sec": {
+              "count": 24,
+              "mean": 1.011,
+              "p50": 1.422,
+              "p95": 1.489,
+              "max": 1.495
+            },
+            "ticks_skipped": 0,
+            "ticks_skipped_fraction": 0.0
+          },
+          "label_latency_sec": {
+            "mean": 6.82,
+            "p50": 6.62,
+            "p95": 11.33,
+            "onsets_scored": 15,
+            "onsets_never_labelled": 5
+          },
+          "label_flips_per_min": 1.0,
+          "label_flip_rate_after_first_shown": 0.0,
+          "regions_labelled": 17,
+          "session_labels_minted": 2,
+          "session_labels_used": 2,
+          "session_labels_merged": 0,
+          "revisions": 0,
+          "revised_sec": 0.0,
+          "revised_fraction": 0.0,
+          "overlap_labels_minted": 2,
+          "reference_speakers_streamed": 3,
+          "labels_minted_per_reference_speaker": 0.67,
+          "speaker_count_error": -1,
+          "speaker_count_within_1": true,
+          "memory": {
+            "rss_after_first_tick_mb": 768.0,
+            "rss_end_mb": 768.6,
+            "rss_min_mb": 718.9,
+            "rss_max_mb": 779.7,
+            "growth_mb": 0.5
+          },
+          "first_seen": {
+            "der": {
+              "value": 0.5385,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.2972,
+              "false_alarm": 0.2205,
+              "confusion": 0.0208
+            },
+            "der_collar_0.25": {
+              "value": 0.4976,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.2574,
+              "false_alarm": 0.226,
+              "confusion": 0.0142
+            },
+            "jer": {
+              "value": 0.6612
+            }
+          },
+          "settled": {
+            "der": {
+              "value": 0.4678,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.188,
+              "false_alarm": 0.2591,
+              "confusion": 0.0208
+            },
+            "der_collar_0.25": {
+              "value": 0.4364,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.1606,
+              "false_alarm": 0.2616,
+              "confusion": 0.0142
+            },
+            "jer": {
+              "value": 0.6073
+            }
+          },
+          "end_of_stream": {
+            "der": {
+              "value": 0.4678,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.188,
+              "false_alarm": 0.2591,
+              "confusion": 0.0208
+            },
+            "der_collar_0.25": {
+              "value": 0.4364,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.1606,
+              "false_alarm": 0.2616,
+              "confusion": 0.0142
+            },
+            "jer": {
+              "value": 0.6073
+            }
+          },
+          "overlap_first_seen": {
+            "der": {
+              "value": 0.5385,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.2972,
+              "false_alarm": 0.2205,
+              "confusion": 0.0208
+            },
+            "der_collar_0.25": {
+              "value": 0.4976,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.2574,
+              "false_alarm": 0.226,
+              "confusion": 0.0142
+            },
+            "jer": {
+              "value": 0.6612
+            }
+          },
+          "overlap_settled": {
+            "der": {
+              "value": 0.4678,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.188,
+              "false_alarm": 0.2591,
+              "confusion": 0.0208
+            },
+            "der_collar_0.25": {
+              "value": 0.4364,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.1606,
+              "false_alarm": 0.2616,
+              "confusion": 0.0142
+            },
+            "jer": {
+              "value": 0.6073
+            }
+          },
+          "overlap_end_of_stream": {
+            "der": {
+              "value": 0.4678,
+              "reference_speech_sec": 61.6,
+              "missed_detection": 0.188,
+              "false_alarm": 0.2591,
+              "confusion": 0.0208
+            },
+            "der_collar_0.25": {
+              "value": 0.4364,
+              "reference_speech_sec": 54.82,
+              "missed_detection": 0.1606,
+              "false_alarm": 0.2616,
+              "confusion": 0.0142
+            },
+            "jer": {
+              "value": 0.6073
+            }
+          }
+        }
+      },
+      {
+        "file": "IS1009a_10min.wav",
+        "audio_sec": 600.0,
+        "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 877.1,
+          "rtf": 1.4619,
+          "stage_cost_sec": {
+            "total": 877.132,
+            "segmentation": 20.825,
+            "embeddings": 856.078,
+            "clustering_and_other": 0.23
+          },
+          "der": {
+            "value": 0.2668,
+            "reference_speech_sec": 481.67,
+            "missed_detection": 0.1586,
+            "false_alarm": 0.0461,
+            "confusion": 0.062
+          },
+          "der_collar_0.25": {
+            "value": 0.213,
+            "reference_speech_sec": 410.9,
+            "missed_detection": 0.1279,
+            "false_alarm": 0.0331,
+            "confusion": 0.0521
+          },
+          "jer": {
+            "value": 0.3884
+          }
+        },
+        "streaming": {
+          "streamed_sec": 120.0,
+          "ticks": 24,
+          "tick_cost_sec": {
+            "count": 24,
+            "mean": 1.2,
+            "p50": 1.518,
+            "p95": 1.828,
+            "max": 2.254,
+            "worst": 2.254,
+            "budget": 5.0,
+            "fits_budget": true
+          },
+          "reconciler_cost_sec": {
+            "count": 24,
+            "mean": 0.000103,
+            "p50": 4.6e-05,
+            "p95": 0.000521,
+            "max": 0.00064
+          },
+          "stage_cost_sec": {
+            "total": {
+              "count": 24,
+              "mean": 1.199,
+              "p50": 1.517,
+              "p95": 1.826,
+              "max": 2.252
+            },
+            "segmentation": {
+              "count": 24,
+              "mean": 0.198,
+              "p50": 0.159,
+              "p95": 0.379,
+              "max": 0.875
+            },
+            "clustering_and_other": {
+              "count": 24,
+              "mean": 0.003,
+              "p50": 0.002,
+              "p95": 0.007,
+              "max": 0.008
+            },
+            "embeddings": {
+              "count": 17,
+              "mean": 1.409,
+              "p50": 1.374,
+              "p95": 1.594,
+              "max": 1.594
+            }
+          },
+          "schedule": {
+            "lag_behind_realtime_sec": {
+              "count": 24,
+              "mean": 1.2,
+              "p50": 1.518,
+              "p95": 1.828,
+              "max": 2.254
+            },
+            "ticks_skipped": 0,
+            "ticks_skipped_fraction": 0.0
+          },
+          "label_latency_sec": {
+            "mean": 4.69,
+            "p50": 4.76,
+            "p95": 6.71,
+            "onsets_scored": 17,
+            "onsets_never_labelled": 0
+          },
+          "label_flips_per_min": 1.0,
+          "label_flip_rate_after_first_shown": 0.0,
+          "regions_labelled": 16,
+          "session_labels_minted": 4,
+          "session_labels_used": 4,
+          "session_labels_merged": 0,
+          "revisions": 0,
+          "revised_sec": 0.0,
+          "revised_fraction": 0.0,
+          "overlap_labels_minted": 4,
+          "reference_speakers_streamed": 4,
+          "labels_minted_per_reference_speaker": 1.0,
+          "speaker_count_error": 0,
+          "speaker_count_within_1": true,
+          "memory": {
+            "rss_after_first_tick_mb": 790.2,
+            "rss_end_mb": 772.1,
+            "rss_min_mb": 741.8,
+            "rss_max_mb": 790.2,
+            "growth_mb": -18.1
+          },
+          "first_seen": {
+            "der": {
+              "value": 0.2164,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0555,
+              "false_alarm": 0.1099,
+              "confusion": 0.0511
+            },
+            "der_collar_0.25": {
+              "value": 0.157,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.034,
+              "false_alarm": 0.0879,
+              "confusion": 0.0351
+            },
+            "jer": {
+              "value": 0.2392
+            }
+          },
+          "settled": {
+            "der": {
+              "value": 0.2589,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0476,
+              "false_alarm": 0.16,
+              "confusion": 0.0514
+            },
+            "der_collar_0.25": {
+              "value": 0.1996,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.0254,
+              "false_alarm": 0.1391,
+              "confusion": 0.0351
+            },
+            "jer": {
+              "value": 0.2484
+            }
+          },
+          "end_of_stream": {
+            "der": {
+              "value": 0.2589,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0476,
+              "false_alarm": 0.16,
+              "confusion": 0.0514
+            },
+            "der_collar_0.25": {
+              "value": 0.1996,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.0254,
+              "false_alarm": 0.1391,
+              "confusion": 0.0351
+            },
+            "jer": {
+              "value": 0.2484
+            }
+          },
+          "overlap_first_seen": {
+            "der": {
+              "value": 0.2164,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0555,
+              "false_alarm": 0.1099,
+              "confusion": 0.0511
+            },
+            "der_collar_0.25": {
+              "value": 0.157,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.034,
+              "false_alarm": 0.0879,
+              "confusion": 0.0351
+            },
+            "jer": {
+              "value": 0.2392
+            }
+          },
+          "overlap_settled": {
+            "der": {
+              "value": 0.2589,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0476,
+              "false_alarm": 0.16,
+              "confusion": 0.0514
+            },
+            "der_collar_0.25": {
+              "value": 0.1996,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.0254,
+              "false_alarm": 0.1391,
+              "confusion": 0.0351
+            },
+            "jer": {
+              "value": 0.2484
+            }
+          },
+          "overlap_end_of_stream": {
+            "der": {
+              "value": 0.2589,
+              "reference_speech_sec": 61.73,
+              "missed_detection": 0.0476,
+              "false_alarm": 0.16,
+              "confusion": 0.0514
+            },
+            "der_collar_0.25": {
+              "value": 0.1996,
+              "reference_speech_sec": 54.74,
+              "missed_detection": 0.0254,
+              "false_alarm": 0.1391,
+              "confusion": 0.0351
+            },
+            "jer": {
+              "value": 0.2484
+            }
+          }
+        }
+      },
+      {
+        "file": "TS3003a_10min.wav",
+        "audio_sec": 600.0,
+        "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 1,
+          "speaker_count_error": -3,
+          "wall_sec": 841.4,
+          "rtf": 1.4023,
+          "stage_cost_sec": {
+            "total": 841.387,
+            "segmentation": 21.865,
+            "embeddings": 819.346,
+            "clustering_and_other": 0.176
+          },
+          "der": {
+            "value": 0.1587,
+            "reference_speech_sec": 506.99,
+            "missed_detection": 0.132,
+            "false_alarm": 0.017,
+            "confusion": 0.0097
+          },
+          "der_collar_0.25": {
+            "value": 0.1373,
+            "reference_speech_sec": 478.66,
+            "missed_detection": 0.1184,
+            "false_alarm": 0.0113,
+            "confusion": 0.0077
+          },
+          "jer": {
+            "value": 0.7839
+          }
+        },
+        "streaming": {
+          "streamed_sec": 120.0,
+          "ticks": 24,
+          "tick_cost_sec": {
+            "count": 24,
+            "mean": 1.457,
+            "p50": 1.511,
+            "p95": 1.782,
+            "max": 3.076,
+            "worst": 3.076,
+            "budget": 5.0,
+            "fits_budget": true
+          },
+          "reconciler_cost_sec": {
+            "count": 24,
+            "mean": 5.8e-05,
+            "p50": 3.5e-05,
+            "p95": 0.000145,
+            "max": 0.000239
+          },
+          "stage_cost_sec": {
+            "total": {
+              "count": 24,
+              "mean": 1.456,
+              "p50": 1.512,
+              "p95": 1.78,
+              "max": 3.074
+            },
+            "segmentation": {
+              "count": 24,
+              "mean": 0.211,
+              "p50": 0.149,
+              "p95": 0.243,
+              "max": 1.416
+            },
+            "clustering_and_other": {
+              "count": 24,
+              "mean": 0.003,
+              "p50": 0.002,
+              "p95": 0.008,
+              "max": 0.009
+            },
+            "embeddings": {
+              "count": 21,
+              "mean": 1.42,
+              "p50": 1.389,
+              "p95": 1.581,
+              "max": 1.651
+            }
+          },
+          "schedule": {
+            "lag_behind_realtime_sec": {
+              "count": 24,
+              "mean": 1.457,
+              "p50": 1.511,
+              "p95": 1.782,
+              "max": 3.076
+            },
+            "ticks_skipped": 0,
+            "ticks_skipped_fraction": 0.0
+          },
+          "label_latency_sec": {
+            "mean": 6.46,
+            "p50": 5.88,
+            "p95": 10.22,
+            "onsets_scored": 14,
+            "onsets_never_labelled": 2
+          },
+          "label_flips_per_min": 1.5,
+          "label_flip_rate_after_first_shown": 0.0,
+          "regions_labelled": 21,
+          "session_labels_minted": 1,
+          "session_labels_used": 1,
+          "session_labels_merged": 0,
+          "revisions": 0,
+          "revised_sec": 0.0,
+          "revised_fraction": 0.0,
+          "overlap_labels_minted": 1,
+          "reference_speakers_streamed": 4,
+          "labels_minted_per_reference_speaker": 0.25,
+          "speaker_count_error": -3,
+          "speaker_count_within_1": false,
+          "memory": {
+            "rss_after_first_tick_mb": 760.6,
+            "rss_end_mb": 772.7,
+            "rss_min_mb": 748.7,
+            "rss_max_mb": 772.9,
+            "growth_mb": 12.1
+          },
+          "first_seen": {
+            "der": {
+              "value": 0.2874,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.2864,
+              "false_alarm": 0.001,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.259,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.259,
+              "false_alarm": 0.0,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.8104
+            }
+          },
+          "settled": {
+            "der": {
+              "value": 0.241,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.2017,
+              "false_alarm": 0.0394,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.2129,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.1759,
+              "false_alarm": 0.037,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.7962
+            }
+          },
+          "end_of_stream": {
+            "der": {
+              "value": 0.241,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.2017,
+              "false_alarm": 0.0394,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.2129,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.1759,
+              "false_alarm": 0.037,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.7962
+            }
+          },
+          "overlap_first_seen": {
+            "der": {
+              "value": 0.2874,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.2864,
+              "false_alarm": 0.001,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.259,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.259,
+              "false_alarm": 0.0,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.8104
+            }
+          },
+          "overlap_settled": {
+            "der": {
+              "value": 0.241,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.2017,
+              "false_alarm": 0.0394,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.2129,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.1759,
+              "false_alarm": 0.037,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.7962
+            }
+          },
+          "overlap_end_of_stream": {
+            "der": {
+              "value": 0.241,
+              "reference_speech_sec": 86.65,
+              "missed_detection": 0.2017,
+              "false_alarm": 0.0394,
+              "confusion": 0.0
+            },
+            "der_collar_0.25": {
+              "value": 0.2129,
+              "reference_speech_sec": 79.16,
+              "missed_detection": 0.1759,
+              "false_alarm": 0.037,
+              "confusion": 0.0
+            },
+            "jer": {
+              "value": 0.7962
+            }
+          }
+        }
+      }
+    ]
+  },
+  "caption_latency": {
+    "reference": {
+      "on": {
+        "label": "phase2b after linux 4c8g run 2 [caption_reference_on]",
+        "generated_at": "2026-10-03T21:59:09+0000",
+        "code_revision": "a6234f4",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "on",
+          "sessions": 1,
+          "provider_overrides": [],
+          "context_overrides": [],
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": true,
+            "diarization_context_tag": "pyannote_diarization",
+            "diarization_period_ms": 5000,
+            "diarization_window_sec": 10,
+            "diarization_edge_margin_sec": 0.5,
+            "diarization_label_timeout_sec": 15
+          },
+          "num_workers": 2,
+          "contexts": [
+            {
+              "uid": "faster-whisper",
+              "worker_ids": [
+                0
+              ],
+              "config": {
+                "model": "base",
+                "device": "cpu"
+              }
+            },
+            {
+              "uid": "silero-vad",
+              "worker_ids": [
+                0
+              ],
+              "config": {}
+            },
+            {
+              "uid": "pyannote-diarization",
+              "worker_ids": [
+                1
+              ],
+              "config": {
+                "model": "pyannote/speaker-diarization-community-1",
+                "device": "cpu",
+                "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+                "num_threads": 1,
+                "nice": 10,
+                "segmentation_step": null
+              }
+            }
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 10.2,
+          "exited_during_run": null,
+          "log": "<outside>/caption_reference_on.service.log",
+          "rss_mb_after_ready": 1540.1,
+          "rss_mb_end": 1738.0,
+          "rss_mb_peak": 1911.1,
+          "rss_mb_growth_during_stream": 197.9,
+          "rss_samples": 210,
+          "workers": [
+            {
+              "pid": 697,
+              "rss_max_mb": 875.4,
+              "cpu_sec": 219.25,
+              "wall_sec": 199.6,
+              "cores": 1.099,
+              "worker": 0
+            },
+            {
+              "pid": 713,
+              "rss_max_mb": 846.8,
+              "cpu_sec": 54.45,
+              "wall_sec": 199.6,
+              "cores": 0.273,
+              "worker": 1
+            }
+          ]
+        },
+        "diarization_cost": {
+          "rtf_from_counters": 0.299,
+          "pass_cost_mean_sec": 1.494,
+          "runs": 36.0,
+          "audio_seconds": 180.0,
+          "uncovered_seconds": 0,
+          "dropped_periods": 0,
+          "failed_passes": 0,
+          "labels_minted": 2.0,
+          "worker_cores_mean": 0.273,
+          "worker_cpu_sec": 54.45,
+          "worker_rss_max_mb": 846.8,
+          "wall_sec": 199.6
+        },
+        "stream": {
+          "sessions": 1,
+          "wall_sec": 199.6,
+          "per_session": [
+            {
+              "late_sends": 0,
+              "max_send_lateness_sec": 0.0,
+              "chunks_sent": 360,
+              "streamed_sec": 180.0
+            }
+          ]
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 25,
+              "mean": 8.975,
+              "p50": 6.231,
+              "p95": 23.016,
+              "max": 28.417
+            },
+            "final": {
+              "count": 15,
+              "mean": 31.35,
+              "p50": 34.283,
+              "p95": 44.749,
+              "max": 44.749
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 546,
+              "mean": 14.851,
+              "p50": 12.441,
+              "p95": 32.438,
+              "max": 35.748
+            },
+            "finalized": {
+              "count": 247,
+              "mean": 35.682,
+              "p50": 36.746,
+              "p95": 43.622,
+              "max": 44.749
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 246,
+              "mean": 0.218,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 20.686
+            },
+            "after_finalized": {
+              "count": 246,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "transcript_messages": 28,
+          "transcript_messages_with_text": 26,
+          "speakers_update_messages": 1,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 15,
+          "final_sequences_settled": 1,
+          "final_words": 247,
+          "final_words_labelled": 246,
+          "final_words_labelled_fraction": 0.996,
+          "speaker_labels_seen": [
+            "spk_0",
+            "spk_1"
+          ],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        "per_session_latency": null,
+        "service_counters_delta": {
+          "jobsCompletedTotal": 28.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 180.0,
+          "asrDroppedPeriodsTotal": 11.0,
+          "audioDroppedBufferFullTotal": 0,
+          "audioDroppedBufferFullSecondsTotal": 0,
+          "bufferOverflowTotal": 16.0,
+          "bufferOverflowSecondsTotal": 123.62,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 4.0,
+          "temperatureFallbackTotal": 2.0,
+          "repeatedSegmentDetectedTotal": 0,
+          "diarizationRunsTotal": 36.0,
+          "diarizationSecondsTotal": 53.783,
+          "diarizationFailedTotal": 0,
+          "reconcilerSecondsTotal": 0.003,
+          "diarizationLabelsMintedTotal": 2.0,
+          "diarizationAudioSecondsTotal": 180.0,
+          "diarizationUncoveredSecondsTotal": 0,
+          "diarizationDroppedPeriodsTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 28,
+            "sampleCount": 18,
+            "mean": 4869.994974388889,
+            "p50": 4584.345044,
+            "p95": 9179.684462,
+            "p99": 9179.684462,
+            "max": 9179.684462
+          },
+          "asrSchedulingDelayMs": {
+            "count": 28,
+            "sampleCount": 18,
+            "mean": 3.6548175555555553,
+            "p50": 3.464661,
+            "p95": 6.354136,
+            "p99": 6.354136,
+            "max": 6.354136
+          },
+          "asrRtf": {
+            "count": 25,
+            "sampleCount": 15,
+            "mean": 0.7544681955632748,
+            "p50": 0.6900509753999999,
+            "p95": 1.2026907006,
+            "p99": 1.2026907006,
+            "max": 1.2026907006
+          },
+          "diarizationExecutionMs": {
+            "count": 39,
+            "sampleCount": 24,
+            "mean": 1438.1745387499998,
+            "p50": 1695.332459,
+            "p95": 1974.754793,
+            "p99": 2181.573834,
+            "max": 2181.573834
+          },
+          "diarizationLagMs": {
+            "count": 36,
+            "sampleCount": 21,
+            "mean": 1724.2419379098076,
+            "p50": 1813.2004737854004,
+            "p95": 2238.4884357452393,
+            "p99": 2243.596315383911,
+            "max": 2243.596315383911
+          },
+          "diarizationRtf": {
+            "count": 36,
+            "sampleCount": 21,
+            "mean": 0.33050659214708994,
+            "p50": 0.35181905,
+            "p95": 0.3949509586,
+            "p99": 0.4363147668,
+            "max": 0.4363147668
+          }
+        }
+      },
+      "off": {
+        "label": "phase2b after linux 4c8g run 2 [caption_reference_off]",
+        "generated_at": "2026-10-03T22:02:33+0000",
+        "code_revision": "a6234f4",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "off",
+          "sessions": 1,
+          "provider_overrides": [],
+          "context_overrides": [],
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": false
+          },
+          "num_workers": 1,
+          "contexts": [
+            {
+              "uid": "faster-whisper",
+              "worker_ids": [
+                0
+              ],
+              "config": {
+                "model": "base",
+                "device": "cpu"
+              }
+            },
+            {
+              "uid": "silero-vad",
+              "worker_ids": [
+                0
+              ],
+              "config": {}
+            }
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 2.6,
+          "exited_during_run": null,
+          "log": "<outside>/caption_reference_off.service.log",
+          "rss_mb_after_ready": 895.6,
+          "rss_mb_end": 1153.2,
+          "rss_mb_peak": 1319.6,
+          "rss_mb_growth_during_stream": 257.6,
+          "rss_samples": 202,
+          "workers": [
+            {
+              "pid": 775,
+              "rss_max_mb": 1022.6,
+              "cpu_sec": 244.02,
+              "wall_sec": 199.5,
+              "cores": 1.223,
+              "worker": 0
+            }
+          ]
+        },
+        "diarization_cost": null,
+        "stream": {
+          "sessions": 1,
+          "wall_sec": 199.5,
+          "per_session": [
+            {
+              "late_sends": 0,
+              "max_send_lateness_sec": 0.0,
+              "chunks_sent": 360,
+              "streamed_sec": 180.0
+            }
+          ]
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 18,
+              "mean": 11.977,
+              "p50": 6.737,
+              "p95": 59.552,
+              "max": 59.552
+            },
+            "final": {
+              "count": 10,
+              "mean": 44.602,
+              "p50": 34.058,
+              "p95": 66.737,
+              "max": 66.737
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 429,
+              "mean": 35.449,
+              "p50": 38.12,
+              "p95": 59.612,
+              "max": 66.011
+            },
+            "finalized": {
+              "count": 173,
+              "mean": 56.972,
+              "p50": 62.111,
+              "p95": 71.237,
+              "max": 73.548
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 22,
+          "transcript_messages_with_text": 19,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 173,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": 0.0,
+          "speaker_labels_seen": [],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        "per_session_latency": null,
+        "service_counters_delta": {
+          "jobsCompletedTotal": 22.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 150.0,
+          "asrDroppedPeriodsTotal": 17.0,
+          "audioDroppedBufferFullTotal": 60.0,
+          "audioDroppedBufferFullSecondsTotal": 30.0,
+          "bufferOverflowTotal": 15.0,
+          "bufferOverflowSecondsTotal": 116.5,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 4.0,
+          "temperatureFallbackTotal": 0,
+          "repeatedSegmentDetectedTotal": 0,
+          "diarizationRunsTotal": 0,
+          "diarizationSecondsTotal": 0,
+          "diarizationFailedTotal": 0,
+          "reconcilerSecondsTotal": 0,
+          "diarizationLabelsMintedTotal": 0,
+          "diarizationAudioSecondsTotal": 0,
+          "diarizationUncoveredSecondsTotal": 0,
+          "diarizationDroppedPeriodsTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 22,
+            "sampleCount": 11,
+            "mean": 9043.47769718182,
+            "p50": 4052.826751,
+            "p95": 58024.080735,
+            "p99": 58024.080735,
+            "max": 58024.080735
+          },
+          "asrSchedulingDelayMs": {
+            "count": 22,
+            "sampleCount": 11,
+            "mean": 3.418527,
+            "p50": 3.484621,
+            "p95": 6.666461,
+            "p99": 6.666461,
+            "max": 6.666461
+          },
+          "asrRtf": {
+            "count": 20,
+            "sampleCount": 9,
+            "mean": 1.322199972845679,
+            "p50": 0.818224342,
+            "p95": 5.8024080735,
+            "p99": 5.8024080735,
+            "max": 5.8024080735
+          }
+        }
+      }
+    }
+  },
+  "durations_sec": {
+    "warmup": 5.7,
+    "replay": 2666.7,
+    "caption_reference_on": 212.5,
+    "caption_reference_off": 204.7
+  },
+  "suite_wall_sec": 3092.9,
+  "key_metrics": {
+    "replay.offline.der": 0.2599,
+    "replay.offline.der_missed": 0.1877,
+    "replay.offline.der_false_alarm": 0.0379,
+    "replay.offline.der_confusion": 0.0344,
+    "replay.offline.jer": 0.522,
+    "replay.offline.speaker_count_abs_error_mean": 1.0,
+    "replay.offline.rtf_mean": 1.43,
+    "replay.first_seen.der": 0.3402,
+    "replay.first_seen.der_missed": 0.2217,
+    "replay.first_seen.der_false_alarm": 0.0974,
+    "replay.first_seen.der_confusion": 0.0211,
+    "replay.first_seen.jer": 0.562,
+    "replay.settled.der": 0.3128,
+    "replay.settled.der_missed": 0.1524,
+    "replay.settled.der_false_alarm": 0.1393,
+    "replay.settled.der_confusion": 0.0212,
+    "replay.settled.jer": 0.5455,
+    "replay.end_of_stream.der": 0.3128,
+    "replay.end_of_stream.der_missed": 0.1524,
+    "replay.end_of_stream.der_false_alarm": 0.1393,
+    "replay.end_of_stream.der_confusion": 0.0212,
+    "replay.end_of_stream.jer": 0.5455,
+    "replay.overlap_first_seen.der": 0.3402,
+    "replay.overlap_first_seen.der_missed": 0.2217,
+    "replay.overlap_first_seen.der_false_alarm": 0.0974,
+    "replay.overlap_first_seen.der_confusion": 0.0211,
+    "replay.overlap_first_seen.jer": 0.562,
+    "replay.overlap_settled.der": 0.3128,
+    "replay.overlap_settled.der_missed": 0.1524,
+    "replay.overlap_settled.der_false_alarm": 0.1393,
+    "replay.overlap_settled.der_confusion": 0.0212,
+    "replay.overlap_settled.jer": 0.5455,
+    "replay.overlap_end_of_stream.der": 0.3128,
+    "replay.overlap_end_of_stream.der_missed": 0.1524,
+    "replay.overlap_end_of_stream.der_false_alarm": 0.1393,
+    "replay.overlap_end_of_stream.der_confusion": 0.0212,
+    "replay.overlap_end_of_stream.jer": 0.5455,
+    "replay.tick_cost_mean_sec": 1.223,
+    "replay.tick_cost_p95_sec": 1.828,
+    "replay.tick_cost_worst_sec": 3.076,
+    "replay.lag_behind_realtime_p50_sec": 1.484,
+    "replay.lag_behind_realtime_p95_sec": 1.828,
+    "replay.ticks_skipped_fraction": 0.0,
+    "replay.label_latency_p50_sec": 5.75,
+    "replay.label_latency_p95_sec": 11.33,
+    "replay.onsets_never_labelled": 7,
+    "replay.label_flips_per_min": 1.17,
+    "replay.label_flip_rate_after_first_shown": 0.0,
+    "replay.labels_minted_per_reference_speaker": 0.64,
+    "replay.speaker_count_abs_error_mean": 1.333,
+    "replay.speaker_count_within_1_fraction": 0.667,
+    "replay.session_labels_merged": 0,
+    "replay.revisions": 0,
+    "replay.revised_fraction": 0.0,
+    "replay.reconciler_cost_mean_sec": 6.7e-05,
+    "replay.memory_growth_mb_total": -5.5,
+    "replay.stage.total_mean_sec": 1.222,
+    "replay.stage.segmentation_mean_sec": 0.179,
+    "replay.stage.embeddings_mean_sec": 1.387,
+    "replay.stage.clustering_and_other_mean_sec": 0.003,
+    "replay.peak_rss_mb": 2605.0,
+    "replay.model_load_sec": 1.9,
+    "replay.window_sec": 10.0,
+    "replay.segmentation_step": null,
+    "caption.on.chunk_id.in_progress.p50": 6.231,
+    "caption.on.chunk_id.in_progress.p95": 23.016,
+    "caption.on.chunk_id.in_progress.mean": 8.975,
+    "caption.on.chunk_id.final.p50": 34.283,
+    "caption.on.chunk_id.final.p95": 44.749,
+    "caption.on.chunk_id.final.mean": 31.35,
+    "caption.on.word.first_shown.p50": 12.441,
+    "caption.on.word.first_shown.p95": 32.438,
+    "caption.on.word.first_shown.mean": 14.851,
+    "caption.on.word.finalized.p50": 36.746,
+    "caption.on.word.finalized.p95": 43.622,
+    "caption.on.word.finalized.mean": 35.682,
+    "caption.on.label.after_text_shown.p50": 0.0,
+    "caption.on.label.after_text_shown.p95": 0.0,
+    "caption.on.label.after_text_shown.mean": 0.218,
+    "caption.on.label.after_finalized.p50": 0.0,
+    "caption.on.label.after_finalized.p95": 0.0,
+    "caption.on.label.after_finalized.mean": 0.0,
+    "caption.on.transcript_messages": 28,
+    "caption.on.speakers_update_messages": 1,
+    "caption.on.final_words": 247,
+    "caption.on.final_words_labelled_fraction": 0.996,
+    "caption.on.speaker_labels_seen": 2,
+    "caption.on.label_changes_before_final": 0,
+    "caption.on.label_changes_before_final_fraction": 0.0,
+    "caption.on.label_changes_after_sent": 0,
+    "caption.on.dropped_periods": 11.0,
+    "caption.on.audio_dropped_buffer_full_sec": 0,
+    "caption.on.buffer_overflow_sec": 123.62,
+    "caption.on.jobs_completed": 28.0,
+    "caption.on.rss_peak_mb": 1911.1,
+    "caption.on.rss_growth_mb": 197.9,
+    "caption.on.exec_ms_p95": 9179.684462,
+    "caption.on.exec_ms_max": 9179.684462,
+    "caption.on.worker0.cores": 1.099,
+    "caption.on.worker0.rss_max_mb": 875.4,
+    "caption.on.worker1.cores": 0.273,
+    "caption.on.worker1.rss_max_mb": 846.8,
+    "caption.on.diarization.rtf": 0.299,
+    "caption.on.diarization.pass_cost_mean_sec": 1.494,
+    "caption.on.diarization.runs": 36.0,
+    "caption.on.diarization.uncovered_sec": 0,
+    "caption.on.diarization.dropped_periods": 0,
+    "caption.on.diarization.failed_passes": 0,
+    "caption.on.diarization.worker_cores": 0.273,
+    "caption.on.diarization.worker_rss_max_mb": 846.8,
+    "caption.on.diarization.lag_ms_p95": 2238.4884357452393,
+    "caption.on.diarization.exec_ms_p95": 1974.754793,
+    "caption.off.chunk_id.in_progress.p50": 6.737,
+    "caption.off.chunk_id.in_progress.p95": 59.552,
+    "caption.off.chunk_id.in_progress.mean": 11.977,
+    "caption.off.chunk_id.final.p50": 34.058,
+    "caption.off.chunk_id.final.p95": 66.737,
+    "caption.off.chunk_id.final.mean": 44.602,
+    "caption.off.word.first_shown.p50": 38.12,
+    "caption.off.word.first_shown.p95": 59.612,
+    "caption.off.word.first_shown.mean": 35.449,
+    "caption.off.word.finalized.p50": 62.111,
+    "caption.off.word.finalized.p95": 71.237,
+    "caption.off.word.finalized.mean": 56.972,
+    "caption.off.label.after_text_shown.p50": null,
+    "caption.off.label.after_text_shown.p95": null,
+    "caption.off.label.after_text_shown.mean": null,
+    "caption.off.label.after_finalized.p50": null,
+    "caption.off.label.after_finalized.p95": null,
+    "caption.off.label.after_finalized.mean": null,
+    "caption.off.transcript_messages": 22,
+    "caption.off.speakers_update_messages": 0,
+    "caption.off.final_words": 173,
+    "caption.off.final_words_labelled_fraction": 0.0,
+    "caption.off.speaker_labels_seen": 0,
+    "caption.off.label_changes_before_final": 0,
+    "caption.off.label_changes_before_final_fraction": 0.0,
+    "caption.off.label_changes_after_sent": 0,
+    "caption.off.dropped_periods": 17.0,
+    "caption.off.audio_dropped_buffer_full_sec": 30.0,
+    "caption.off.buffer_overflow_sec": 116.5,
+    "caption.off.jobs_completed": 22.0,
+    "caption.off.rss_peak_mb": 1319.6,
+    "caption.off.rss_growth_mb": 257.6,
+    "caption.off.exec_ms_p95": 58024.080735,
+    "caption.off.exec_ms_max": 58024.080735,
+    "caption.off.worker0.cores": 1.223,
+    "caption.off.worker0.rss_max_mb": 1022.6
+  }
+}

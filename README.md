@@ -5,22 +5,24 @@
 > each word with a stable speaker (`spk_0`, `spk_1`, ...) and the viewer renders
 > colored `Speaker N:` labels. Everything else tracks upstream `staging`.
 >
-> **Status (2026-10-03, Phase 2a):** working end to end, optional, off by
+> **Status (2026-10-03, Phase 2b):** working end to end, optional, off by
 > default. Captions never wait for diarization: it runs as its own worker-pool
-> job on its own worker process, labels arrive afterwards through a
-> backward-compatible `speakers_update` message, and the viewer shows a
-> `Speaker ?` slot that fills in place. Measured on upstream's CPU image with
-> 4 CPUs (Docker Desktop on a Mac): captions with diarization on arrive in
-> 4.7 s (p50) against 5.0 s with it off, with no extra dropped periods; the
-> diarization worker costs 0.25 cores, 0.9 GB and a real-time factor of
-> 0.28 per session; labels are known when the caption text appears (0 s p50
-> and p95; 92 percent of finalized words get a label, the rest show
-> `Speaker ?`). The price is accuracy: the 10 s diarization window the CPU
-> budget allows scores a streaming DER of 0.63 against 0.41 for the old 30 s
-> window inside the caption tick, and that stays worse until Phase 2b adds
-> speaker-embedding memory. A 4-CPU box sustains one diarized session, and
-> Whisper, not diarization, is the limit. Full tables and caveats are in the
-> design document below.
+> job on its own worker and labels reach already-shown captions through a
+> `speakers_update` message that fills a label slot in place. Speaker
+> identity now rests on per-session embedding memory (in memory only, kept
+> 60 s for a reconnect): a voice keeps its label when the window slides,
+> after silence and after a long gap, and new labels are minted only for
+> long, clearly distinct voices. Measured on upstream's CPU image with 4 CPUs
+> (Docker Desktop on a Mac): streaming settled DER 0.31 against 0.63 after
+> Phase 2a and 0.41 for the old 30 s window inside the caption tick,
+> speaker confusion 0.02, 0.64 labels per real speaker, 99.6 percent of
+> finalized words labelled, captions with diarization on at 6.2 s p50
+> against 6.7 s off, diarization worker 0.27 cores, 0.85 GB, real-time
+> factor 0.30. Still open: the speaker count lands within one of the truth
+> on 2 of 3 AMI meetings (target 4 of 5), and far-field noise at 5 dB SNR
+> merges voices. A 4-CPU box sustains one diarized session, and Whisper,
+> not diarization, is the limit. Full tables, the threshold tradeoff and
+> caveats are in the diarization doc linked below.
 >
 > **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
 > `pyannote/speaker-diarization-community-1` terms, export

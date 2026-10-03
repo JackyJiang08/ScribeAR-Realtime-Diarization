@@ -116,10 +116,13 @@ benchmark_diarization_gate_docker: benchmark_diarization_suite_docker
 
 # Hard cases: overlap, short turns, return after a long gap, 4 speakers,
 # background noise (hard_cases.json). Streams every case in full.
+# DIARIZATION_WINDOW is the diarization_window_sec of the reference config.
+DIARIZATION_WINDOW ?= 10
 benchmark_diarization_hardcases: benchmark_diarization_data
 	uv run python $(BENCH_DIR)/prepare_hard_cases.py
 	uv run python $(BENCH_DIR)/benchmark_baseline.py \
 		--data $(BENCH_DIR)/data/hard_cases --suffix "" --stream-sec 0 \
+		--max-buffer-sec $(DIARIZATION_WINDOW) --threads 1 \
 		--skip-offline --label "$(LABEL)" \
 		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_hardcases.json,$(RESULT))
 

@@ -24,8 +24,24 @@ Severity scale: **P0** blocks a release to real customers, **P1** serious,
 > `docs/upstream_issue_drafts.md`, not changed in the fork. The measured
 > outcome against the Phase 2a acceptance criteria, including the accuracy
 > cost of the 10 s window, is in `transcription_service/docs/speaker_diarization.md`
-> ("Phase 2a results"). Sections 3 (accuracy) and 5 (robustness) remain
-> Phase 2b and 2c work.
+> ("Phase 2a results").
+>
+> **Status after Phase 2b (2026-10-03).** Section 3.2 is closed: the
+> reconciler keeps a per-session centroid embedding per speaker (in memory
+> only, dropped with the session after a reconnect grace) and matches every
+> pass against the whole session, mints only for long, clearly distinct
+> voices, and pools short unknown ones; the six synthetic cases are passing
+> unit tests. Section 3.5's under-counting turned out to be pyannote's
+> exclusive output collapsing a one-chunk window to one speaker, fixed by
+> reporting the segmentation's own speaker tracks (`local_speakers`); the
+> clustering threshold (`clustering_threshold`) is exposed but has no effect
+> on one-chunk windows. Section 3.1 (overlap) was measured and is
+> configurable (`overlap_aware`). Section 5.3 (reconnects) is closed by the
+> provider's in-memory speaker memory keyed by `session_uid`. Section 4's
+> unattributed state is now an empty slot once settled, never a question
+> mark. Numbers, the threshold tradeoff and the remaining misses are in
+> `transcription_service/docs/speaker_diarization.md` ("Phase 2b results").
+> Section 5 (robustness beyond reconnects) remains Phase 2c work.
 
 ## Executive summary
 
