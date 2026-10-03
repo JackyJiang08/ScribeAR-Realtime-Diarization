@@ -182,7 +182,10 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
                                 against the diarization job's)
 
             Returns:
-                Settling updates for timed-out pending sequences
+                Settling updates: for a finalized sequence that was fully
+                decided at emission but has unattributed words (nothing
+                more will come for it), and for pending sequences that
+                waited past the timeout
             """
             assert self._attacher is not None
             self._attacher.record_whisper_drop(
@@ -192,11 +195,14 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
                 )
             )
             now = time.time()
+            updates = []
             if value.final is not None:
-                self._attacher.label_sequence(value.final, True, now)
+                settled = self._attacher.label_sequence(value.final, True, now)
+                if settled is not None:
+                    updates.append(settled)
             if value.in_progress is not None:
                 self._attacher.label_sequence(value.in_progress, False, now)
-            return self._attacher.expire(now)
+            return updates + self._attacher.expire(now)
 
         def _handle_diarization_result(
             self, result: JobSuccess[DiarizationResult | None] | JobException

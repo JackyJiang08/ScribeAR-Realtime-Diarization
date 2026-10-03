@@ -211,3 +211,44 @@ def test_sequence_without_timestamps_is_labelled_none_and_not_pending():
     assert sequence.speakers == [None, None]
     assert sequence.sequence_id == "s0"
     assert attacher.pending_sequences == 0
+
+
+def test_final_sequence_decided_with_unattributed_words_is_settled_at_once():
+    """
+    A finalized sequence whose audio was all covered but whose words fell
+    outside every speaker segment is settled immediately: the client gets a
+    settled update with the nulls, so its placeholder reads as "no speaker"
+    rather than "still waiting".
+    """
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 1.0, "spk_0")], 0.0, 10.0, now=100.0
+    )
+    sequence = _sequence([("a", 0.5, 0.9), ("b", 5.0, 6.0)])
+
+    update = attacher.label_sequence(sequence, final=True, now=100.0)
+
+    assert sequence.speakers == ["spk_0", None]
+    assert update is not None
+    assert update.sequence_id == sequence.sequence_id
+    assert update.speakers == ["spk_0", None]
+    assert update.settled is True
+    assert attacher.pending_sequences == 0
+
+
+def test_fully_labelled_or_pending_final_sequence_returns_no_update():
+    """No settling update when every word is labelled, or when words wait."""
+    attacher = SpeakerLabelAttacher(edge_margin_sec=0.5)
+    attacher.add_coverage(
+        [SpeakerSegment(0.0, 9.5, "spk_0")], 0.0, 10.0, now=100.0
+    )
+
+    assert (
+        attacher.label_sequence(_sequence([("a", 1.0, 2.0)]), True, 100.0)
+        is None
+    )
+    assert (
+        attacher.label_sequence(_sequence([("b", 20.0, 21.0)]), True, 100.0)
+        is None
+    )
+    assert attacher.pending_sequences == 1

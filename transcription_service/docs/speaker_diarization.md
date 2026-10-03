@@ -46,9 +46,12 @@ The session (main process) joins the two with `SpeakerLabelAttacher`:
   show. Finalized words that were still `null` are sent later as a
   `speakers_update` naming the `sequence_id`; a client that ignores the
   message still has every caption.
-- Audio no pass covered (the diarization job fell behind and skipped
-  ahead) is decided as "no speaker" the moment the next pass reports its
-  window, and a finalized sequence that has waited longer than
+- A finalized sequence whose words were all decided at emission but some
+  got no label (no speaker segment overlapped them) is settled at once with
+  a `speakers_update`, so the client can show an explicit unattributed
+  state instead of waiting. Audio no pass covered (the diarization job fell
+  behind and skipped ahead) is decided as "no speaker" the moment the next
+  pass reports its window, and a finalized sequence that has waited longer than
   `diarization_label_timeout_sec` (15 s) is settled with the labels it has.
   Nothing can leave a caption pending forever.
 
@@ -488,7 +491,7 @@ Acceptance (`make benchmark_diarization_acceptance`), container run:
 | caption latency (chunk-id) with diarization on within 10% of off | **met**: p50 4.69 s against 5.04 s off, p95 28.2 s against 28.2 s |
 | zero caption periods dropped because of diarization | **met**: 6 dropped with diarization on, 9 off (both upstream's own drops under the 4-CPU quota) |
 | per session at most 1 core, 1 GB extra RAM, RTF at most 0.3 | **met**: 0.25 cores, 881 MB, RTF 0.277 (margin 0.023; p95 pass 1.69 s against a 5 s period) |
-| label at most 2 s p50 / 4 s p95 after the caption text appears | **met**: 0 / 0 s. Captions appear 5 s or more after the audio, labels are ready about 1.4 s after it, so every label was already known when its text arrived (no `speakers_update` was needed in this run); the late path is exercised by the unit tests and by a stalled diarization worker |
+| label at most 2 s p50 / 4 s p95 after the caption text appears | **met**: 0 / 0 s, measured over the 92 percent of finalized words that received a label (242 of 262): captions appear 5 s or more after the audio, labels are ready about 1.4 s after it, so every label was already known when its text arrived and no `speakers_update` was needed in this run; the late path is exercised by the unit tests and by a stalled diarization worker. The other 8 percent are words diarization covered but no speaker segment overlapped (pyannote found no speech there: hallucinated or far-field words in pauses, the same words that go unlabelled offline); they keep the `Speaker ?` placeholder, settled at once so the client knows nothing more will come |
 | labels change only before finalization, at most 5 percent corrected | **met**: 0 corrections before final, 0 changes after sending |
 | streaming settled DER no worse than the Phase 2 baseline | **missed by +0.198**: 0.627 against 0.408 (+0.02 allowed). First-seen DER 0.627 against 0.462 (+0.165); confusion 0.31, missed 0.21, false alarm 0.10 |
 

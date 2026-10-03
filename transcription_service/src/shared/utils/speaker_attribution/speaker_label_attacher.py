@@ -217,7 +217,7 @@ class SpeakerLabelAttacher:
 
     def label_sequence(
         self, sequence: TranscriptionSequence, final: bool, now: float
-    ) -> None:
+    ) -> SpeakerLabelUpdate | None:
         """
         Labels a caption sequence's words from the frozen timeline, in place
 
@@ -229,12 +229,24 @@ class SpeakerLabelAttacher:
                             in-progress tail (replaced every tick, so late
                             labels ride on the next tick instead)
             now         - Wall clock, for the label timeout
+
+        Returns:
+            A settling update when the sequence is finalized, every word is
+            already decided, and some words got no label: nothing more will
+            ever arrive for them, and the client is told so at once rather
+            than left to tell "still pending" from "never" by itself. None
+            otherwise (either everything is labelled, or the undecided words
+            are remembered and their update follows the next coverage).
         """
         if sequence.starts is None or sequence.ends is None:
             sequence.speakers = [None] * len(sequence.text)
             if final:
                 sequence.sequence_id = self.new_sequence_id()
-            return
+                if sequence.text:
+                    return SpeakerLabelUpdate(
+                        sequence.sequence_id, list(sequence.speakers), True
+                    )
+            return None
 
         self.note_whisper_end(max(sequence.ends, default=0.0))
         starts = [self.to_diarization_time(t) for t in sequence.starts]
@@ -242,7 +254,7 @@ class SpeakerLabelAttacher:
         speakers, undecided_from = self._label_words(starts, ends, 0)
         sequence.speakers = speakers
         if not final:
-            return
+            return None
 
         sequence.sequence_id = self.new_sequence_id()
         if undecided_from < len(speakers):
@@ -254,6 +266,12 @@ class SpeakerLabelAttacher:
                 undecided_from=undecided_from,
                 sent_at=now,
             )
+            return None
+        if any(speaker is None for speaker in speakers):
+            return SpeakerLabelUpdate(
+                sequence.sequence_id, list(speakers), True
+            )
+        return None
 
     def expire(self, now: float) -> list[SpeakerLabelUpdate]:
         """
