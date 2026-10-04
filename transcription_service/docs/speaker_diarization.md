@@ -1192,9 +1192,14 @@ count itself, so the `overlap_aware` context option now really reports
 overlapping turns. On the dev set (full 10 min, from the rebuilt cache)
 the overlap-aware output scores settled DER 0.262 and confusion 0.054
 against 0.279 and 0.061 for the exclusive output, with 1.08 instead of
-0.92 labels minted per speaker. The default stays exclusive in this step
-(words are attributed to one speaker either way); the standard-set
-measurement of the corrected option is in the known limitations.
+0.92 labels minted per speaker. On the standard set (24 files, rebuilt
+cache) it scores 0.258 against 0.266, the gain being missed speech (0.114
+against 0.124) at the same confusion (0.102), but it mints 1.22 labels per
+speaker instead of 1.17 (1.10 against 1.06 on settled captions), gets the
+count within one on 18 instead of 19 meetings and revises three times as
+much audio (1.9 against 0.6 percent). The default stays exclusive in this
+step: words are attributed to one speaker either way, and the extra
+labels cost more on screen than the DER gains.
 
 **Merging converged speakers, re-tested.** The merge path that shipped
 disabled in Phase 2b (`diarization_merge_threshold`: two speakers whose
@@ -1327,16 +1332,115 @@ IS1009c 2 against 4, TS3003a 2 against 4, TS3003b 3 against 4, jwggf 3
 against 5, ylgug 2 against 3): people with under 5 s in ten minutes, who
 cannot earn a label at a 2.5 s minting minimum.
 
-**Offline reference (the model's ceiling).** Pending the whole-file
-offline pass on the remaining 15 files of the standard set (9 are done:
-the dev meetings and the six decisive files of Phase 2c); see the
-container run note below.
+**Offline reference (the model's ceiling), 9-file subset.** The
+whole-file offline pass exists for 9 of the 24 files: the three dev
+meetings and the six files Phase 2c chose because the streaming count
+was wrong or most inflated. The remaining 15 were not run (about 90 min
+of compute), so this is a **biased subset leaning to the hard files**,
+not the set. Offline is the community-1 pipeline over the whole 10 min
+(VBx clustering with all the context); streaming is the final
+configuration replayed from the cached passes, settled labels; aggregates
+pooled by reference speech (4770 s). `results/phase2d/offline_subset_comparison.json`.
 
-**Container run and gate baseline.** Pending the Linux reference container
-run of this configuration (`make benchmark_diarization_gate_docker
-SET=standard STREAM_SEC=0 SUITE_ARGS=--skip-offline`); the baseline moves
-only when every Phase 2a and 2b must target, the RTF ceiling included,
-holds in that run.
+| file | people | offline DER / confusion / missed | streaming DER / confusion / missed | speakers offline / streaming (settled) |
+|---|---|---|---|---|
+| ES2004a | 4 | 0.374 / 0.032 / 0.288 | 0.412 / 0.105 / 0.233 | 4 / 4 |
+| ES2004b | 4 | 0.176 / 0.014 / 0.100 | 0.200 / 0.030 / 0.095 | 4 / 6 |
+| IS1009a | 4 | 0.267 / 0.062 / 0.159 | 0.290 / 0.078 / 0.153 | 4 / 4 |
+| IS1009d | 4 | 0.124 / 0.018 / 0.070 | 0.303 / 0.194 / 0.064 | 4 / 5 |
+| TS3003a | 2 | 0.159 / 0.010 / 0.132 | 0.158 / 0.008 / 0.118 | 1 / 1 |
+| EN2002b | 4 | 0.422 / 0.038 / 0.359 | 0.556 / 0.182 / 0.355 | 4 / 7 |
+| EN2002d | 4 | 0.401 / 0.071 / 0.311 | 0.411 / 0.079 / 0.305 | 3 / 3 |
+| VoxConverse hhepf | 6 | 0.077 / 0.013 / 0.024 | 0.422 / 0.360 / 0.019 | 6 / 2 |
+| VoxConverse iacod | 3 | 0.071 / 0.004 / 0.022 | 0.155 / 0.087 / 0.012 | 3 / 2 |
+| **pooled, 9 files** | | **0.243 / 0.031 / 0.175** (false alarm 0.036) | **0.338 / 0.129 / 0.164** (false alarm 0.045) | |
+
+Streaming confusion is **0.098 above** the offline pipeline on these
+files, far outside the 0.02 that would make it a model limit, so it is
+not treated as one: missed speech and false alarm match offline (the
+segmentation is the same model), and the whole gap is identity, that is
+clustering 10 s windows against a cosine memory instead of the whole
+file. Where the streaming count is right (ES2004a, IS1009a, EN2002d,
+TS3003a) the gap is 0.00 to 0.07; where it is wrong it is 0.14 to 0.35
+(IS1009d one extra label, EN2002b three, hhepf four people merged). This
+is the open item for a later phase, with the subset caveat: on the 15
+files not run, several of which streaming already counts exactly, the
+gap is expected to be smaller.
+
+**Container run.** One run of the standard set in the Linux CPU
+reference container (`make benchmark_diarization_gate_docker
+SET=standard STREAM_SEC=0 SUITE_ARGS=--skip-offline`, hygiene clean before
+and after), then one repeat of the caption-latency step alone, because the
+first run's diarization-on caption stream was an outlier of the kind the
+audit's section 1.4 and the Phase 2b run describe (Whisper's own
+executions on the caption worker averaged 11.5 s against 5.2 s in the off
+stream minutes earlier, while the diarization worker sat at 0.12 cores).
+Both are reported; the reports are
+`baselines/phase2-wrapup-linux-cpu-4c8g.json` (the suite run) and
+`baselines/phase2-wrapup-caption-repeat-linux-cpu-4c8g.json`.
+
+| metric | Phase 2c run | wrap-up run | wrap-up caption repeat |
+|---|---|---|---|
+| diarization RTF / pass cost mean | 0.301 / 1.51 s | **0.135 / 0.67 s** | **0.132 / 0.66 s** |
+| diarization worker cores / peak RSS | 0.274 / 866 MB | **0.124 / 707 MB** | 0.122 / 702 MB |
+| diarization passes / dropped periods / audio skipped | 36 / 0 / 0 | 36 / 0 / 0 | 36 / 0 / 0 |
+| diarization lag p95 | - | 1007 ms | 933 ms |
+| replay tick mean / p95 / worst (24 files) | 1.41 / 1.87 / 10.7 s | **0.58 / 0.82 / 2.1 s** | - |
+| replay stage: embeddings / segmentation / other | 1.34 / 0.13 / 0.002 s | **0.44 / 0.14 / 0.002 s** | - |
+| replay peak RSS | 886 MB | 728 MB | - |
+| settled DER / confusion / JER | 0.267 / 0.103 / 0.514 | 0.266 / 0.102 / 0.512 | - |
+| labels minted / on settled captions per speaker | 1.17 / 1.14 | 1.17 / 1.06 | - |
+| settled count within one / exact | 20 / 10 of 24 | 19 / 11 of 24 | - |
+| classroom labels on settled captions / own-label questions | 8 / 8 of 9 | **6 / 8 of 9** | - |
+| caption p50, chunk-id in-progress, on / off | 5.71 / 5.82 s | 10.45 / 5.52 s | 4.92 / 4.39 s |
+| caption p95, on / off | 22.8 / 38.6 s | 41.4 / 21.7 s | 28.4 / 22.1 s |
+| caption periods dropped (of 36), on / off | 9 / 13 | 19 / 10 | 10 / 9 |
+| Whisper execution mean / p95 on the caption worker, on | - | 11.5 / 26.7 s | 4.7 / 20.8 s |
+| Whisper execution mean / p95, off | - | 5.2 / 31.6 s | 4.4 / 19.4 s |
+| finalized words labelled | 99.6% | 98.1% | 97.2% |
+| label after text p50 / p95 | 0 / 0 s | 0 / 0 s | 0 / 0 s |
+| label corrections before final / changes after sent | 0 / 0 | 0.8% / 0 | 0.4% / 0 |
+
+Acceptance, on the suite run with the caption columns of both runs:
+
+| target | result |
+|---|---|
+| wrap-up: diarization RTF at most 0.25 | **met**: 0.135 (margin 0.115; the pass costs 0.67 s of a 5 s period, down from 1.51 s) |
+| Phase 2a: RTF at most 0.3, at most 1 core, at most 1 GB | **met**: 0.135, 0.12 cores, 707 MB |
+| wrap-up: classroom at most 1.5 labels per person on settled captions | **met at the edge**: 1.5 (6 for 4) |
+| wrap-up and 2c: at least 80% of classroom questions with their own label | **met**: 8 of 9 |
+| wrap-up: labels on settled captions per speaker in 0.8 to 1.2 | **met**: 1.06 (2c's minted ratio 1.17 also inside the band) |
+| wrap-up: settled count within one on at least 80% of meetings | **missed by one meeting**: 19 of 24 (79 percent), epygx; on the minted and used counts (2b, 2c) 20 of 24, met |
+| Phase 2b musts: settled DER better than 0.408, at least 97% of final words labelled, the six regression tests | **met**: 0.266; 98.1% (97.2% in the repeat); 114 reconciler and job tests pass |
+| Phase 2b / 2c: confusion at most 0.08 | **missed by 0.022**: 0.102 (unchanged from 2c; the offline reference above puts 0.10 of it on the clustering context) |
+| Phase 2a: label within 2 s p50 / 4 s p95 after the text, no change after sending, under 5% corrections | **met**: 0 / 0 s, 0, 0.8% (a folded fragment label that had reached an in-progress caption) |
+| Phase 2a: caption p50 and p95 with diarization on within 10% of off, no more dropped periods than off | **missed in both runs**: suite run 10.45 against 5.52 s (+89%), 41.4 against 21.7 s, 19 against 10 dropped; repeat 4.92 against 4.39 s (+12%), 28.4 against 22.1 s (+28%), 10 against 9 dropped |
+
+What to make of the caption miss. The diarization worker now costs a
+tenth of a core, half of what it did when these targets were met in
+Phase 2a, 2b and 2c (on 5.71 against off 5.82 s in 2c), and the caption
+worker runs upstream's unchanged job; both streams in the repeat show the
+same Whisper execution profile (mean 4.7 against 4.4 s, p95 20.8 against
+19.4 s) and the first run's on stream shows Whisper itself running twice
+as slowly for three minutes. The run-to-run spread of the same off
+configuration in this step alone (p50 5.52 against 4.39 s, p95 21.7
+against 22.1 s, 10 against 9 drops) is larger than the on-against-off
+difference of the repeat, so these two runs cannot attribute the
+difference to diarization, and they cannot rule it out either. The target
+is reported as missed, not explained away.
+
+**Gate baseline: not moved.** The condition for moving it was every
+Phase 2a and 2b must target holding, the RTF ceiling included, in the
+container run. The RTF ceiling now holds with a wide margin, but the
+caption-parity targets did not hold in either caption stream, so the gate
+still compares against the Phase 2b baselines (dev set, first 120 s; this
+run fails that gate on exactly the set-mismatch metric, onsets never
+labelled, plus the caption metrics above). To move it once a caption run
+holds parity, copy `baselines/phase2-wrapup-linux-cpu-4c8g.json` over
+`baselines/linux-cpu-4c8g.json` in its own commit; until then run the
+gate with `SET=dev STREAM_SEC=120` to compare like with like. Every
+accuracy and cost metric of this run is within or better than the old
+gate's tolerances.
 
 ### Hard cases
 
@@ -1393,10 +1497,9 @@ Diarization costs one pass per period on its own worker. Up to Phase 2c a
 10 s window cost about 1.4 s per 5 s period on the 4-CPU reference
 container (RTF 0.30) at one torch thread, 95 percent of it in the
 embedding network, which pyannote ran three times per window; since the
-Phase 2 wrap-up the network runs once per window (native pass 0.52 s to
-0.20 s, same embeddings; the container figure is in "Phase 2 wrap-up
-results"). The worker holds about 0.85 GB; see "Phase 2a results" for the
-per-session cost and how many sessions the container sustains. The
+Phase 2 wrap-up the network runs once per window: on the same container a
+pass costs 0.67 s (RTF 0.135), the worker 0.12 cores and 0.7 GB. See
+"Phase 2a results" for how many sessions the container sustains. The
 caption worker is never slowed by it: if the diarization
 worker falls behind it skips audio (unlabelled, counted) rather than
 queueing. Measure real hardware with `benchmarks/diarization/` before
@@ -1472,10 +1575,25 @@ tables).
   Where offline pyannote separates every voice with the whole file in
   hand, the 10 s windows plus the session memory merge people: the
   six-person news panel hhepf ends with 2 labels (confusion 0.36 of its
-  speech), the three-person iacod with 2, and the five-person debate
-  epygx with 3 since the fragment fold (5 before it; two of its speakers'
-  first turns were re-labelled as another panelist by the next window).
-  This is the one real streaming-pipeline under-count and it is open.
+  speech) and the three-person iacod with 2. This is the one real
+  streaming-pipeline under-count and it is open.
+- **The fragment fold trades a debate for the classroom.** The fold
+  (`diarization_fragment_fold_sec`, default 7.5 s; 0 disables) removes a
+  label the next window re-labels as an existing speaker. In a classroom
+  that is a split of the instructor; in the five-person debate epygx it
+  was two real speakers whose first turns the next window put under
+  another panelist, so epygx shows 3 labels instead of 5 (settled DER
+  0.196 to 0.204) and the set's count-within-one goes from 20 to 19 of 24.
+  It is on by default because the classroom is the product case and DER,
+  confusion and the label band hold on the set; a deployment with
+  many-speaker panels and few fragments can set it to 0.
+- **Streaming identity is about 0.10 confusion behind the offline
+  pipeline.** On the 9 files that have a whole-file offline pass (a subset
+  leaning to the hard files) offline pyannote scores confusion 0.031 and
+  DER 0.243 against streaming's 0.129 and 0.338; missed speech and false
+  alarm match, so the gap is the clustering context (10 s windows plus a
+  cosine memory against the whole file), not the model. See "Phase 2
+  wrap-up results".
 - **One person can still appear as two labels.** The typical far-field
   error is a split, not a merge: 1.17 labels are minted per real speaker
   on the set and 1.06 reach settled captions (1.14 before the fold); 11 of
@@ -1500,8 +1618,10 @@ tables).
   else take the dominant speaker's label, and missed speech (0.12 of
   reference speech on the set, mostly overlap and far-field pauses) is
   the segmentation model's, with no threshold to lower. The context can
-  report overlapping turns (`overlap_aware`); on the dev set that output
-  scores settled DER 0.262 against 0.279, and it is not the default yet.
+  report overlapping turns (`overlap_aware`); that output scores settled
+  DER 0.258 against 0.266 on the 24-file set (0.262 against 0.279 on the
+  dev set) but mints more labels (1.22 against 1.17 per speaker), so it is
+  not the default.
 - **A fragment label can flash on an in-progress caption.** The fold
   that removes a split label arrives one period after it was minted, so
   such a label can show on the in-progress tail for up to 5 s and is

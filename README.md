@@ -5,32 +5,35 @@
 > each word with a stable speaker (`spk_0`, `spk_1`, ...) and the viewer renders
 > colored `Speaker N:` labels. Everything else tracks upstream `staging`.
 >
-> **Status (2026-10-04, Phase 2c):** working end to end, optional, off by
-> default. Captions never wait for diarization: it runs as its own worker-pool
-> job on its own worker and labels reach already-shown captions through a
-> `speakers_update` message that fills a label slot in place. Speaker
-> identity rests on per-session embedding memory (in memory only, kept 60 s
-> for a reconnect). Phase 2c re-examined speaker counting on a broader set:
-> all 16 AMI test meetings plus an 8-file VoxConverse subset (1 to 8
-> speakers), full 10 minutes each, and a synthetic classroom case (one
-> instructor 83 percent of the time, nine 5 to 15 s questions, one voice
-> under 5 dB pink noise). Measured on upstream's CPU image with 4 CPUs:
-> 1.17 labels per real speaker (band 0.8 to 1.2), speaker count within one
-> on 20 of 24 meetings, 8 of 9 classroom questions labelled as someone
-> other than the instructor (all three noisy ones), settled DER 0.27,
-> 99.6 percent of finalized words labelled, captions with diarization on
-> at 5.7 s p50 against 5.8 s off, diarization worker 0.27 cores, 0.87 GB,
-> real-time factor 0.30. The typical error is one far-field speaker split
-> into fragments, not two people merged; the two merge-guards that were
-> built (sustained-voice split, PLDA/VBx re-clustering of the session
-> memory) only trade confusion for more labels and ship disabled. Missed:
-> confusion 0.10 over the whole set against the 0.08 target, RTF 0.30
-> against the 0.25 margin target (a 6 s period reaches 0.25 but puts label
-> latency p95 at 12.7 s, so 5 s stays), and two clean VoxConverse panels
-> (six and three speakers) that end with two labels although offline
-> pyannote separates every voice: the one real pipeline under-count left.
-> Full tables, per-meeting counts and caveats are in the diarization doc
-> linked below.
+> **Status (2026-10-04, Phase 2 wrap-up):** working end to end, optional,
+> off by default. Captions never wait for diarization: it runs as its own
+> worker-pool job on its own worker and labels reach already-shown captions
+> through a `speakers_update` message that fills a label slot in place.
+> Speaker identity rests on per-session embedding memory (in memory only,
+> kept 60 s for a reconnect). The wrap-up step cut the diarization pass to
+> a third of its cost by running the speaker-embedding network once per
+> window instead of once per speaker slot (identical embeddings): on
+> upstream's CPU image with 4 CPUs the diarization worker now takes 0.12
+> cores and 0.7 GB at a real-time factor of 0.13 (0.30 before). It also
+> folds a fresh speaker label that the next window re-labels as an existing
+> speaker before its captions settle, so the synthetic classroom case (one
+> instructor, three questioners, nine short questions, one under 5 dB pink
+> noise) shows 6 labels for 4 people instead of 8 while 8 of 9 questions
+> keep a non-instructor label. On the 24-file set (16 AMI test meetings and
+> an 8-file VoxConverse subset, full 10 minutes): settled DER 0.27,
+> confusion 0.10, 1.06 labels on settled captions per real speaker (band
+> 0.8 to 1.2), speaker count exact on 11 and within one on 19 of 24
+> meetings, 98 percent of finalized words labelled. Open: confusion 0.10
+> against the 0.08 target, which the offline pipeline puts at 0.03 on the
+> nine files with a whole-file reference (clustering context, not the
+> model); clean many-speaker panels still collapse in streaming (a
+> six-person panel ends with two labels), and the fold costs a five-person
+> debate two labels; and caption latency with diarization on measured
+> 12 percent above off in the clean repeat run (4.9 against 4.4 s p50) and
+> far above it in a run with a Whisper outlier, so caption parity, met in
+> every earlier phase, is reported as unresolved by this step's two runs
+> and the gate baseline stays where it was. Full tables, per-meeting counts
+> and caveats are in the diarization doc linked below.
 >
 > **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
 > `pyannote/speaker-diarization-community-1` terms, export

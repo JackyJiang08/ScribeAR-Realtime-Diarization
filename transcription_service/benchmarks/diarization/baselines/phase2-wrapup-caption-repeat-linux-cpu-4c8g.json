@@ -1,0 +1,703 @@
+{
+  "label": "phase2 wrap-up caption repeat",
+  "generated_at": "2026-10-04T10:23:11+0000",
+  "code_revision": "de05327",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "resource_limits": {
+    "runner": "docker",
+    "requested_cpus": 4.0,
+    "requested_memory_gb": 8.0,
+    "cgroup_cpus": 4.0,
+    "cgroup_memory_gb": 8.0,
+    "host_cpus": 8,
+    "host_memory_gb": 7.65,
+    "effective_cpus": 4.0,
+    "effective_memory_gb": 8.0
+  },
+  "hygiene": {
+    "before": {
+      "state": {
+        "taken_at": "2026-10-04T10:23:11+0000",
+        "free_memory_mb": 7144,
+        "swap_used_mb": 0,
+        "load_1m": 0.94,
+        "load_5m": 1.49,
+        "load_15m": 2.14
+      },
+      "warnings": [],
+      "clean": true
+    },
+    "after": {
+      "taken_at": "2026-10-04T10:30:13+0000",
+      "free_memory_mb": 6823,
+      "swap_used_mb": 0,
+      "load_1m": 1.73,
+      "load_5m": 1.59,
+      "load_15m": 1.93
+    },
+    "clean": true,
+    "warnings": []
+  },
+  "config": {
+    "reference_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "diarization": {
+      "window_sec": 10.0,
+      "period_ms": 5000,
+      "segmentation_step": null
+    },
+    "dev_vad_config": null,
+    "data": "benchmarks/diarization/data/ami",
+    "suffix": "_10min",
+    "files": null,
+    "set": "standard",
+    "offline_set": "dev",
+    "stream_sec": 0.0,
+    "skip_offline": true,
+    "reconciler_overrides": null,
+    "classroom_data": "benchmarks/diarization/data/classroom",
+    "caption_audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+    "caption_seconds": 180.0,
+    "chunk_ms": 500,
+    "sessions_sweep": null,
+    "steps": [
+      "caption",
+      "warmup"
+    ]
+  },
+  "logs": "<outside>/diarization_suite_lhmeizsd",
+  "warmup": {
+    "whisper_load_sec": 1.03,
+    "whisper_pass_sec": 1.17,
+    "silero_load_sec": 0.51,
+    "pyannote_load_sec": 1.92,
+    "pyannote_pass_sec": 0.21
+  },
+  "caption_latency": {
+    "reference": {
+      "on": {
+        "label": "phase2 wrap-up caption repeat [caption_reference_on]",
+        "generated_at": "2026-10-04T10:26:45+0000",
+        "code_revision": "de05327",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "on",
+          "sessions": 1,
+          "provider_overrides": [],
+          "context_overrides": [],
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": true,
+            "diarization_context_tag": "pyannote_diarization",
+            "diarization_period_ms": 5000,
+            "diarization_window_sec": 10,
+            "diarization_edge_margin_sec": 0.5,
+            "diarization_label_timeout_sec": 15
+          },
+          "num_workers": 2,
+          "contexts": [
+            {
+              "uid": "faster-whisper",
+              "worker_ids": [
+                0
+              ],
+              "config": {
+                "model": "base",
+                "device": "cpu"
+              }
+            },
+            {
+              "uid": "silero-vad",
+              "worker_ids": [
+                0
+              ],
+              "config": {}
+            },
+            {
+              "uid": "pyannote-diarization",
+              "worker_ids": [
+                1
+              ],
+              "config": {
+                "model": "pyannote/speaker-diarization-community-1",
+                "device": "cpu",
+                "token_env_var": "HUGGINGFACE_ACCESS_TOKEN",
+                "num_threads": 1,
+                "nice": 10,
+                "segmentation_step": null
+              }
+            }
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 5.1,
+          "exited_during_run": null,
+          "log": "<outside>/caption_reference_on.service.log",
+          "rss_mb_after_ready": 1541.9,
+          "rss_mb_end": 1829.2,
+          "rss_mb_peak": 1995.4,
+          "rss_mb_growth_during_stream": 287.3,
+          "rss_samples": 205,
+          "workers": [
+            {
+              "pid": 66,
+              "rss_max_mb": 1031.9,
+              "cpu_sec": 210.76,
+              "wall_sec": 199.6,
+              "cores": 1.056,
+              "worker": 0
+            },
+            {
+              "pid": 74,
+              "rss_max_mb": 701.7,
+              "cpu_sec": 24.3,
+              "wall_sec": 199.6,
+              "cores": 0.122,
+              "worker": 1
+            }
+          ]
+        },
+        "diarization_cost": {
+          "rtf_from_counters": 0.132,
+          "pass_cost_mean_sec": 0.66,
+          "runs": 36.0,
+          "audio_seconds": 180.0,
+          "uncovered_seconds": 0,
+          "dropped_periods": 0,
+          "failed_passes": 0,
+          "labels_minted": 2.0,
+          "worker_cores_mean": 0.122,
+          "worker_cpu_sec": 24.3,
+          "worker_rss_max_mb": 701.7,
+          "wall_sec": 199.6
+        },
+        "stream": {
+          "sessions": 1,
+          "wall_sec": 199.6,
+          "per_session": [
+            {
+              "late_sends": 0,
+              "max_send_lateness_sec": 0.0,
+              "chunks_sent": 360,
+              "streamed_sec": 180.0
+            }
+          ]
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 24,
+              "mean": 8.835,
+              "p50": 4.924,
+              "p95": 28.383,
+              "max": 29.682
+            },
+            "final": {
+              "count": 15,
+              "mean": 28.495,
+              "p50": 31.615,
+              "p95": 50.8,
+              "max": 50.8
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 523,
+              "mean": 13.464,
+              "p50": 11.01,
+              "p95": 29.112,
+              "max": 34.735
+            },
+            "finalized": {
+              "count": 253,
+              "mean": 27.576,
+              "p50": 26.096,
+              "p95": 42.228,
+              "max": 51.801
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 246,
+              "mean": 0.101,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 8.083
+            },
+            "after_finalized": {
+              "count": 246,
+              "mean": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "transcript_messages": 29,
+          "transcript_messages_with_text": 25,
+          "speakers_update_messages": 3,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 15,
+          "final_sequences_settled": 3,
+          "final_words": 253,
+          "final_words_labelled": 246,
+          "final_words_labelled_fraction": 0.972,
+          "speaker_labels_seen": [
+            "spk_0",
+            "spk_1"
+          ],
+          "label_changes_before_final": 1,
+          "label_changes_before_final_fraction": 0.004,
+          "label_changes_after_sent": 0
+        },
+        "per_session_latency": null,
+        "service_counters_delta": {
+          "jobsCompletedTotal": 29.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 180.0,
+          "asrDroppedPeriodsTotal": 10.0,
+          "audioDroppedBufferFullTotal": 0,
+          "audioDroppedBufferFullSecondsTotal": 0,
+          "bufferOverflowTotal": 13.0,
+          "bufferOverflowSecondsTotal": 108.2,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 6.0,
+          "temperatureFallbackTotal": 4.0,
+          "repeatedSegmentDetectedTotal": 0,
+          "diarizationRunsTotal": 36.0,
+          "diarizationSecondsTotal": 23.766,
+          "diarizationFailedTotal": 0,
+          "reconcilerSecondsTotal": 0.003,
+          "diarizationLabelsMintedTotal": 2.0,
+          "diarizationAudioSecondsTotal": 180.0,
+          "diarizationUncoveredSecondsTotal": 0,
+          "diarizationDroppedPeriodsTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 29,
+            "sampleCount": 19,
+            "mean": 4740.408484684211,
+            "p50": 3590.341793,
+            "p95": 20767.503135,
+            "p99": 20767.503135,
+            "max": 20767.503135
+          },
+          "asrSchedulingDelayMs": {
+            "count": 29,
+            "sampleCount": 19,
+            "mean": 4.405634578947368,
+            "p50": 4.449532,
+            "p95": 6.4149,
+            "p99": 6.4149,
+            "max": 6.4149
+          },
+          "asrRtf": {
+            "count": 26,
+            "sampleCount": 16,
+            "mean": 0.9030575677611111,
+            "p50": 0.5093282586,
+            "p95": 4.153500627,
+            "p99": 4.153500627,
+            "max": 4.153500627
+          },
+          "diarizationExecutionMs": {
+            "count": 39,
+            "sampleCount": 24,
+            "mean": 619.2468371250001,
+            "p50": 729.873375,
+            "p95": 846.75725,
+            "p99": 873.509917,
+            "max": 873.509917
+          },
+          "diarizationLagMs": {
+            "count": 36,
+            "sampleCount": 21,
+            "mean": 785.723572685605,
+            "p50": 794.4056987762451,
+            "p95": 933.2327842712402,
+            "p99": 1265.0401592254639,
+            "max": 1265.0401592254639
+          },
+          "diarizationRtf": {
+            "count": 36,
+            "sampleCount": 21,
+            "mean": 0.14228995434391536,
+            "p50": 0.14767747520000002,
+            "p95": 0.16935145000000001,
+            "p99": 0.1747019834,
+            "max": 0.1747019834
+          }
+        }
+      },
+      "off": {
+        "label": "phase2 wrap-up caption repeat [caption_reference_off]",
+        "generated_at": "2026-10-04T10:30:11+0000",
+        "code_revision": "de05327",
+        "code_dirty": null,
+        "environment": {
+          "machine": "aarch64",
+          "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+          "python": "3.12.11",
+          "device": "cpu",
+          "omp_num_threads": "1",
+          "openblas_num_threads": "1",
+          "resource_limits": {
+            "runner": "docker",
+            "requested_cpus": 4.0,
+            "requested_memory_gb": 8.0,
+            "cgroup_cpus": 4.0,
+            "cgroup_memory_gb": 8.0,
+            "host_cpus": 8,
+            "host_memory_gb": 7.65,
+            "effective_cpus": 4.0,
+            "effective_memory_gb": 8.0
+          },
+          "baseline_key": "linux-cpu-4c8g",
+          "torch": "2.13.0+cpu",
+          "torch_threads": 1,
+          "pyannote_audio": "4.0.7",
+          "faster_whisper": "1.2.1"
+        },
+        "hygiene": null,
+        "config": {
+          "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+          "provider": "whisper",
+          "diarization": "off",
+          "sessions": 1,
+          "provider_overrides": [],
+          "context_overrides": [],
+          "effective_provider_config": {
+            "whisper_context_tag": "whisper_context",
+            "silero_context_tag": "silero_vad",
+            "job_period_ms": 5000,
+            "max_buffer_len_sec": 30,
+            "local_agree_dim": 2,
+            "diarization_detector": false
+          },
+          "num_workers": 1,
+          "contexts": [
+            {
+              "uid": "faster-whisper",
+              "worker_ids": [
+                0
+              ],
+              "config": {
+                "model": "base",
+                "device": "cpu"
+              }
+            },
+            {
+              "uid": "silero-vad",
+              "worker_ids": [
+                0
+              ],
+              "config": {}
+            }
+          ],
+          "audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
+          "chunk_ms": 500,
+          "seconds": 180.0,
+          "linger_sec": 20.0
+        },
+        "service": {
+          "ready_after_sec": 2.6,
+          "exited_during_run": null,
+          "log": "<outside>/caption_reference_off.service.log",
+          "rss_mb_after_ready": 895.2,
+          "rss_mb_end": 1174.2,
+          "rss_mb_peak": 1246.4,
+          "rss_mb_growth_during_stream": 279.0,
+          "rss_samples": 202,
+          "workers": [
+            {
+              "pid": 142,
+              "rss_max_mb": 951.4,
+              "cpu_sec": 211.91,
+              "wall_sec": 199.5,
+              "cores": 1.062,
+              "worker": 0
+            }
+          ]
+        },
+        "diarization_cost": null,
+        "stream": {
+          "sessions": 1,
+          "wall_sec": 199.5,
+          "per_session": [
+            {
+              "late_sends": 0,
+              "max_send_lateness_sec": 0.0,
+              "chunks_sent": 360,
+              "streamed_sec": 180.0
+            }
+          ]
+        },
+        "latency": {
+          "chunk_id_method": {
+            "in_progress": {
+              "count": 25,
+              "mean": 7.64,
+              "p50": 4.385,
+              "p95": 22.107,
+              "max": 28.493
+            },
+            "final": {
+              "count": 14,
+              "mean": 26.622,
+              "p50": 28.493,
+              "p95": 44.425,
+              "max": 44.425
+            }
+          },
+          "word_method": {
+            "first_shown": {
+              "count": 544,
+              "mean": 12.825,
+              "p50": 10.652,
+              "p95": 26.203,
+              "max": 34.109
+            },
+            "finalized": {
+              "count": 240,
+              "mean": 26.224,
+              "p50": 25.05,
+              "p95": 39.202,
+              "max": 44.425
+            }
+          },
+          "label_latency": {
+            "after_text_shown": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            },
+            "after_finalized": {
+              "count": 0,
+              "mean": null,
+              "p50": null,
+              "p95": null,
+              "max": null
+            }
+          },
+          "transcript_messages": 30,
+          "transcript_messages_with_text": 26,
+          "speakers_update_messages": 0,
+          "speakers_updates_for_unknown_sequence": 0,
+          "final_sequences_with_id": 0,
+          "final_sequences_settled": 0,
+          "final_words": 240,
+          "final_words_labelled": 0,
+          "final_words_labelled_fraction": 0.0,
+          "speaker_labels_seen": [],
+          "label_changes_before_final": 0,
+          "label_changes_before_final_fraction": 0.0,
+          "label_changes_after_sent": 0
+        },
+        "per_session_latency": null,
+        "service_counters_delta": {
+          "jobsCompletedTotal": 30.0,
+          "jobsFailedTotal": 0,
+          "asrAudioSecondsTotal": 180.0,
+          "asrDroppedPeriodsTotal": 9.0,
+          "audioDroppedBufferFullTotal": 0,
+          "audioDroppedBufferFullSecondsTotal": 0,
+          "bufferOverflowTotal": 13.0,
+          "bufferOverflowSecondsTotal": 103.16,
+          "vadNoSpeechTotal": 0,
+          "noWordsTotal": 6.0,
+          "temperatureFallbackTotal": 1.0,
+          "repeatedSegmentDetectedTotal": 0,
+          "diarizationRunsTotal": 0,
+          "diarizationSecondsTotal": 0,
+          "diarizationFailedTotal": 0,
+          "reconcilerSecondsTotal": 0,
+          "diarizationLabelsMintedTotal": 0,
+          "diarizationAudioSecondsTotal": 0,
+          "diarizationUncoveredSecondsTotal": 0,
+          "diarizationDroppedPeriodsTotal": 0
+        },
+        "service_histograms_end": {
+          "asrExecutionMs": {
+            "count": 30,
+            "sampleCount": 19,
+            "mean": 4419.399982210527,
+            "p50": 3522.097584,
+            "p95": 19386.555508,
+            "p99": 19386.555508,
+            "max": 19386.555508
+          },
+          "asrSchedulingDelayMs": {
+            "count": 30,
+            "sampleCount": 19,
+            "mean": 3.417230631578947,
+            "p50": 3.538366,
+            "p95": 6.834068,
+            "p99": 6.834068,
+            "max": 6.834068
+          },
+          "asrRtf": {
+            "count": 27,
+            "sampleCount": 16,
+            "mean": 0.7089592394454861,
+            "p50": 0.6777501004,
+            "p95": 1.4982336672,
+            "p99": 1.4982336672,
+            "max": 1.4982336672
+          }
+        }
+      }
+    }
+  },
+  "durations_sec": {
+    "warmup": 5.9,
+    "caption_reference_on": 208.1,
+    "caption_reference_off": 204.8
+  },
+  "suite_wall_sec": 421.8,
+  "key_metrics": {
+    "caption.on.chunk_id.in_progress.p50": 4.924,
+    "caption.on.chunk_id.in_progress.p95": 28.383,
+    "caption.on.chunk_id.in_progress.mean": 8.835,
+    "caption.on.chunk_id.final.p50": 31.615,
+    "caption.on.chunk_id.final.p95": 50.8,
+    "caption.on.chunk_id.final.mean": 28.495,
+    "caption.on.word.first_shown.p50": 11.01,
+    "caption.on.word.first_shown.p95": 29.112,
+    "caption.on.word.first_shown.mean": 13.464,
+    "caption.on.word.finalized.p50": 26.096,
+    "caption.on.word.finalized.p95": 42.228,
+    "caption.on.word.finalized.mean": 27.576,
+    "caption.on.label.after_text_shown.p50": 0.0,
+    "caption.on.label.after_text_shown.p95": 0.0,
+    "caption.on.label.after_text_shown.mean": 0.101,
+    "caption.on.label.after_finalized.p50": 0.0,
+    "caption.on.label.after_finalized.p95": 0.0,
+    "caption.on.label.after_finalized.mean": 0.0,
+    "caption.on.transcript_messages": 29,
+    "caption.on.speakers_update_messages": 3,
+    "caption.on.final_words": 253,
+    "caption.on.final_words_labelled_fraction": 0.972,
+    "caption.on.speaker_labels_seen": 2,
+    "caption.on.label_changes_before_final": 1,
+    "caption.on.label_changes_before_final_fraction": 0.004,
+    "caption.on.label_changes_after_sent": 0,
+    "caption.on.dropped_periods": 10.0,
+    "caption.on.audio_dropped_buffer_full_sec": 0,
+    "caption.on.buffer_overflow_sec": 108.2,
+    "caption.on.jobs_completed": 29.0,
+    "caption.on.rss_peak_mb": 1995.4,
+    "caption.on.rss_growth_mb": 287.3,
+    "caption.on.exec_ms_p95": 20767.503135,
+    "caption.on.exec_ms_max": 20767.503135,
+    "caption.on.worker0.cores": 1.056,
+    "caption.on.worker0.rss_max_mb": 1031.9,
+    "caption.on.worker1.cores": 0.122,
+    "caption.on.worker1.rss_max_mb": 701.7,
+    "caption.on.diarization.rtf": 0.132,
+    "caption.on.diarization.pass_cost_mean_sec": 0.66,
+    "caption.on.diarization.runs": 36.0,
+    "caption.on.diarization.uncovered_sec": 0,
+    "caption.on.diarization.dropped_periods": 0,
+    "caption.on.diarization.failed_passes": 0,
+    "caption.on.diarization.worker_cores": 0.122,
+    "caption.on.diarization.worker_rss_max_mb": 701.7,
+    "caption.on.diarization.lag_ms_p95": 933.2327842712402,
+    "caption.on.diarization.exec_ms_p95": 846.75725,
+    "caption.off.chunk_id.in_progress.p50": 4.385,
+    "caption.off.chunk_id.in_progress.p95": 22.107,
+    "caption.off.chunk_id.in_progress.mean": 7.64,
+    "caption.off.chunk_id.final.p50": 28.493,
+    "caption.off.chunk_id.final.p95": 44.425,
+    "caption.off.chunk_id.final.mean": 26.622,
+    "caption.off.word.first_shown.p50": 10.652,
+    "caption.off.word.first_shown.p95": 26.203,
+    "caption.off.word.first_shown.mean": 12.825,
+    "caption.off.word.finalized.p50": 25.05,
+    "caption.off.word.finalized.p95": 39.202,
+    "caption.off.word.finalized.mean": 26.224,
+    "caption.off.label.after_text_shown.p50": null,
+    "caption.off.label.after_text_shown.p95": null,
+    "caption.off.label.after_text_shown.mean": null,
+    "caption.off.label.after_finalized.p50": null,
+    "caption.off.label.after_finalized.p95": null,
+    "caption.off.label.after_finalized.mean": null,
+    "caption.off.transcript_messages": 30,
+    "caption.off.speakers_update_messages": 0,
+    "caption.off.final_words": 240,
+    "caption.off.final_words_labelled_fraction": 0.0,
+    "caption.off.speaker_labels_seen": 0,
+    "caption.off.label_changes_before_final": 0,
+    "caption.off.label_changes_before_final_fraction": 0.0,
+    "caption.off.label_changes_after_sent": 0,
+    "caption.off.dropped_periods": 9.0,
+    "caption.off.audio_dropped_buffer_full_sec": 0,
+    "caption.off.buffer_overflow_sec": 103.16,
+    "caption.off.jobs_completed": 30.0,
+    "caption.off.rss_peak_mb": 1246.4,
+    "caption.off.rss_growth_mb": 279.0,
+    "caption.off.exec_ms_p95": 19386.555508,
+    "caption.off.exec_ms_max": 19386.555508,
+    "caption.off.worker0.cores": 1.062,
+    "caption.off.worker0.rss_max_mb": 951.4
+  }
+}
