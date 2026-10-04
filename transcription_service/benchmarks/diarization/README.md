@@ -15,8 +15,12 @@ guide, including what every metric means and how to read a report, is in
 | `window_sweep.py` | Phase 2a: replays every diarization window x segmentation step combination and prints DER, tick cost and labels minted per point. The defaults were chosen from its output. |
 | `compare_baseline.py` | Regression gate against `baselines/<environment>.json` with `baselines/gate_rules.json`. |
 | `acceptance.py` | Acceptance: the absolute targets in `baselines/phase2a_acceptance.json` (caption latency within 10 percent of off, no extra dropped periods, 1 core / 1 GB / RTF 0.3 per session, label within 2 s p50 and 4 s p95, no label changes after sending, settled DER no worse than the baseline) or, with `--targets`, `baselines/phase2b_acceptance.json` (settled DER, confusion, labels per speaker, speaker count, coverage, corrections), reported with margins. |
-| `tune_reconciler.py` | Phase 2b: caches pyannote's per-window passes (segments and embeddings) once per window setting, then replays every reconciler configuration of a grid (`configs/tune_grid*.json`) through the production reconciler and attacher and ranks them by DER, confusion, labels minted per speaker, speaker count and revisions. `--score-sec 120` scores the gate horizon. |
-| `baselines/` | Committed reference reports (the Phase 2 starting point), the gate rules and the Phase 2a acceptance targets. |
+| `tune_reconciler.py` | Phase 2b/2c: caches pyannote's per-window passes (segmentation tracks and raw embeddings) once per window setting and set (`--set`, several `--cache` files merge), then replays every reconciler configuration of a grid (`configs/tune_grid*.json`) through the production reconciler and attacher and ranks them by DER, confusion, labels minted per speaker, speaker count (two-sided) and revisions, loading the model's PLDA/VBx clustering when a row asks for re-clustering. `--score-sec 120` scores the old gate horizon. |
+| `eval_sets.py` | The named evaluation sets: `dev` (ES2004a, IS1009a, TS3003a), `ami` (the 16 AMI test meetings), `standard` (AMI test set + VoxConverse subset). |
+| `voxconverse_subset.py`, `voxconverse_subset.json` | VoxConverse test subset (speaker counts 1 to 8, first 10 min): selection rule, manifest, and a fetcher that reads only the chosen members from the 4.3 GB archive through HTTP range requests. |
+| `prepare_classroom_case.py`, `classroom_case.json`, `classroom_score.py` | Synthetic classroom case (one instructor about 83 percent of the time, nine 5 to 15 s questions from three voices, one of them at 5 dB pink noise) and its scorer: does every question get a label other than the instructor's. |
+| `embedding_separability.py` | Model or pipeline: from a pass cache, how well cosine and the shipped PLDA separate each meeting's voices on oracle-labelled tracks (EER, error at the match threshold, oracle centroid distances). |
+| `baselines/` | Committed reference reports (the gate baselines), the gate rules and the Phase 2a, 2b and 2c acceptance targets. |
 | `docker/` | Linux CPU reference environment: upstream's `Dockerfile_CPU` image plus the pyannote extra, run with `--cpus 4 --memory 8g` by default. |
 | `warmup.py` | One model load of whisper, Silero and pyannote before timed runs. |
 | `hard_cases.json`, `select_hard_cases.py`, `prepare_hard_cases.py` | Hard-case set (overlap, short turns, return after a long gap, four speakers, background noise), its selection method and its source documentation. |
@@ -29,7 +33,8 @@ guide, including what every metric means and how to read a report, is in
 Quick start (from `transcription_service/`, token exported, ffmpeg installed):
 
 ```bash
-make benchmark_diarization_suite            # native, quick dev loop
+make benchmark_diarization_suite SET=dev    # native, quick dev loop (3 meetings)
+make benchmark_diarization_suite            # standard set: 16 AMI test meetings + VoxConverse subset
 make benchmark_diarization_suite_docker     # Linux CPU reference, 4 CPUs / 8 GB
 make benchmark_diarization_gate             # suite + fail on regression
 make benchmark_diarization_gate_docker      # the run that decides acceptance
@@ -37,6 +42,8 @@ make benchmark_diarization_acceptance RESULT=benchmarks/diarization/results/<dat
 make benchmark_diarization_concurrency_docker SESSIONS="2 3 4"
 make benchmark_diarization_window_sweep_docker
 make benchmark_diarization_hardcases
+make benchmark_diarization_classroom         # synthetic classroom case
+make benchmark_diarization_offline_counts    # offline pyannote speaker counts, once per file
 make benchmark_diarization_soak SOAK_MINUTES=60
 ```
 

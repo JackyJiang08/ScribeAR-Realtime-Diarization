@@ -168,6 +168,8 @@ and this is the whole of their lifetime.
    | `diarization_max_session_speakers` | 32 | bound on labels (and centroids) per session |
    | `diarization_merge_threshold` | 1.0 (off) | two speakers whose centroids reach this similarity are merged |
    | `diarization_overlap_bonus` | 0.15 | added to the score in proportion to the time overlap with the previous pass's labels (consecutive windows share audio); also carries identity when a pass has no embeddings |
+   | `diarization_sustained_split_sec` | 0 (off) | a voice that keeps scoring between the new-speaker and the match threshold against its best speaker mints its own label after this many seconds of such evidence; measured in "Phase 2c results" (adds labels, never finds a second person on the benchmark set) |
+   | `diarization_recluster_period_sec` | 0 (off) | every this many seconds of session time the session's track history is re-clustered with the PLDA/VBx clustering shipped with the model, merging and splitting speakers to follow it; sent labels never change. Measured in "Phase 2c results" |
    | `diarization_attach_gap_sec` | 1.0 | a word with no speech segment under it takes the nearest speaker within this gap; 0 disables |
    | `diarization_revision_margin` | 0.1 | a later pass replaces an earlier label on shared audio only when it is at least this much more confident |
    | `diarization_reconnect_grace_sec` | 60 | how long a closed session's speaker memory is kept for a reconnect; 0 disables |
@@ -360,16 +362,24 @@ runs a warm-up pass on its own model instance.
 `make benchmark_diarization_suite` (or `_docker`) runs, each in its own
 process:
 
-1. **Replay benchmark** (`benchmark_baseline.py`) over the AMI set
-   (ES2004a, IS1009a, TS3003a, single distant microphone, first 10 min):
-   one offline pass per file and a streaming replay of the diarization job
-   loop (the reference config's period and window, `SpeakerReconciler`)
-   over the first `STREAM_SEC` seconds (default 120; `STREAM_SEC=0` replays
-   the full length).
+1. **Replay benchmark** (`benchmark_baseline.py`) over the evaluation
+   set (`SET=standard`, the default since Phase 2c: the 16 AMI test-set
+   meetings plus the VoxConverse subset, single distant microphone or
+   in-the-wild audio, first 10 min; `SET=dev`: ES2004a, IS1009a, TS3003a,
+   the Phase 2 meetings; `eval_sets.py`): one offline pass per file of
+   `OFFLINE_SET` (default `dev`, since a whole-file pass costs minutes on
+   CPU; `make benchmark_diarization_offline_counts` covers the standard
+   set once) and a streaming replay of the diarization job loop (the
+   reference config's period and window, `SpeakerReconciler`) over the
+   first `STREAM_SEC` seconds (default 0 = the full 10 min since Phase 2c;
+   the Phase 2a/2b baselines used 120).
 2. **Caption latency** (`caption_latency.py`): starts the real service with
    the reference config, streams ES2004a at real time in 0.5 s SAFP frames
    for `CAPTION_SEC` seconds (default 180), diarization **on** and **off**.
-3. Optionally **concurrency** (`SESSIONS="2 3 4"` with
+3. **Classroom case** (`classroom_score.py` over a replay of
+   `data/classroom`, see "Phase 2c results"): whether each short question
+   gets a label other than the instructor's.
+4. Optionally **concurrency** (`SESSIONS="2 3 4"` with
    `make benchmark_diarization_concurrency_docker`): the same stream over N
    concurrent sessions with diarization on.
 
@@ -381,7 +391,12 @@ Per file and aggregated, in `report.replay`:
   its missed / false-alarm / confusion breakdown (pyannote convention: no
   collar, overlap scored; a 0.25 s collar variant is included), **JER**,
   and the **speaker count error** (hypothesis labels minus reference
-  speakers). *First seen* is the label the newest pass gives in-progress
+  speakers; since Phase 2c a reference speaker counts only with at least
+  `--min-speaker-sec` = 5 s of speech in the streamed part, the raw count
+  is kept beside it, and the report lists true and predicted counts per
+  file in `speaker_counts` together with the signed mean error, the
+  fraction of files within one and exact, and how many were under- and
+  over-counted). *First seen* is the label the newest pass gives in-progress
   words; *settled* is the label a region has two passes later. With a 10 s
   window and a 5 s period a region is seen by two passes, so settled equals
   first seen; the service freezes the first label anyway (see "How it
@@ -392,7 +407,10 @@ Per file and aggregated, in `report.replay`:
   dominant label changed after a viewer first saw it (plus the older
   `label_flips_per_min`).
 - `labels_minted_per_reference_speaker`: session labels the reconciler
-  created divided by the people actually speaking in the streamed part.
+  created divided by the people actually speaking in the streamed part
+  (at least 5 s). Two-sided since Phase 2c: the acceptance band is 0.8 to
+  1.2 and the gate tracks `labels_per_speaker_deviation` (its distance
+  from 1), because "at most 1.2" could not catch under-counting.
 - `tick_cost_sec` (mean / p50 / p95 / worst against the period budget),
   `stage_cost_sec` per pyannote stage (segmentation, embeddings,
   clustering and other) and `reconciler_cost_sec`.
@@ -447,8 +465,10 @@ then commit it.
 
 `make benchmark_diarization_acceptance RESULT=<report>` checks the Phase 2a
 targets in `baselines/phase2a_acceptance.json` and reports each with its
-margin, or by how much it was missed. A missed target is never relaxed in
-the file; it is reported.
+margin, or by how much it was missed; `TARGETS=` points it at the Phase 2b
+(`phase2b_acceptance.json`) and Phase 2c (`phase2c_acceptance.json`, with
+the two-sided labels-per-speaker band and the classroom target) files. A
+missed target is never relaxed in the file; it is reported.
 
 The committed baselines are the official Phase 2 starting point measured on
 the unmodified, synchronous pipeline (commit recorded in each file's
@@ -800,6 +820,281 @@ the old gate with room to spare. With every must target met the baseline
 is moved to this run in its own commit, and the Phase 2b numbers become
 the gate.
 
+### Phase 2c results
+
+Speaker counting on a broader set, measured 2026-10-03/04. Phase 2b met
+every must target but minted 0.64 labels per real speaker on the gate
+horizon, and TS3003a ended with one label for its four reference speakers:
+a sign that different people were being merged into one label, the
+visible error in a classroom. This phase asks whether that is so, on
+enough meetings to tell, and fixes what the numbers support.
+
+**Evaluation set.** The standard set is now every meeting of the AMI test
+set (pyannote/AMI-diarization-setup `lists/test.meetings.txt`: ES2004a-d,
+IS1009a-d, TS3003a-d, EN2002a-d; Array1-01, first 10 minutes, only_words
+references) plus a VoxConverse v0.3 test subset (`voxconverse_subset.json`:
+for each speaker count from 1 to 8 the longest test file, first 10
+minutes; political debates and news panels, CC BY 4.0, read from the
+test archive with HTTP range requests so 170 MB are transferred instead
+of 4.3 GB). The three Phase 2 meetings remain the `dev` set
+(`SET=dev`). `eval_sets.py` defines both; `make benchmark_diarization_data`
+prepares everything. Audio is never committed. Every number below is on
+the full 10 minutes of each file (the Phase 2a/2b tables scored the first
+120 s, where most speakers had not spoken yet).
+
+**Two-sided counting.** Labels minted per real speaker now has a band,
+0.8 to 1.2, in `phase2c_acceptance.json`; the gate tracks its distance
+from 1 (`replay.labels_per_speaker_deviation`). The report lists the
+true and predicted speaker count per meeting (`speaker_counts`), the
+signed mean error and how many meetings were under- and over-counted. A
+reference speaker counts only with at least 5 s of speech in the scored
+part (`--min-speaker-sec`; the raw count is kept beside it), because a
+voice with a few seconds in ten minutes cannot earn a label: the minting
+minimum alone is 2.5 s of evidence. This matters for TS3003a: in its
+first ten minutes MTD009PM speaks for 490 s and the other three for 4.0,
+11.6 and 1.6 s, so "one label for four voices" was mostly a reference
+artefact, and the one real miss is the 11.6 s speaker.
+
+**Model or pipeline?** Two measurements separate what the embedding model
+can tell apart from what the reconciler does with it.
+`embedding_separability.py` takes every pure segmentation track of the
+cached passes (at least 1 s, 70 percent inside one reference speaker),
+scores every pair with cosine similarity and with the PLDA
+log-likelihood ratio that ships with community-1, and reports the best
+achievable error on each meeting:
+
+| meeting | tracks | cosine EER (threshold) | PLDA EER (threshold) | same-speaker pairs below 0.4 | different-speaker pairs at or above 0.4 | nearest oracle centroids (cosine) |
+|---|---|---|---|---|---|---|
+| ES2004a | 111 | 0.170 (0.21) | 0.197 (2.6) | 44% | 0.3% | 0.15 |
+| IS1009a | 123 | 0.122 (0.27) | 0.132 (0.9) | 25% | 2.1% | 0.03 |
+| TS3003a | 120 | one speaker has pure tracks | - | 18% | - | - |
+
+The voices are separable: the real speakers' centroids sit at cosine 0.15
+or less from each other, and only 0.3 to 2 percent of different-speaker
+track pairs reach the match threshold. What is noisy is the single
+far-field track: a quarter to almost half of same-speaker pairs fall
+below 0.4. So the risk at the 10 s window is splitting one person into
+several labels, not merging two people into one, and the shipped PLDA is
+no sharper than cosine on these tracks (its EER is slightly worse on both
+meetings), which is why the clustering experiments below do not improve
+on the cosine rule. The second measurement, offline pyannote over the
+whole 10 minutes of every file, is in the table below (column "offline").
+
+**Classroom scenario.** `prepare_classroom_case.py` builds a synthetic
+lecture from the four people of the ES2004 series (same room, same
+distant microphone): stretches where only one person speaks, joined with
+0.4 s silences; the speaker with the most such speech (FEE013, 486 s) is
+the instructor and talks in 45 s blocks, the other three ask three
+questions each of 5 to 15 s in a seeded order, and one questioner's
+questions (MEE014) carry pink noise at 5 dB SNR. The case is 552 s long,
+the instructor has 83 percent of the speech, the questions total 95 s.
+`classroom_score.py` reads the settled label timeline and gives every
+question the label covering most of it: a question has "its own label"
+when that label is not the instructor's (the label covering most of the
+lecture time). The case runs as a suite step (`classroom.*` key metrics,
+`make benchmark_diarization_classroom`).
+
+**Under-counting fixes, measured.** All replays below run the production
+reconciler and attacher over cached pyannote passes (10 s window, 5 s
+period), so a configuration costs seconds to score and the pyannote stage
+is identical for every row. Scored on the dev set plus the classroom case,
+full length:
+
+| configuration | settled DER | confusion | labels per speaker | count within one | signed count error | labels: ES2004a, IS1009a, TS3003a, classroom (reference 4, 4, 2, 4) |
+|---|---|---|---|---|---|---|
+| Phase 2b defaults | **0.231** | **0.061** | 1.19 | 3 of 4 | +1.00 | 5, 4, 1, 8 |
+| (b) sustained split 15 s | 0.231 | 0.061 | 1.50 | 2 of 4 | +2.00 | 6, 5, 2, 9 |
+| (b) sustained split 10 s | 0.333 | 0.163 | 1.62 | 1 of 4 | +2.50 | 6, 6, 2, 10 |
+| (a) PLDA/VBx re-clustering every 60 s | 0.246 | 0.076 | 1.25 | 3 of 4 | +0.75 | 4, 4, 1, 10 |
+| (a) re-clustering every 120 s | 0.260 | 0.090 | 1.19 | 3 of 4 | +0.75 | 4, 4, 1, 9 |
+| (c) minting minimum 4 s | 0.239 | 0.068 | 1.00 | 3 of 4 | +0.25 | 4, 3, 1, 7 |
+| (c) a voice must be re-found in the next window (`min_mint_passes` 2) | 0.287 | 0.109 | 0.81 | 2 of 4 | -0.50 | 2, 3, 1, 6 |
+| (c) new-speaker threshold 0.25 | 0.279 | 0.110 | 0.88 | 2 of 4 | -0.25 | 4, 2, 1, 6 |
+
+- *(b) Sustained split.* A voice that keeps scoring between the
+  new-speaker and the match threshold against its best speaker mints its
+  own label after N seconds of such evidence (`sustained_split_sec`;
+  grey-zone attachments stop moving the centroid so the split stays
+  possible). It never finds a second person: on TS3003a's single speaker
+  it splits one far-field voice in two at 10 s (confusion 0.008 to
+  0.393, the two labels then alternate), and at 15 s it adds one spurious
+  label to every file. Shipped disabled.
+- *(a) Session-level re-clustering.* Every N seconds the session's track
+  history (raw embeddings, up to 600) is re-clustered with the PLDA/VBx
+  clustering of community-1 at its shipped hyper-parameters (AHC 0.6, Fa
+  0.07, Fb 0.8; tracks weighted by their seconds), speakers whose tracks
+  the clustering joins are merged and a speaker whose tracks fall into
+  two clusters is split; sent labels never change. On oracle tracks the
+  clustering recovers the four speakers of ES2004a and IS1009a cleanly
+  (and one cluster for TS3003a, correctly), and in the replay it fixes
+  ES2004a (5 labels to 4, DER 0.412 to 0.371). But in the classroom it
+  merges the 35 s questioner FEE016 (cosine 0.39 to the instructor) into
+  the instructor's 840 s and splits the noisy questioner in two, so
+  confusion there rises from 0.060 to 0.148 and the mean gets worse. The
+  machinery stays (`diarization_recluster_period_sec`, 0 = off) because it
+  is the right tool when a deployment has long sessions of a few
+  long-speaking people; it is not the default.
+- *(c) Stricter minting.* Fewer labels for more confusion and DER in
+  every variant: the extra labels the defaults mint are fragments (in the
+  classroom: two labels on the instructor's first seconds before the
+  centroid settles, a 0 s and a 2 s label), and making minting stricter
+  removes real speakers before it removes fragments. Merging fragments
+  (labels with little speech) into their nearest speaker afterwards was
+  also tried and cannot help the viewer-centric count, since a label
+  already shown stays shown.
+
+**On the standard set** (24 files, full 10 minutes, replay from the
+cached passes; the container run below reproduces these accuracy numbers
+exactly, the replay being deterministic):
+
+| configuration | settled DER | confusion | labels per speaker | count within one | exact | signed error (under / over) |
+|---|---|---|---|---|---|---|
+| **Phase 2b defaults (kept)** | 0.267 | 0.103 | **1.17** | **20 of 24 (83%)** | 8 of 24 | +0.42 (4 / 12) |
+| (a) re-clustering every 60 s | 0.244 | 0.080 | 1.49 | 16 of 24 | 7 | +1.29 (2 / 15) |
+| (a) re-clustering, merges only | 0.270 | 0.106 | 1.29 | 16 of 24 | 10 | +0.67 |
+| (b) sustained split 15 s | 0.257 | 0.093 | 1.44 | 13 of 24 | 5 | +1.25 (1 / 18) |
+| (a) + (b) | 0.231 | 0.067 | 1.65 | 13 of 24 | 5 | +1.83 (0 / 19) |
+| (c) minting minimum 4 s | 0.277 | 0.111 | 0.92 | 20 of 24 | 7 | -0.42 (12 / 5) |
+| (c) 4 s + (b) 15 s | 0.265 | 0.100 | 1.19 | 20 of 24 | 9 | +0.46 (3 / 12) |
+
+Re-clustering and the sustained split buy DER and confusion with labels:
+(a) + (b) reaches 0.231 / 0.067 but mints 1.65 labels per speaker and
+over-counts 19 of 24 meetings, because each split lands a new label on
+audio whose earlier label stays on screen. Nothing improves the count
+without raising confusion, so the Phase 2b thresholds stay and both
+guards ship disabled (`diarization_sustained_split_sec`,
+`diarization_recluster_period_sec`, both 0). Per meeting, with the
+defaults (reference speakers with at least 5 s of speech; in brackets
+with any speech; "offline" is pyannote's own pipeline over the whole
+file, run once on the dev meetings and on the six files whose count the
+replay got wrong or most inflated, "-" = not run):
+
+| file | reference | predicted | offline | settled DER | confusion |
+|---|---|---|---|---|---|
+| IS1009a | 4 | 4 | 4 | 0.290 | 0.078 |
+| IS1009b | 3 (4) | 4 | - | 0.146 | 0.056 |
+| IS1009c | 2 (4) | 2 | - | 0.123 | 0.019 |
+| IS1009d | 4 | 5 | 4 (DER 0.124) | 0.303 | 0.194 |
+| ES2004a | 4 | 5 | 4 | 0.412 | 0.105 |
+| ES2004b | 4 | 6 | 4 (DER 0.176) | 0.200 | 0.030 |
+| ES2004c | 4 | 5 | - | 0.441 | 0.297 |
+| ES2004d | 4 | 4 | - | 0.350 | 0.159 |
+| TS3003a | 2 (4) | 1 | 1 | 0.158 | 0.008 |
+| TS3003b | 3 (4) | 4 | - | 0.130 | 0.013 |
+| TS3003c | 3 | 3 | - | 0.398 | 0.264 |
+| TS3003d | 4 | 4 | - | 0.379 | 0.206 |
+| EN2002a | 4 | 5 | - | 0.393 | 0.132 |
+| EN2002b | 4 | 7 | 4 (DER 0.422) | 0.560 | 0.185 |
+| EN2002c | 3 | 4 | - | 0.252 | 0.035 |
+| EN2002d | 4 | 3 | 3 (DER 0.401) | 0.411 | 0.079 |
+| VoxConverse bgvvt | 2 | 2 | - | 0.114 | 0.001 |
+| VoxConverse epygx | 5 | 5 | - | 0.196 | 0.079 |
+| VoxConverse gtjow | 2 | 2 | - | 0.065 | 0.002 |
+| VoxConverse hhepf | 6 | 2 | 6 (DER 0.077) | 0.422 | 0.360 |
+| VoxConverse iacod | 3 | 2 | 3 (DER 0.071) | 0.155 | 0.087 |
+| VoxConverse jwggf | 3 (5) | 6 | - | 0.114 | 0.017 |
+| VoxConverse uicid | 1 | 2 | - | 0.114 | 0.005 |
+| VoxConverse ylgug | 2 (3) | 3 | - | 0.064 | 0.007 |
+
+The four under-counted files are TS3003a (the 11.6 s speaker), EN2002d
+(3 for 4), iacod (2 for 3) and hhepf, a six-person news panel that ends
+with two labels and confusion 0.36: the one file where people are merged
+at scale. Offline pyannote over the whole file, with its own VBx
+clustering and all ten minutes of context, splits the under-counted files
+in two groups. On EN2002d (3 of 4) and TS3003a (1) it lands where the
+streaming path does: a recording and model limit, and the thresholds are
+not bent to it. On hhepf and iacod it is exact (6 of 6 at DER 0.077, 3
+of 3 at 0.071): clean in-the-wild audio whose voices the model tells
+apart with the whole file in hand, and which the 10 s windows plus the
+cosine memory merge anyway. That is the one real pipeline under-count on
+the set, and the open item this phase leaves: a panel of many
+short-turn speakers in clean audio. The over-counts are the pipeline's
+too: on EN2002b, ES2004b and IS1009d the offline pipeline finds exactly
+four speakers where the 10 s windows mint 7, 6 and 5 labels. The over-counts are fragments on far-field meetings (EN2002b: 7
+labels for 4). Confusion over the whole set, 0.103, is above the Phase 2b
+target of 0.08, which was set on three meetings over their first 120 s;
+at that horizon the same code still scores 0.021.
+
+**Classroom result** (defaults, settled labels):
+
+| question | speaker | noise | length | label | verdict |
+|---|---|---|---|---|---|
+| 1 | FEE016 | - | 11.3 s | spk_3 | own |
+| 2 | FEE016 | - | 10.5 s | spk_3 | own |
+| 3 | MEO015 | - | 8.3 s | spk_2 | **instructor** |
+| 4 | MEO015 | - | 11.5 s | spk_6 | own |
+| 5 | MEO015 | - | 14.8 s | spk_6 | own |
+| 6 | FEE016 | - | 9.1 s | spk_3 | own |
+| 7 | MEE014 | 5 dB pink | 8.1 s | spk_7 | own |
+| 8 | MEE014 | 5 dB pink | 11.5 s | spk_7 | own |
+| 9 | MEE014 | 5 dB pink | 9.7 s | spk_0 | own |
+
+8 of 9 questions (89 percent) get a label other than the instructor's,
+including all three noisy ones; 7 percent of question seconds are
+labelled as the instructor; the one miss is an 8 s question whose track
+scored above the match threshold against the instructor's centroid. The
+instructor's label covers 96.5 percent of the lecture time. The cost is
+on the other side: 8 labels for 4 people, because the instructor's first
+seconds mint two labels before the centroid settles, two more are
+fragments of 0 and 2 s, and two questioners get a second label on one of
+their questions (only one questioner keeps a single label throughout).
+Settled DER 0.105, confusion 0.060.
+
+**Diarization period.** `diarization_period_ms` was already a provider
+setting (default: the caption period, 5000; the reference config sets it
+explicitly). At 6000 in the container (`caption_latency.py
+--provider-set diarization_period_ms=6000`, 180 s of ES2004a) the
+diarization worker's RTF is 0.249 against 0.299 at 5000, within the 0.25
+target, but the label latency after the text was shown has a p95 of
+12.7 s against the 4 s target (p50 0 s; every label still arrives with
+the final, so nothing is corrected afterwards), 96.1 percent of final
+words got a label (must: 97), and on the dev set the settled DER rises
+from 0.279 to 0.296 because consecutive windows share 4 s instead of 5.
+The period therefore stays at 5 s; a deployment that needs the CPU
+margin more than the second of label latency can set 6000.
+
+**Container run and targets.** One run of the standard set in the Linux
+CPU reference container (`make benchmark_diarization_gate_docker
+SET=standard STREAM_SEC=0 SUITE_ARGS=--skip-offline`; the whole-file
+offline pass is deterministic and comes from the native
+`benchmark_diarization_offline_counts` run). Acceptance
+(`TARGETS=benchmarks/diarization/baselines/phase2c_acceptance.json`, with
+the Phase 2a and 2b files checked as well):
+
+| target | result |
+|---|---|
+| labels per real speaker between 0.8 and 1.2 | **met**: 1.17 (margin 0.03 to the upper edge; the set over-counts) |
+| speaker count within one on at least 80% of meetings | **met**: 20 of 24 (83%); exact on 8 |
+| classroom: at least 80% of questions get a label other than the instructor's | **met**: 8 of 9 (0.889) |
+| diarization real-time factor at most 0.25 | **missed by 0.051**: 0.301 (worker 0.274 cores, 866 MB, pass 1.51 s mean). The diarization pipeline is unchanged since Phase 2b, which measured 0.277 and 0.299 on the same code path, so this is where a 10 s window at a 5 s period lands on 4 shared CPUs; the only lever that reaches 0.25, a 6 s period, costs label latency (above) and was not adopted |
+| Phase 2b musts: settled DER better than 0.408; at least 97% of final words labelled | **met**: 0.267; 99.6% (230 of 231) |
+| Phase 2a targets: captions within 10% of off (p50 and p95), no extra dropped periods, 1 core, 1 GB, label within 2 s p50 / 4 s p95 after text, no label change after sending, under 5% corrections | **met**: 5.71 s on against 5.82 s off (p95 22.8 against 38.6), 9 dropped periods against 13 off, 0.27 cores, 866 MB, 0 / 0 s, 0, 0 |
+| Phase 2a target: diarization RTF at most 0.3 | **missed by 0.001**: 0.301 against 0.299 in the Phase 2b run of the same diarization code (run-to-run noise on the shared VM; reported, not relaxed) |
+| Phase 2b target: confusion at most 0.08 | **missed by 0.023**: 0.103 on 24 meetings over their full 10 minutes (the target was set on 3 meetings over 120 s, where the same code scores 0.021); the far-field AMI meetings carry it (ES2004c 0.30, TS3003c 0.26, TS3003d 0.21) |
+| Phase 2b target: settled DER at most 0.32 | **met**: 0.267 (first seen 0.271, JER 0.514) |
+
+Replay cost in the container: tick 1.41 s mean, 1.87 s p95 against the
+5 s period; label latency from a reference onset to the first pass
+covering it 4.6 s p50 / 11.2 s p95 (118 of the onsets over 24 files and
+four hours of audio were never covered by a pass, most of them under a
+second long). The diarization-off caption run again carried the VM's
+outlier (p95 38.6 s, 15 s of audio dropped) while the on run was clean
+(0 s dropped). Report: `baselines/phase2c-linux-cpu-4c8g.json`
+(`results/phase2c/final_linux.json`), hygiene clean before and after.
+
+**Gate baseline.** The regression gate still compares against the Phase
+2b baselines (dev set, first 120 s), which the Phase 2c report cannot be
+compared with (different set and horizon: the gate run above fails on
+exactly one metric, onsets never labelled, 118 against 7, for that
+reason). The baseline is **not moved**: the Phase 2a RTF target is missed
+by 0.001 in this run, and the rule is that every target holds before a
+move. To gate against the standard set once that is settled, copy
+`baselines/phase2c-linux-cpu-4c8g.json` over
+`baselines/linux-cpu-4c8g.json` in its own commit; until then run the
+gate with `SET=dev STREAM_SEC=120` to compare like with like. The
+Phase 2b thresholds and defaults are unchanged, so the Phase 2b baseline
+is still what this code produces on that set.
+
 ### Hard cases
 
 `make benchmark_diarization_hardcases` prepares and replays the six cases in
@@ -914,10 +1209,13 @@ all rights to the original code.
 ## Known limitations
 
 - Speaker identity rests on one centroid embedding per speaker and a
-  single set of thresholds tuned on three far-field AMI meetings. Voices
-  that the embedding model keeps close (TS3003a) share a label; a noisy
-  far-field room (ES2004a) still mints a few labels too many. The
-  tradeoff is measured in "Phase 2b results"; the thresholds are
+  single set of thresholds, confirmed on 24 meetings in Phase 2c. The
+  typical error on far-field audio is one person split into several
+  labels (fragments on a speaker's first seconds, a questioner's second
+  question under a new label), not two people under one; the exception is
+  a many-speaker panel in clean audio (VoxConverse hhepf: two labels for
+  six people, where the offline pipeline finds all six). The tradeoff is measured in "Phase 2b results" and "Phase 2c
+  results"; the thresholds and the two optional guards are
   configuration.
 - A new speaker is labelled only after about `diarization_min_mint_sec`
   of speech; their first words attach to the nearest known speaker or stay

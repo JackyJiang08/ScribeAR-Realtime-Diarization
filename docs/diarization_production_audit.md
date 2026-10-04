@@ -41,7 +41,31 @@ Severity scale: **P0** blocks a release to real customers, **P1** serious,
 > unattributed state is now an empty slot once settled, never a question
 > mark. Numbers, the threshold tradeoff and the remaining misses are in
 > `transcription_service/docs/speaker_diarization.md` ("Phase 2b results").
-> Section 5 (robustness beyond reconnects) remains Phase 2c work.
+> Section 5 (robustness beyond reconnects) remains later work.
+>
+> **Status after Phase 2c (2026-10-04, speaker counting).** Section 3.5 was
+> re-examined on a broader set: all 16 AMI test meetings plus a VoxConverse
+> subset with 1 to 8 speakers, full 10 minutes each, and a synthetic
+> classroom case. TS3003a's "four voices in one label" is mostly a
+> reference artefact (three of its four speakers have 4.0, 11.6 and 1.6 s
+> of speech in ten minutes); over the set the system over-counts rather
+> than under-counts (1.17 labels per speaker with at least 5 s of speech,
+> count within one on 20 of 24 meetings, 12 over and 4 under), and the
+> embedding model separates the voices (oracle centroids at cosine 0.15 or
+> less). Offline pyannote over whole files agrees with the streaming path
+> on the far-field under-counts (EN2002d, TS3003a: model and recording
+> limits) and is exact on the two clean VoxConverse panels the streaming
+> path merges (hhepf 6 of 6, iacod 3 of 3): that merge is the one real
+> pipeline under-count left. The two
+> candidate fixes, a sustained-voice split and periodic PLDA/VBx
+> re-clustering of the session memory, were built, measured and left
+> disabled: both lower DER and confusion only by minting more labels, and
+> the shipped PLDA is no sharper than cosine on these tracks. In the
+> classroom case 8 of 9 questions (all three noisy ones) get a label other
+> than the instructor's. The diarization period at 6 s brings the worker's
+> RTF to 0.249 but label latency p95 to 12.7 s, so 5 s stays. Numbers,
+> per-meeting counts and the remaining misses are in
+> `transcription_service/docs/speaker_diarization.md` ("Phase 2c results").
 
 ## Executive summary
 

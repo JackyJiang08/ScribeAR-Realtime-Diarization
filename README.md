@@ -5,24 +5,32 @@
 > each word with a stable speaker (`spk_0`, `spk_1`, ...) and the viewer renders
 > colored `Speaker N:` labels. Everything else tracks upstream `staging`.
 >
-> **Status (2026-10-03, Phase 2b):** working end to end, optional, off by
+> **Status (2026-10-04, Phase 2c):** working end to end, optional, off by
 > default. Captions never wait for diarization: it runs as its own worker-pool
 > job on its own worker and labels reach already-shown captions through a
 > `speakers_update` message that fills a label slot in place. Speaker
-> identity now rests on per-session embedding memory (in memory only, kept
-> 60 s for a reconnect): a voice keeps its label when the window slides,
-> after silence and after a long gap, and new labels are minted only for
-> long, clearly distinct voices. Measured on upstream's CPU image with 4 CPUs
-> (Docker Desktop on a Mac): streaming settled DER 0.31 against 0.63 after
-> Phase 2a and 0.41 for the old 30 s window inside the caption tick,
-> speaker confusion 0.02, 0.64 labels per real speaker, 99.6 percent of
-> finalized words labelled, captions with diarization on at 6.2 s p50
-> against 6.7 s off, diarization worker 0.27 cores, 0.85 GB, real-time
-> factor 0.30. Still open: the speaker count lands within one of the truth
-> on 2 of 3 AMI meetings (target 4 of 5), and far-field noise at 5 dB SNR
-> merges voices. A 4-CPU box sustains one diarized session, and Whisper,
-> not diarization, is the limit. Full tables, the threshold tradeoff and
-> caveats are in the diarization doc linked below.
+> identity rests on per-session embedding memory (in memory only, kept 60 s
+> for a reconnect). Phase 2c re-examined speaker counting on a broader set:
+> all 16 AMI test meetings plus an 8-file VoxConverse subset (1 to 8
+> speakers), full 10 minutes each, and a synthetic classroom case (one
+> instructor 83 percent of the time, nine 5 to 15 s questions, one voice
+> under 5 dB pink noise). Measured on upstream's CPU image with 4 CPUs:
+> 1.17 labels per real speaker (band 0.8 to 1.2), speaker count within one
+> on 20 of 24 meetings, 8 of 9 classroom questions labelled as someone
+> other than the instructor (all three noisy ones), settled DER 0.27,
+> 99.6 percent of finalized words labelled, captions with diarization on
+> at 5.7 s p50 against 5.8 s off, diarization worker 0.27 cores, 0.87 GB,
+> real-time factor 0.30. The typical error is one far-field speaker split
+> into fragments, not two people merged; the two merge-guards that were
+> built (sustained-voice split, PLDA/VBx re-clustering of the session
+> memory) only trade confusion for more labels and ship disabled. Missed:
+> confusion 0.10 over the whole set against the 0.08 target, RTF 0.30
+> against the 0.25 margin target (a 6 s period reaches 0.25 but puts label
+> latency p95 at 12.7 s, so 5 s stays), and two clean VoxConverse panels
+> (six and three speakers) that end with two labels although offline
+> pyannote separates every voice: the one real pipeline under-count left.
+> Full tables, per-meeting counts and caveats are in the diarization doc
+> linked below.
 >
 > **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
 > `pyannote/speaker-diarization-community-1` terms, export
