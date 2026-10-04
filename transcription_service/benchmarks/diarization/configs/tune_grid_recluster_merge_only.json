@@ -1,0 +1,18 @@
+{
+  "_comment": [
+    "Phase 2c: session-level PLDA/VBx re-clustering restricted to merges",
+    "(splits disabled by an unreachable minimum), on the standard set cache."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.3],
+    "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5],
+    "overlap_bonus": [0.15],
+    "merge_threshold": [1.0],
+    "revision_margin": [0.1],
+    "recluster_period_sec": [60.0, 120.0],
+    "recluster_min_split_sec": [1000000.0],
+    "recluster_merge_fraction": [0.7, 0.9]
+  }
+}

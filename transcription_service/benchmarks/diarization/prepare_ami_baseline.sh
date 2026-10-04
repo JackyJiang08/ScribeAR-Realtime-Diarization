@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Download the AMI meetings used by the diarization accuracy baseline and
-# crop them (audio + reference RTTM/UEM) to the first N minutes.
+# Download the AMI meetings used by the diarization benchmark and crop them
+# (audio + reference RTTM/UEM) to the first N minutes. The default list is
+# the whole AMI test set of pyannote/AMI-diarization-setup (16 meetings);
+# the three Phase 2 meetings ES2004a IS1009a TS3003a are the dev subset.
 #
 # Source data:
 #   audio      - AMI corpus mirror, single distant microphone Array1-01
@@ -16,7 +18,8 @@ MINUTES="${1:-10}"
 shift || true
 MEETINGS=("$@")
 if [ ${#MEETINGS[@]} -eq 0 ]; then
-  MEETINGS=(ES2004a IS1009a TS3003a)
+  MEETINGS=(IS1009a IS1009b IS1009c IS1009d ES2004a ES2004b ES2004c ES2004d
+            TS3003a TS3003b TS3003c TS3003d EN2002a EN2002b EN2002c EN2002d)
 fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

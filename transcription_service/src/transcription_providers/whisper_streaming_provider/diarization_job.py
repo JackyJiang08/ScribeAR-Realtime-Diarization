@@ -112,6 +112,8 @@ def reconciler_config_from(
         max_speakers=config.diarization_max_session_speakers,
         merge_threshold=config.diarization_merge_threshold,
         overlap_bonus=config.diarization_overlap_bonus,
+        sustained_split_sec=config.diarization_sustained_split_sec,
+        recluster_period_sec=config.diarization_recluster_period_sec,
     )
 
 
@@ -170,6 +172,7 @@ class DiarizationJob(
         self._reconciler = SpeakerReconciler(
             config=reconciler_config_from(config), state=state
         )
+        self._recluster = config.diarization_recluster_period_sec > 0
         self._state_version_sent = self._reconciler.state_version
 
     @property
@@ -256,6 +259,14 @@ class DiarizationJob(
         batch: list[DiarizationChunk],
     ) -> DiarizationResult | None:
         (diarizer,) = contexts
+        if self._reconciler.clusterer is None and self._recluster:
+            # The clustering the model ships, for the periodic session-level
+            # re-clustering; resolved on the first batch because the context
+            # only exists inside the worker
+            self._reconciler.clusterer = getattr(
+                diarizer, "track_clusterer", None
+            )
+            self._recluster = self._reconciler.clusterer is not None
 
         appended = self._decode_audio(batch)
         if appended == 0:

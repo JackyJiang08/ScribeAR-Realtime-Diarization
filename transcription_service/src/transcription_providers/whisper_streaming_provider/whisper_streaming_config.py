@@ -88,6 +88,20 @@ class WhisperStreamingProviderConfig(BaseModel):
     # disables).
     diarization_merge_threshold: float = _RECONCILER_DEFAULTS.merge_threshold
     diarization_overlap_bonus: float = _RECONCILER_DEFAULTS.overlap_bonus
+    # Guards against merging different people into one label (Phase 2c). A
+    # voice that keeps scoring between the new-speaker and the match
+    # threshold against its best speaker mints its own label once it has
+    # this many seconds of evidence (0 disables); and every
+    # `recluster_period_sec` of session time the session's tracks are
+    # re-clustered with the PLDA/VBx clustering the pyannote model ships,
+    # merging or splitting speakers to follow it (0 disables). Neither
+    # changes a label already sent.
+    diarization_sustained_split_sec: float = (
+        _RECONCILER_DEFAULTS.sustained_split_sec
+    )
+    diarization_recluster_period_sec: float = (
+        _RECONCILER_DEFAULTS.recluster_period_sec
+    )
     # A word the diarizer found no speech under takes the nearest speaker
     # within this gap (seconds); 0 leaves such words unlabelled.
     diarization_attach_gap_sec: float = _ATTACHER_DEFAULTS.attach_gap_sec
@@ -222,6 +236,8 @@ class WhisperStreamingProviderConfig(BaseModel):
             "diarization_attach_gap_sec",
             "diarization_revision_margin",
             "diarization_reconnect_grace_sec",
+            "diarization_sustained_split_sec",
+            "diarization_recluster_period_sec",
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} must not be negative")

@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "Synthetic classroom case for the diarization benchmark, built by",
+    "prepare_classroom_case.py from the four people of the AMI ES2004",
+    "series (single distant microphone Array1-01, CC BY 4.0;",
+    "pyannote/AMI-diarization-setup only_words references). The speaker",
+    "with the most exclusive speech over the series is the instructor and",
+    "talks for lecture_block_sec between questions; the other three ask",
+    "questions_per_questioner questions each, between question_min_sec",
+    "and question_max_sec long, in a shuffled order; the questions of one",
+    "questioner (noisy_questioner_index among the questioners ranked by",
+    "material) carry synthesised pink noise at noise_snr_db. Audio is",
+    "never committed."
+  ],
+  "seed": 20261003,
+  "meetings": ["ES2004a", "ES2004b", "ES2004c", "ES2004d"],
+  "layout": {
+    "min_run_sec": 1.0,
+    "join_gap_sec": 0.3,
+    "gap_sec": 0.4,
+    "lecture_block_sec": 45.0,
+    "questions_per_questioner": 3,
+    "question_min_sec": 5.0,
+    "question_max_sec": 15.0,
+    "noisy_questioner_index": 1,
+    "noise_snr_db": 5.0
+  }
+}

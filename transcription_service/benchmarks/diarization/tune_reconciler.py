@@ -34,6 +34,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from eval_sets import SETS, missing_in, set_wavs  # noqa: E402
 from bench_common import (  # noqa: E402
     ensure_hf_token_env,
     git_rev,
@@ -75,8 +76,38 @@ RECONCILER_KEYS = {
     "centroid_memory_sec",
     "max_candidates",
     "min_mint_passes",
+    "sustained_split_sec",
+    "recluster_period_sec",
+    "recluster_min_split_sec",
+    "recluster_merge_fraction",
+    "max_tracks",
 }
 ATTACHER_KEYS = {"revision_margin", "edge_margin_sec"}
+
+
+def load_track_clusterer():
+    """
+    The PLDA/VBx clustering of community-1 at the pipeline's shipped
+    hyper-parameters, without loading the neural models
+    """
+    import os
+
+    from pyannote.audio.core.plda import PLDA
+
+    from src.transcription_contexts.pyannote_diarization_context import (
+        build_track_clusterer,
+    )
+
+    token_var = ensure_hf_token_env()
+    plda = PLDA.from_pretrained(
+        "pyannote/speaker-diarization-community-1",
+        subfolder="plda",
+        token=os.environ.get(token_var),
+    )
+    if plda is None:
+        raise SystemExit("could not load the PLDA of community-1")
+    # The shipped pipeline parameters (config.yaml of community-1)
+    return build_track_clusterer(plda, threshold=0.6, fa=0.07, fb=0.8)
 
 
 def build_cache(args, wavs: list[Path]) -> dict:
@@ -177,13 +208,16 @@ def replay(
     attacher_kwargs: dict,
     tick_sec: float,
     overlap_aware: bool = False,
+    clusterer=None,
 ) -> dict:
     """
     Replays one file's cached passes through the production reconciler and
     attacher. Returns first-seen, settled and end-of-stream hypotheses plus
     bookkeeping.
     """
-    reconciler = SpeakerReconciler(config=reconciler_config)
+    reconciler = SpeakerReconciler(
+        config=reconciler_config, clusterer=clusterer
+    )
     # Unbounded history: the replay reads the whole timeline at the end
     attacher = SpeakerLabelAttacher(
         attach_gap_sec=0.0, history_sec=1e9, **attacher_kwargs
@@ -193,6 +227,7 @@ def replay(
     settled_through = 0.0
     labels_used: set[str] = set()
     merges = 0
+    splits = 0
     key = "overlap_segments" if overlap_aware else "segments"
     for pass_ in file_cache["passes"]:
         segments = [SpeakerSegment(*s) for s in pass_[key]]
@@ -200,6 +235,7 @@ def replay(
         reconciled = reconciler.reconcile(segments, pass_["embeddings"])
         labels_used.update(s.speaker for s in reconciled)
         merges += len(reconciler.last_merges)
+        splits += len(reconciler.last_splits)
         attacher.add_coverage(
             reconciled,
             pass_["window_start"],
@@ -226,6 +262,8 @@ def replay(
         "labels_minted": reconciler.labels_minted,
         "labels_used": len(labels_used),
         "merges": merges,
+        "splits": splits,
+        "reclusterings": reconciler.reclusterings,
         "revisions": revisions,
         "revised_sec": revised_sec,
     }
@@ -243,10 +281,17 @@ def _timeline(attacher: SpeakerLabelAttacher, start: float, end: float):
 
 
 def evaluate(
-    cache: dict, references: dict, config: dict, tick_sec: float
+    cache: dict,
+    references: dict,
+    config: dict,
+    tick_sec: float,
+    clusterer=None,
+    min_speaker_sec: float = 5.0,
 ) -> dict:
     """
-    Scores one configuration over every cached file
+    Scores one configuration over every cached file. Speaker counts are
+    judged against the reference speakers with at least `min_speaker_sec`
+    of speech in the scored part (the raw count is reported beside it)
     """
     reconciler_config = SpeakerReconcilerConfig(
         **{k: v for k, v in config.items() if k in RECONCILER_KEYS}
@@ -259,9 +304,11 @@ def evaluate(
     }
     per_file = {}
     count_errors = []
+    signed_errors = []
     minted_ratio = []
     revised = []
     merges = 0
+    splits = 0
     for stem, file_cache in cache["files"].items():
         reference, uem = references[stem]
         streamed = file_cache["streamed_sec"]
@@ -274,6 +321,7 @@ def evaluate(
             attacher_kwargs,
             tick_sec,
             overlap_aware,
+            clusterer=clusterer,
         )
         entry = {}
         for kind in metrics:
@@ -283,18 +331,25 @@ def evaluate(
                 for k, m in metrics[kind].items()
             }
         ref_speakers = speakers_in(reference, 0.0, streamed)
+        ref_speaking = speakers_in(reference, 0.0, streamed, min_speaker_sec)
         entry["reference_speakers"] = ref_speakers
+        entry["reference_speakers_speaking"] = ref_speaking
         entry["labels_minted"] = result["labels_minted"]
         entry["labels_used"] = result["labels_used"]
-        entry["speaker_count_error"] = result["labels_used"] - ref_speakers
+        entry["speaker_count_error"] = result["labels_used"] - ref_speaking
+        entry["speaker_count_error_all"] = result["labels_used"] - ref_speakers
         entry["merges"] = result["merges"]
+        entry["splits"] = result["splits"]
+        entry["reclusterings"] = result["reclusterings"]
         entry["revisions"] = result["revisions"]
         entry["revised_sec"] = round(result["revised_sec"], 1)
         per_file[stem] = entry
         count_errors.append(abs(entry["speaker_count_error"]))
-        minted_ratio.append(result["labels_minted"] / max(1, ref_speakers))
+        signed_errors.append(entry["speaker_count_error"])
+        minted_ratio.append(result["labels_minted"] / max(1, ref_speaking))
         revised.append(result["revised_sec"] / max(1.0, streamed))
         merges += result["merges"]
+        splits += result["splits"]
 
     def agg(kind):
         der = _normalise(metrics[kind]["der"][:], abs(metrics[kind]["der"]))
@@ -315,11 +370,18 @@ def evaluate(
         "speaker_count_within_1_fraction": round(
             float(np.mean([e <= 1 for e in count_errors])), 3
         ),
+        "speaker_count_exact_fraction": round(
+            float(np.mean([e == 0 for e in count_errors])), 3
+        ),
+        "speaker_count_signed_error_mean": round(
+            float(np.mean(signed_errors)), 3
+        ),
         "labels_minted_per_reference_speaker": round(
             float(np.mean(minted_ratio)), 3
         ),
         "revised_fraction_of_audio": round(float(np.mean(revised)), 4),
         "merges": merges,
+        "splits": splits,
         "files": per_file,
     }
 
@@ -345,9 +407,22 @@ def expand_grid(grid: dict) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", required=True)
+    parser.add_argument("--data", default=None, help="folder of WAV+RTTM")
     parser.add_argument("--suffix", default="_10min")
     parser.add_argument("--files", nargs="*", default=None)
+    parser.add_argument(
+        "--set",
+        choices=SETS,
+        default=None,
+        help="named evaluation set (eval_sets.py) instead of --data/--files",
+    )
+    parser.add_argument(
+        "--min-speaker-sec",
+        type=float,
+        default=5.0,
+        help="a reference speaker counts for the speaker-count metrics "
+        "only with at least this much speech in the scored part",
+    )
     parser.add_argument("--window", type=float, default=10.0)
     parser.add_argument("--step", type=float, default=None)
     parser.add_argument("--clustering-threshold", type=float, default=None)
@@ -360,7 +435,13 @@ def main():
     parser.add_argument("--tick-sec", type=float, default=5.0)
     parser.add_argument("--stream-sec", type=float, default=0.0)
     parser.add_argument("--threads", type=int, default=2)
-    parser.add_argument("--cache", required=True, help="pickle of raw passes")
+    parser.add_argument(
+        "--cache",
+        required=True,
+        nargs="+",
+        help="pickle of raw passes; built when a single missing path is "
+        "given, several existing ones are merged (one per data folder)",
+    )
     parser.add_argument(
         "--grid", default=None, help="JSON grid; omit to only build the cache"
     )
@@ -380,23 +461,46 @@ def main():
     )
     args = parser.parse_args()
 
-    data = Path(args.data)
-    wavs = (
-        [data / f"{stem}.wav" for stem in args.files]
-        if args.files
-        else sorted(data.glob(f"*{args.suffix}.wav"))
-    )
-    cache_path = Path(args.cache)
-    if cache_path.exists():
-        with cache_path.open("rb") as handle:
-            cache = pickle.load(handle)
-        print(f"loaded cache {rel_path(cache_path)}: {cache['config']}")
-    else:
+    cache_paths = [Path(c) for c in args.cache]
+    wavs: list[Path] = []
+    if args.set:
+        wavs = set_wavs(args.set)
+        missing = missing_in(wavs)
+        if missing:
+            raise SystemExit(f"set {args.set} is missing {missing}")
+    elif args.data:
+        data = Path(args.data)
+        wavs = (
+            [data / f"{stem}.wav" for stem in args.files]
+            if args.files
+            else sorted(data.glob(f"*{args.suffix}.wav"))
+        )
+    elif not all(c.exists() for c in cache_paths):
+        raise SystemExit("one of --set or --data is required to build a cache")
+    cache_path = cache_paths[0]
+    if all(c.exists() for c in cache_paths):
+        cache = None
+        for path in cache_paths:
+            with path.open("rb") as handle:
+                loaded = pickle.load(handle)
+            if cache is None:
+                cache = loaded
+            else:
+                if loaded["config"] != cache["config"]:
+                    raise SystemExit(
+                        f"{rel_path(path)} was cached with other settings: "
+                        f"{loaded['config']} != {cache['config']}"
+                    )
+                cache["files"].update(loaded["files"])
+            print(f"loaded cache {rel_path(path)}: {loaded['config']}")
+    elif len(cache_paths) == 1:
         cache = build_cache(args, wavs)
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         with cache_path.open("wb") as handle:
             pickle.dump(cache, handle)
         print(f"wrote cache {rel_path(cache_path)}")
+    else:
+        raise SystemExit("with several --cache paths every one must exist")
     if not args.grid:
         return
 
@@ -421,12 +525,26 @@ def main():
     with open(args.grid, encoding="utf-8") as handle:
         grid = json.load(handle)
     combos = expand_grid(grid.get("grid", grid))
+    clusterer = None
+    if any(c.get("recluster_period_sec", 0) > 0 for c in combos):
+        clusterer = load_track_clusterer()
     print(f"{len(combos)} configurations over {len(cache['files'])} files")
     rows = []
     started = time.perf_counter()
     for index, combo in enumerate(combos):
         rows.append(
-            evaluate(cache, references, combo, cache["config"]["tick_sec"])
+            evaluate(
+                cache,
+                references,
+                combo,
+                cache["config"]["tick_sec"],
+                clusterer=(
+                    clusterer
+                    if combo.get("recluster_period_sec", 0) > 0
+                    else None
+                ),
+                min_speaker_sec=args.min_speaker_sec,
+            )
         )
         if (index + 1) % 25 == 0:
             print(
@@ -437,7 +555,8 @@ def main():
 
     header = (
         f"{'first':>6} {'settl':>6} {'end':>6} {'conf':>6} {'miss':>6} "
-        f"{'fa':>6} {'mint/ref':>8} {'cnt±1':>6} {'rev%':>6} {'merg':>5}  config"
+        f"{'fa':>6} {'mint/ref':>8} {'cnt±1':>6} {'cnt=':>5} {'signed':>6} "
+        f"{'rev%':>6} {'merg':>5} {'split':>5}  config"
     )
     print(header)
     for row in rows[: args.top]:
@@ -448,8 +567,10 @@ def main():
             f"{agg['settled']['missed']:6.3f} {agg['settled']['false_alarm']:6.3f} "
             f"{row['labels_minted_per_reference_speaker']:8.2f} "
             f"{row['speaker_count_within_1_fraction']:6.2f} "
-            f"{100 * row['revised_fraction_of_audio']:6.2f} {row['merges']:5d}  "
-            f"{json.dumps(row['config'])}"
+            f"{row['speaker_count_exact_fraction']:5.2f} "
+            f"{row['speaker_count_signed_error_mean']:+6.2f} "
+            f"{100 * row['revised_fraction_of_audio']:6.2f} {row['merges']:5d} "
+            f"{row['splits']:5d}  {json.dumps(row['config'])}"
         )
     if args.out:
         write_json(
@@ -457,7 +578,7 @@ def main():
             {
                 "generated_at": now_iso(),
                 "code_revision": git_rev(),
-                "cache": rel_path(cache_path),
+                "cache": [rel_path(c) for c in cache_paths],
                 "cache_config": cache["config"],
                 "grid": grid,
                 "rows": rows,

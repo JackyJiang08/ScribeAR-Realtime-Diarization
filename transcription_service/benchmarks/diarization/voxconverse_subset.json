@@ -1,0 +1,69 @@
+{
+  "_comment": [
+    "VoxConverse test subset for the diarization standard set.",
+    "Audio is never committed: voxconverse_subset.py --fetch reads",
+    "only these members from the test archive (CC BY 4.0, research",
+    "use; copyright stays with the video owners) and crops each to",
+    "its first 10 minutes with the reference RTTM from",
+    "https://github.com/joonson/voxconverse (test/).",
+    "Selection: for every speaker count 1..8 the longest test file",
+    "of at least 8 minutes (ties by name); 'speakers' is the whole",
+    "file's count, the first 10 minutes can hold fewer."
+  ],
+  "sources": {
+    "audio": "https://www.robots.ox.ac.uk/~vgg/data/voxconverse/data/voxconverse_test_wav.zip",
+    "annotations": "https://github.com/joonson/voxconverse.git (test/*.rttm, v0.3)",
+    "license": "CC BY 4.0 (research), https://www.robots.ox.ac.uk/~vgg/data/voxconverse/"
+  },
+  "crop_minutes": 10,
+  "files": [
+    {
+      "id": "uicid",
+      "speakers": 1,
+      "duration_sec": 1200.1,
+      "speech_sec": 902.8
+    },
+    {
+      "id": "bgvvt",
+      "speakers": 2,
+      "duration_sec": 1200.1,
+      "speech_sec": 1004.4
+    },
+    {
+      "id": "ylgug",
+      "speakers": 3,
+      "duration_sec": 1200.0,
+      "speech_sec": 1082.2
+    },
+    {
+      "id": "gtjow",
+      "speakers": 4,
+      "duration_sec": 1200.1,
+      "speech_sec": 1144.3
+    },
+    {
+      "id": "jwggf",
+      "speakers": 5,
+      "duration_sec": 1200.1,
+      "speech_sec": 1088.8
+    },
+    {
+      "id": "iacod",
+      "speakers": 6,
+      "duration_sec": 1200.1,
+      "speech_sec": 1002.2
+    },
+    {
+      "id": "hhepf",
+      "speakers": 7,
+      "duration_sec": 1200.1,
+      "speech_sec": 1112.8
+    },
+    {
+      "id": "epygx",
+      "speakers": 8,
+      "duration_sec": 1200.1,
+      "speech_sec": 1037.0
+    }
+  ]
+}

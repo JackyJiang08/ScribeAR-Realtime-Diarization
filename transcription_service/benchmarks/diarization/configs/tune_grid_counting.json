@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Phase 2c grid for tune_reconciler.py: the two under-counting guards",
+    "(sustained-voice split, periodic PLDA/VBx re-clustering) on top of",
+    "the Phase 2b defaults, so their effect on labels per speaker, speaker",
+    "count and confusion is visible in isolation and combined."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.3],
+    "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5],
+    "overlap_bonus": [0.15],
+    "merge_threshold": [1.0],
+    "revision_margin": [0.1],
+    "sustained_split_sec": [0.0, 6.0, 10.0, 15.0],
+    "recluster_period_sec": [0.0, 60.0, 120.0]
+  }
+}

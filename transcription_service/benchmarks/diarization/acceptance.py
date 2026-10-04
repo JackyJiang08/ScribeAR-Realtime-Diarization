@@ -33,6 +33,8 @@ def load(path: Path) -> dict:
 def _fmt(value) -> str:
     if value is None:
         return "-"
+    if isinstance(value, str):
+        return value
     if isinstance(value, float):
         return f"{value:.4g}"
     return str(value)
@@ -41,7 +43,8 @@ def _fmt(value) -> str:
 def evaluate(report: dict, baseline: dict | None, targets: dict) -> list:
     """
     One row per target: (name, value, limit, status, note). A target is a
-    dict with `metric` (key_metrics name), `max` or `min` (absolute), or
+    dict with `metric` (key_metrics name), `max` or `min` (absolute; both
+    together make a band the value must stay inside), or
     `max_relative_to` (another metric) with `ratio` and optional `plus`, or
     `max_vs_baseline` with `abs` slack.
     """
@@ -54,6 +57,32 @@ def evaluate(report: dict, baseline: dict | None, targets: dict) -> list:
         note = target.get("note", "")
         if value is None:
             rows.append((name, None, None, "SKIPPED", "metric missing"))
+            continue
+        if "max" in target and "min" in target:
+            low, high = float(target["min"]), float(target["max"])
+            ok = low <= value <= high
+            if ok:
+                margin = min(value - low, high - value)
+                rows.append(
+                    (
+                        name,
+                        value,
+                        f"{low:g}..{high:g}",
+                        "PASS",
+                        f"margin {margin:.3g}",
+                    )
+                )
+            else:
+                miss = value - high if value > high else value - low
+                rows.append(
+                    (
+                        name,
+                        value,
+                        f"{low:g}..{high:g}",
+                        "MISSED",
+                        f"by {miss:+.3g}. {note}".strip(),
+                    )
+                )
             continue
         if "max" in target:
             limit = float(target["max"])

@@ -29,10 +29,13 @@ class DiarizationPass:
                                 the exclusive diarization (one speaker per
                                 instant) unless the context is configured
                                 `overlap_aware`, then the overlap-aware one
-        embeddings          - Raw label -> unit-normalised speaker
-                                embedding (pyannote's per-speaker centroid
-                                for the pass); a label whose centroid the
-                                pipeline could not compute is absent
+        embeddings          - Raw label -> speaker embedding (pyannote's
+                                per-speaker centroid for the pass) in the
+                                embedding model's own scale: the reconciler
+                                normalises for cosine scoring and the PLDA
+                                that ships with the model needs the raw
+                                vector. A label whose centroid the pipeline
+                                could not compute is absent
         overlap_segments    - The overlap-aware diarization, always, so a
                                 benchmark can score both conventions from
                                 one pass
@@ -41,6 +44,15 @@ class DiarizationPass:
     segments: list[SpeakerSegment]
     embeddings: dict[str, np.ndarray] = field(default_factory=dict)
     overlap_segments: list[SpeakerSegment] = field(default_factory=list)
+
+
+def _usable(vector: np.ndarray) -> bool:
+    """
+    Whether an embedding carries information: pyannote pads missing
+    centroids with zeros, and a NaN row means the stage failed on it
+    """
+    norm = float(np.linalg.norm(vector))
+    return bool(np.isfinite(norm) and norm > 0.0)
 
 
 def _annotation_segments(annotation: Any) -> list[SpeakerSegment]:
@@ -241,23 +253,23 @@ class PyannoteDiarizationService:
         embeddings: Any, mapping: dict
     ) -> dict[str, np.ndarray]:
         vectors = np.asarray(embeddings, dtype=np.float32)[0]
-        unit: dict[str, np.ndarray] = {}
+        raw: dict[str, np.ndarray] = {}
         for label, name in mapping.items():
             index = int(label)
             if index >= len(vectors):
                 continue
             vector = vectors[index].reshape(-1)
-            norm = float(np.linalg.norm(vector))
-            if np.isfinite(norm) and norm > 0.0:
-                unit[name] = vector / norm
-        return unit
+            if _usable(vector):
+                raw[name] = vector.copy()
+        return raw
 
     @staticmethod
     def _embeddings(output: Any, diarization: Any) -> dict[str, np.ndarray]:
         """
-        Pyannote's per-speaker centroids, keyed by raw label and normalised
-        to unit length. The array is sorted in `labels()` order and padded
-        with zero rows for speakers without a centroid, which are skipped
+        Pyannote's per-speaker centroids, keyed by raw label, in the
+        embedding model's own scale. The array is sorted in `labels()` order
+        and padded with zero rows for speakers without a centroid, which
+        are skipped
         """
         centroids = getattr(output, "speaker_embeddings", None)
         if centroids is None:
@@ -268,10 +280,82 @@ class PyannoteDiarizationService:
             if index >= len(centroids):
                 break
             vector = centroids[index].reshape(-1)
-            norm = float(np.linalg.norm(vector))
-            if np.isfinite(norm) and norm > 0.0:
-                embeddings[str(label)] = vector / norm
+            if _usable(vector):
+                embeddings[str(label)] = vector.copy()
         return embeddings
+
+    @property
+    def track_clusterer(self):
+        """
+        The session-level re-clustering the reconciler can call: the
+        PLDA/VBx clustering that ships with the pipeline, applied to a
+        session's track embeddings. None when the pipeline has no PLDA
+        """
+        clustering = getattr(self._pipeline, "clustering", None)
+        plda = getattr(clustering, "plda", None)
+        if plda is None:
+            return None
+        return build_track_clusterer(
+            plda,
+            float(getattr(clustering, "threshold", 0.6)),
+            float(getattr(clustering, "Fa", 0.07)),
+            float(getattr(clustering, "Fb", 0.8)),
+        )
+
+
+def build_track_clusterer(plda: Any, threshold: float, fa: float, fb: float):
+    """
+    The clustering step of the community-1 pipeline (agglomerative
+    clustering on unit-normalised embeddings at `threshold`, refined by
+    VBx in the PLDA space with `fa`, `fb`) as a function over a session's
+    track embeddings. Each track is weighted by its speech seconds by
+    repeating it (one copy per second, at most 20), so VBx's statistics
+    follow speech time rather than the number of windows.
+
+    Returns:
+        clusterer(embeddings (n, d), seconds (n,)) -> cluster index (n,)
+    """
+
+    def clusterer(  # pylint: disable=too-many-locals
+        embeddings: np.ndarray, seconds: np.ndarray
+    ) -> np.ndarray:
+        from pyannote.audio.utils.vbx import cluster_vbx
+        from scipy.cluster.hierarchy import fcluster, linkage
+
+        embeddings = np.asarray(embeddings, dtype=np.float64)
+        count = len(embeddings)
+        if count == 0:
+            return np.zeros(0, dtype=int)
+        if count == 1:
+            return np.zeros(1, dtype=int)
+        repeats = np.clip(np.rint(np.asarray(seconds)), 1, 20).astype(int)
+        expanded = np.repeat(embeddings, repeats, axis=0)
+        owner = np.repeat(np.arange(count), repeats)
+        normed = expanded / np.maximum(
+            np.linalg.norm(expanded, axis=1, keepdims=True), 1e-12
+        )
+        dendrogram = linkage(normed, method="centroid", metric="euclidean")
+        ahc = fcluster(dendrogram, threshold, criterion="distance") - 1
+        _, ahc = np.unique(ahc, return_inverse=True)
+        if ahc.max() == 0:
+            return np.zeros(count, dtype=int)
+        features = plda(expanded)
+        q, prior = cluster_vbx(
+            ahc, features, plda.phi, Fa=fa, Fb=fb, maxIters=20
+        )
+        kept = q[:, prior > 1e-7]
+        if kept.shape[1] == 0:
+            return np.zeros(count, dtype=int)
+        per_row = kept.argmax(axis=1)
+        # Back to one cluster per track: the cluster most of its copies took
+        out = np.zeros(count, dtype=int)
+        for index in range(count):
+            votes = np.bincount(per_row[owner == index])
+            out[index] = int(votes.argmax())
+        _, out = np.unique(out, return_inverse=True)
+        return out.astype(int)
+
+    return clusterer
 
 
 PyannoteDiarizationModelType = PyannoteDiarizationService

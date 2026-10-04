@@ -39,6 +39,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from eval_sets import SETS, missing_in, set_wavs  # noqa: E402
 from bench_common import (  # noqa: E402
     BENCH_DIR,
     CONFIGS_DIR,
@@ -56,7 +57,7 @@ from bench_common import (  # noqa: E402
     write_json,
 )
 
-STEPS = ("warmup", "replay", "caption", "concurrency")
+STEPS = ("warmup", "replay", "caption", "classroom", "concurrency")
 
 
 def run_step(name: str, argv: list[str], log_dir: Path) -> float:
@@ -255,9 +256,16 @@ def replay_key_metrics(report: dict | None) -> dict:
             "label_flips_per_min",
             "label_flip_rate_after_first_shown",
             "labels_minted_per_reference_speaker",
+            "labels_per_speaker_deviation",
             "speaker_count_abs_error_mean",
+            "speaker_count_signed_error_mean",
             "speaker_count_within_1_fraction",
+            "speaker_count_exact_fraction",
+            "meetings_under_counted",
+            "meetings_over_counted",
             "session_labels_merged",
+            "session_labels_split",
+            "reclusterings",
             "revisions",
             "revised_fraction",
             "reconciler_cost_mean_sec",
@@ -266,12 +274,37 @@ def replay_key_metrics(report: dict | None) -> dict:
             out[f"replay.{key}"] = streaming.get(key)
         for stage, stats in streaming.get("stage_cost_sec", {}).items():
             out[f"replay.stage.{stage}_mean_sec"] = stats.get("mean")
+    out["replay.files"] = len(report.get("files", []))
     out["replay.peak_rss_mb"] = report.get("peak_rss_mb")
     out["replay.model_load_sec"] = report.get("model_load_sec")
     out["replay.window_sec"] = _get(report, "config", "max_buffer_sec")
     out["replay.segmentation_step"] = _get(
         report, "config", "segmentation_step"
     )
+    return out
+
+
+def classroom_key_metrics(scores: dict | None) -> dict:
+    if not scores:
+        return {}
+    out = {}
+    for key in (
+        "questions_total",
+        "questions_own_label",
+        "questions_attributed_to_instructor",
+        "questions_unlabelled",
+        "questions_own_label_fraction",
+        "questions_as_instructor_fraction",
+        "question_seconds_as_instructor_fraction",
+        "clean_questions_own_label_fraction",
+        "noisy_questions_own_label_fraction",
+        "questioners_with_consistent_own_label",
+        "questioners_sharing_a_label",
+        "labels_minted",
+        "settled_der",
+        "settled_confusion",
+    ):
+        out[f"classroom.{key}"] = scores.get(key)
     return out
 
 
@@ -330,12 +363,39 @@ def main():
     parser.add_argument("--suffix", default="_10min")
     parser.add_argument("--files", nargs="*", default=None)
     parser.add_argument(
+        "--set",
+        choices=SETS,
+        default=None,
+        help="named evaluation set for the replay (eval_sets.py): dev = the "
+        "three Phase 2 meetings, standard = 16 AMI test meetings + the "
+        "VoxConverse subset; overrides --data/--files",
+    )
+    parser.add_argument(
+        "--offline-set",
+        choices=SETS,
+        default=None,
+        help="run the full-file offline pass only on this set (default: "
+        "every replayed file; the suite passes 'dev' for the standard set "
+        "because the offline pass costs minutes per file on CPU)",
+    )
+    parser.add_argument(
         "--stream-sec",
         type=float,
         default=120.0,
         help="replay length per file (0 = full length)",
     )
     parser.add_argument("--skip-offline", action="store_true")
+    parser.add_argument(
+        "--reconciler-json",
+        default=None,
+        help="SpeakerReconcilerConfig overrides (JSON) for the replay and "
+        "classroom steps, for before/after comparisons",
+    )
+    parser.add_argument(
+        "--classroom-data",
+        default=str(DATA_DIR / "classroom"),
+        help="folder of the synthetic classroom case (prepare_classroom_case.py)",
+    )
     parser.add_argument(
         "--reference-config",
         default=str(CONFIGS_DIR / "reference_provider_config.json"),
@@ -374,7 +434,7 @@ def main():
     args = parser.parse_args()
 
     ensure_hf_token_env()
-    steps = set(args.only or ("warmup", "replay", "caption"))
+    steps = set(args.only or ("warmup", "replay", "caption", "classroom"))
     if args.sessions_sweep:
         steps.add("concurrency")
         steps.add("caption")
@@ -387,6 +447,22 @@ def main():
             f"no *{args.suffix}.wav in {data}; run "
             "benchmarks/diarization/prepare_ami_baseline.sh first"
         )
+    if "replay" in steps and args.set:
+        missing = missing_in(set_wavs(args.set))
+        if missing:
+            raise SystemExit(
+                f"set {args.set} is missing {[str(m) for m in missing]}; "
+                "run make benchmark_diarization_data SET={args.set}"
+            )
+    classroom_data = Path(args.classroom_data)
+    if "classroom" in steps and not (classroom_data / "classroom.wav").exists():
+        if args.only:
+            raise SystemExit(
+                f"{classroom_data}/classroom.wav missing; run "
+                "benchmarks/diarization/prepare_classroom_case.py"
+            )
+        print("classroom case not prepared; skipping that step", flush=True)
+        steps.discard("classroom")
     if "caption" in steps and not caption_audio.exists():
         raise SystemExit(f"caption audio missing: {caption_audio}")
 
@@ -417,8 +493,16 @@ def main():
             "data": rel_path(data),
             "suffix": args.suffix,
             "files": args.files,
+            "set": args.set,
+            "offline_set": args.offline_set,
             "stream_sec": args.stream_sec,
             "skip_offline": args.skip_offline,
+            "reconciler_overrides": (
+                json.loads(args.reconciler_json)
+                if args.reconciler_json
+                else None
+            ),
+            "classroom_data": rel_path(classroom_data),
             "caption_audio": rel_path(caption_audio),
             "caption_seconds": args.caption_seconds,
             "chunk_ms": args.chunk_ms,
@@ -470,14 +554,65 @@ def main():
         ]
         if settings["segmentation_step"] is not None:
             argv += ["--segmentation-step", str(settings["segmentation_step"])]
-        if args.files:
+        if args.set:
+            argv += ["--set", args.set]
+        elif args.files:
             argv += ["--files", *args.files]
+        if args.offline_set:
+            argv += ["--offline-set", args.offline_set]
         if args.skip_offline:
             argv.append("--skip-offline")
         if args.threads:
             argv += ["--threads", str(args.threads)]
+        if args.reconciler_json:
+            argv += ["--reconciler-json", args.reconciler_json]
         durations["replay"] = run_step("replay", argv, log_dir)
         report["replay"] = json.loads(replay_out.read_text(encoding="utf-8"))
+
+    if "classroom" in steps:
+        classroom_out = log_dir / "classroom_replay.json"
+        argv = [
+            str(bench / "benchmark_baseline.py"),
+            "--data",
+            str(classroom_data),
+            "--suffix",
+            "",
+            "--stream-sec",
+            "0",
+            "--tick-sec",
+            str(settings["period_ms"] / 1000.0),
+            "--max-buffer-sec",
+            str(settings["window_sec"]),
+            "--skip-offline",
+            "--keep-hypotheses",
+            "--out",
+            str(classroom_out),
+            "--label",
+            args.label,
+            "--no-hygiene",
+        ]
+        if settings["segmentation_step"] is not None:
+            argv += ["--segmentation-step", str(settings["segmentation_step"])]
+        if args.threads:
+            argv += ["--threads", str(args.threads)]
+        if args.reconciler_json:
+            argv += ["--reconciler-json", args.reconciler_json]
+        durations["classroom"] = run_step("classroom", argv, log_dir)
+        scores_out = log_dir / "classroom_scores.json"
+        run_step(
+            "classroom_score",
+            [
+                str(bench / "classroom_score.py"),
+                "--report",
+                str(classroom_out),
+                "--questions",
+                str(classroom_data / "classroom.questions.json"),
+                "--out",
+                str(scores_out),
+            ],
+            log_dir,
+        )
+        report["classroom"] = json.loads(scores_out.read_text(encoding="utf-8"))
 
     def caption_run(name: str, config_path: str, mode: str, sessions: int):
         out_path = log_dir / f"{name}.json"
@@ -537,6 +672,7 @@ def main():
 
     key_metrics: dict = {}
     key_metrics.update(replay_key_metrics(report.get("replay")))
+    key_metrics.update(classroom_key_metrics(report.get("classroom")))
     reference_runs = (
         _get(report, "caption_latency", "reference", default={}) or {}
     )

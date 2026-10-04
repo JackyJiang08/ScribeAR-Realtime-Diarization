@@ -1,0 +1,18 @@
+{
+  "_comment": [
+    "Phase 2c finalists for tune_reconciler.py on the standard set cache:",
+    "the Phase 2b defaults against the two guards and the stricter minting",
+    "minimum, alone and combined."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.3],
+    "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5, 4.0],
+    "overlap_bonus": [0.15],
+    "merge_threshold": [1.0],
+    "revision_margin": [0.1],
+    "sustained_split_sec": [0.0, 15.0],
+    "recluster_period_sec": [0.0, 60.0]
+  }
+}

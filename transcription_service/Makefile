@@ -58,7 +58,11 @@ test_integration:
 # downloads ~110 MB of AMI audio into benchmarks/diarization/data (gitignored).
 #
 #   RESULT=...      report path (default: results/<date>_<target>.json)
-#   STREAM_SEC=...  streaming replay length per file (default 120, 0 = full)
+#   SET=...         evaluation set: standard (16 AMI test meetings + the
+#                   VoxConverse subset, the default) or dev (the three Phase 2
+#                   meetings, fast loop); see benchmarks/diarization/eval_sets.py
+#   STREAM_SEC=...  streaming replay length per file (default 0 = full 10 min;
+#                   the Phase 2a/2b baselines used 120)
 #   CAPTION_SEC=... seconds streamed in the end-to-end caption probe (180)
 #   LABEL=...       free-text label stored in the report
 #   SUITE_ARGS=...  extra run_suite.py flags, e.g. --with-dev-vad --skip-offline
@@ -66,21 +70,44 @@ test_integration:
 BENCH_DIR := benchmarks/diarization
 DATE := $(shell date +%Y%m%d)
 RESULT ?= $(BENCH_DIR)/results/$(DATE)_suite.json
-STREAM_SEC ?= 120
+SET ?= standard
+STREAM_SEC ?= 0
+# The full-file offline pass costs minutes per file on CPU, so the suite runs
+# it on the dev subset only; the broader-set offline counts come from
+# benchmark_diarization_offline_counts.
+OFFLINE_SET ?= dev
 CAPTION_SEC ?= 180
 LABEL ?=
 SUITE_ARGS ?=
 GATE_BASELINE ?= auto
 
-# Download and crop the AMI meetings for the standard set
+# Download and crop the AMI meetings (all 16 test-set meetings), fetch the
+# VoxConverse subset, and build the synthetic classroom case. Everything
+# lands in data/ (gitignored); ~1.5 GB of audio on the first run.
 benchmark_diarization_data:
 	$(BENCH_DIR)/prepare_ami_baseline.sh 10
+	uv run python $(BENCH_DIR)/voxconverse_subset.py --fetch
+	uv run python $(BENCH_DIR)/prepare_classroom_case.py
+
+# Offline pyannote (full pipeline, whole file) speaker counts over the
+# standard set: the model-or-pipeline question of Phase 2c. Minutes per file.
+benchmark_diarization_offline_counts: benchmark_diarization_data
+	uv run python $(BENCH_DIR)/benchmark_baseline.py \
+		--data $(BENCH_DIR)/data/ami --set $(SET) --skip-streaming \
+		--label "$(LABEL)" \
+		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_offline_counts.json,$(RESULT))
+
+# The synthetic classroom case alone: replay plus question attribution.
+benchmark_diarization_classroom: benchmark_diarization_data
+	uv run python $(BENCH_DIR)/run_suite.py --only classroom \
+		--label "$(LABEL)" --out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_classroom.json,$(RESULT)) $(SUITE_ARGS)
 
 # Replay benchmark only (offline + streaming DER/JER, label metrics, tick cost).
 # Kept as the quick accuracy loop; the suite below includes it.
 benchmark_diarization_baseline: benchmark_diarization_data
 	uv run python $(BENCH_DIR)/benchmark_baseline.py \
-		--data $(BENCH_DIR)/data/ami --suffix _10min \
+		--data $(BENCH_DIR)/data/ami --suffix _10min --set $(SET) \
+		--offline-set $(OFFLINE_SET) \
 		--stream-sec $(STREAM_SEC) --label "$(LABEL)" \
 		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_baseline.json,$(RESULT))
 
@@ -95,6 +122,7 @@ benchmark_diarization_caption: benchmark_diarization_data
 # The standard suite, natively (quick dev loop on this machine)
 benchmark_diarization_suite: benchmark_diarization_data
 	uv run python $(BENCH_DIR)/run_suite.py \
+		--set $(SET) --offline-set $(OFFLINE_SET) \
 		--stream-sec $(STREAM_SEC) --caption-seconds $(CAPTION_SEC) \
 		--label "$(LABEL)" --out $(RESULT) $(SUITE_ARGS)
 
@@ -102,6 +130,7 @@ benchmark_diarization_suite: benchmark_diarization_data
 # (the reference environment). Report lands in results/ like the native one.
 benchmark_diarization_suite_docker: benchmark_diarization_data
 	$(BENCH_DIR)/docker/run_in_docker.sh \
+		--set $(SET) --offline-set $(OFFLINE_SET) \
 		--stream-sec $(STREAM_SEC) --caption-seconds $(CAPTION_SEC) \
 		--label "$(LABEL)" --out $(subst $(BENCH_DIR)/,/app/$(BENCH_DIR)/,$(RESULT)) $(SUITE_ARGS)
 

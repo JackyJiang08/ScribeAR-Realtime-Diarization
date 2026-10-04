@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Phase 2c grid for tune_reconciler.py on the standard set: how strict",
+    "minting should be (evidence seconds, passes that must re-find a voice,",
+    "new-speaker threshold) and whether converged centroids should merge,",
+    "with the two guards of tune_grid_counting.json off. Chosen by labels",
+    "per speaker (band 0.8..1.2), speaker count within one, confusion and",
+    "settled DER together."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.25, 0.3],
+    "attach_threshold": [
+      {"relative_to": "new_speaker_threshold", "offset": -0.1}
+    ],
+    "min_mint_duration_sec": [2.5, 4.0, 6.0],
+    "min_mint_passes": [1, 2],
+    "overlap_bonus": [0.15],
+    "merge_threshold": [1.0, 0.6],
+    "revision_margin": [0.1]
+  }
+}

@@ -4,8 +4,15 @@ repeated diarization runs, with a per-session memory of speaker embeddings
 """
 
 from dataclasses import dataclass, field, replace
+from typing import Callable
 
 import numpy as np
+
+#: Session-level re-clustering: (raw embeddings (n, d), seconds per row (n,))
+#: -> integer cluster per row. Provided by the diarization context (the
+#: PLDA/VBx clustering that ships with the pyannote model); the reconciler
+#: only knows cosine similarity on its own.
+TrackClusterer = Callable[[np.ndarray, np.ndarray], np.ndarray]
 
 
 @dataclass
@@ -76,6 +83,33 @@ class SpeakerReconcilerConfig:
                                     absent
         min_update_sec          - Clusters shorter than this never move a
                                     centroid (backchannels are too noisy)
+        sustained_split_sec     - A voice that keeps scoring between the
+                                    new-speaker and the match threshold
+                                    against its best speaker (near, but
+                                    never a clear match) mints its own
+                                    label once it has this many seconds of
+                                    evidence, in one pass or accumulated
+                                    over the passes that heard it. Lets a
+                                    sustained second voice split off a
+                                    speaker it resembles without lowering
+                                    the threshold for everyone. 0 disables
+        recluster_period_sec    - Every this many seconds of session time
+                                    the session's track history is
+                                    re-clustered with the model's own
+                                    PLDA/VBx scoring (`clusterer`), and
+                                    speakers whose tracks the clustering
+                                    joins are merged while a speaker whose
+                                    tracks fall into two clusters is split.
+                                    Labels already sent never change; the
+                                    new partition rules from the next pass
+                                    on. 0 disables
+        recluster_min_split_sec - A split needs at least this much speech
+                                    in the part that leaves the speaker
+        recluster_merge_fraction - Two speakers merge when at least this
+                                    fraction of each one's speech lands in
+                                    the same cluster
+        max_tracks              - Bound on the track history kept for
+                                    re-clustering (oldest dropped first)
     """
 
     # Tuned 2026-10-03 on the three AMI meetings (full 10 min, 10 s window,
@@ -93,6 +127,11 @@ class SpeakerReconcilerConfig:
     centroid_memory_sec: float = 120.0
     overlap_bonus: float = 0.15
     min_update_sec: float = 0.5
+    sustained_split_sec: float = 0.0
+    recluster_period_sec: float = 0.0
+    recluster_min_split_sec: float = 10.0
+    recluster_merge_fraction: float = 0.7
+    max_tracks: int = 600
 
 
 @dataclass(eq=False)
@@ -131,19 +170,39 @@ class _Candidate:
     passes: int = 0
 
 
+@dataclass(eq=False)
+class _Track:
+    """
+    One labelled cluster of one run, kept for session-level re-clustering:
+    the raw embedding (the model's scale, as the PLDA expects), its speech
+    seconds, when it ended and the session label it was given
+    """
+
+    embedding: np.ndarray
+    duration: float
+    end: float
+    label: str
+
+
 @dataclass
 class SpeakerReconcilerState:
     """
     Everything a reconciler needs to continue a session: the speaker
-    memory, the candidate pool, the previous run and the label counter.
-    Picklable, held in memory only, never written to disk.
+    memory, the candidate pools, the track history, the previous run and
+    the label counter. Picklable, held in memory only, never written to
+    disk.
     """
 
     speakers: list[SpeakerMemory] = field(default_factory=list)
     candidates: list[_Candidate] = field(default_factory=list)
+    # Voices heard near, but never clearly matching, a known speaker
+    # (`sustained_split_sec`)
+    shadows: list[_Candidate] = field(default_factory=list)
+    tracks: list[_Track] = field(default_factory=list)
     previous: list[SpeakerSegment] = field(default_factory=list)
     next_label_id: int = 0
     version: int = 0
+    last_recluster_at: float = 0.0
 
 
 @dataclass
@@ -157,6 +216,14 @@ class _RawCluster:
     duration: float
     embedding: np.ndarray | None
     first_start: float
+    raw_embedding: np.ndarray | None = None
+
+    @property
+    def last_end(self) -> float:
+        """
+        Session time the cluster ends
+        """
+        return max(s.end for s in self.segments)
 
 
 def _unit(vector) -> np.ndarray | None:
@@ -169,6 +236,16 @@ def _unit(vector) -> np.ndarray | None:
     if not np.isfinite(norm) or norm <= 0.0:
         return None
     return array / norm
+
+
+def _weighted_centroid(tracks: list["_Track"]) -> np.ndarray | None:
+    """
+    Unit-normalised, duration-weighted mean of the tracks' embeddings
+    """
+    if not tracks:
+        return None
+    total = sum(t.embedding.astype(np.float64) * t.duration for t in tracks)
+    return _unit(total)
 
 
 class SpeakerReconciler:
@@ -191,11 +268,21 @@ class SpeakerReconciler:
     voice has spoken enough to deserve a label. Memory per session is
     bounded by `max_speakers` and `max_candidates` centroids.
 
+    Two guards against under-counting (merging different people into one
+    label) are available on top: `sustained_split_sec` lets a voice that
+    keeps landing just below the match threshold mint its own label once it
+    has spoken long enough, and `recluster_period_sec` re-clusters the
+    session's track history periodically with the clustering the model
+    ships (`clusterer`, PLDA/VBx) and merges or splits speakers to follow
+    it. Neither changes a label already given to earlier audio: a split
+    only rules from the next pass on, and a merge is reported through
+    `last_merges` for the consumer to apply where it still can.
+
     After every run `last_mapping` holds raw label -> session label (or
     None for a cluster left unlabelled), `last_confidence` the score each
-    session label was attached with, and `last_merges` the (junior, senior)
+    session label was attached with, `last_merges` the (junior, senior)
     label pairs merged during the run so a consumer can relabel what it
-    had.
+    had, and `last_splits` the (parent, child) pairs split off.
     """
 
     def __init__(
@@ -203,14 +290,22 @@ class SpeakerReconciler:
         label_prefix: str = "spk_",
         config: SpeakerReconcilerConfig | None = None,
         state: SpeakerReconcilerState | None = None,
+        clusterer: TrackClusterer | None = None,
     ):
         self._config = config or SpeakerReconcilerConfig()
         if config is None:
             self._config = replace(self._config, label_prefix=label_prefix)
         self._state = state if state is not None else SpeakerReconcilerState()
+        self.clusterer = clusterer
         self.last_mapping: dict[str, str | None] = {}
         self.last_confidence: dict[str, float] = {}
         self.last_merges: list[tuple[str, str]] = []
+        self.last_splits: list[tuple[str, str]] = []
+        self.reclusterings = 0
+        # Raw labels attached in the grey zone during the current run; they
+        # must not pull the speaker's centroid towards a voice that may be
+        # someone else's (see `sustained_split_sec`)
+        self._hold_centroid: set[str] = set()
 
     @property
     def labels_minted(self) -> int:
@@ -252,9 +347,18 @@ class SpeakerReconciler:
                 replace(c, centroid=c.centroid.copy())
                 for c in self._state.candidates
             ],
+            shadows=[
+                replace(c, centroid=c.centroid.copy())
+                for c in self._state.shadows
+            ],
+            tracks=[
+                replace(t, embedding=t.embedding.copy())
+                for t in self._state.tracks
+            ],
             previous=list(self._state.previous),
             next_label_id=self._state.next_label_id,
             version=self._state.version,
+            last_recluster_at=self._state.last_recluster_at,
         )
 
     def reconcile(
@@ -280,6 +384,8 @@ class SpeakerReconciler:
         self.last_mapping = {}
         self.last_confidence = {}
         self.last_merges = []
+        self.last_splits = []
+        self._hold_centroid = set()
         # Keep the last non-empty run so continuity survives silent ticks
         if len(segments) == 0:
             return []
@@ -307,8 +413,12 @@ class SpeakerReconciler:
             label = mapping.get(cluster.label)
             self.last_mapping[cluster.label] = label
             if label is not None:
-                self._update_speaker(label, cluster)
+                self._update_speaker(
+                    label, cluster, cluster.label not in self._hold_centroid
+                )
+                self._remember_track(label, cluster)
         self._merge_similar_speakers(mapping)
+        self._maybe_recluster(mapping, max(c.last_end for c in clusters))
 
         reconciled = [
             replace(segment, speaker=mapping[segment.speaker])
@@ -356,15 +466,19 @@ class SpeakerReconciler:
         clusters = []
         for label, group in by_label.items():
             embedding = embeddings.get(label)
+            unit = _unit(embedding) if embedding is not None else None
             clusters.append(
                 _RawCluster(
                     label=label,
                     segments=group,
                     duration=sum(max(0.0, s.end - s.start) for s in group),
-                    embedding=(
-                        _unit(embedding) if embedding is not None else None
-                    ),
+                    embedding=unit,
                     first_start=min(s.start for s in group),
+                    raw_embedding=(
+                        np.asarray(embedding, dtype=np.float32).reshape(-1)
+                        if unit is not None
+                        else None
+                    ),
                 )
             )
         return clusters
@@ -459,33 +573,64 @@ class SpeakerReconciler:
                 # label; this run's audio is the first it labels
                 self._state.candidates.remove(pooled)
                 return self._mint(pooled.centroid), cfg.match_threshold
+        if (
+            cfg.sustained_split_sec > 0
+            and can_mint
+            and cluster.embedding is not None
+            and best_label is not None
+            and not clearly_far
+        ):
+            # Near a known speaker but never a clear match: pool the voice
+            # on its own and let it split off once it has sustained that
+            # for long enough (a second person who sounds like the first,
+            # or a far-field voice the centroid drifted away from)
+            shadow = self._pool_candidate(
+                cluster, self._state.shadows, cfg.sustained_split_sec
+            )
+            if shadow is not None:
+                self._state.shadows.remove(shadow)
+                return self._mint(shadow.centroid), cfg.match_threshold
+            # Attached below, but without moving the centroid: a centroid
+            # that follows every near voice would soon match it clearly
+            # and the split could never happen
+            self._hold_centroid.add(cluster.label)
         if best_label is not None and (
             best_score >= cfg.attach_threshold or (long_enough and not can_mint)
         ):
             return best_label, best_score
         return None
 
-    def _pool_candidate(self, cluster: _RawCluster) -> _Candidate | None:
+    def _pool_candidate(
+        self,
+        cluster: _RawCluster,
+        pool: list[_Candidate] | None = None,
+        min_duration: float | None = None,
+    ) -> _Candidate | None:
         """
-        Adds the cluster to the candidate it resembles (or a new one) and
-        returns the candidate when it has been heard in enough runs and
-        has accumulated enough novel speech to mint
+        Adds the cluster to the candidate it resembles (or a new one) in
+        `pool` (default: the unknown-voice pool) and returns the candidate
+        when it has been heard in enough runs and has accumulated at least
+        `min_duration` seconds (default: the minting minimum) of speech
         """
         cfg = self._config
         assert cluster.embedding is not None
+        if pool is None:
+            pool = self._state.candidates
+        if min_duration is None:
+            min_duration = cfg.min_mint_duration_sec
         best = None
         best_similarity = cfg.match_threshold
-        for candidate in self._state.candidates:
+        for candidate in pool:
             similarity = float(np.dot(cluster.embedding, candidate.centroid))
             if similarity >= best_similarity:
                 best, best_similarity = candidate, similarity
         if best is None:
             best = _Candidate(cluster.embedding.copy(), 0.0, 0.0)
-            self._state.candidates.append(best)
-            if len(self._state.candidates) > cfg.max_candidates:
-                self._state.candidates.sort(key=lambda c: c.last_seen)
-                del self._state.candidates[0]
-                if best not in self._state.candidates:
+            pool.append(best)
+            if len(pool) > cfg.max_candidates:
+                pool.sort(key=lambda c: c.last_seen)
+                del pool[0]
+                if best not in pool:
                     return None
         # Evidence seconds: every run that hears the voice counts its whole
         # cluster, so a voice the next (overlapping) window finds again
@@ -500,10 +645,7 @@ class SpeakerReconciler:
         best.last_seen = max(
             best.last_seen, max(s.end for s in cluster.segments)
         )
-        if (
-            best.duration >= cfg.min_mint_duration_sec
-            and best.passes >= cfg.min_mint_passes
-        ):
+        if best.duration >= min_duration and best.passes >= cfg.min_mint_passes:
             return best
         return None
 
@@ -530,14 +672,20 @@ class SpeakerReconciler:
                 return speaker
         raise KeyError(label)
 
-    def _update_speaker(self, label: str, cluster: _RawCluster) -> None:
+    def _update_speaker(
+        self, label: str, cluster: _RawCluster, move_centroid: bool = True
+    ) -> None:
         cfg = self._config
         speaker = self._speaker(label)
         speaker.total_sec += cluster.duration
         speaker.last_seen = max(
             speaker.last_seen, max(s.end for s in cluster.segments)
         )
-        if cluster.embedding is None or cluster.duration < cfg.min_update_sec:
+        if (
+            not move_centroid
+            or cluster.embedding is None
+            or cluster.duration < cfg.min_update_sec
+        ):
             return
         if speaker.centroid is None:
             speaker.centroid = cluster.embedding.copy()
@@ -553,6 +701,151 @@ class SpeakerReconciler:
         speaker.weight = min(
             speaker.weight + cluster.duration, cfg.centroid_memory_sec
         )
+
+    def _remember_track(self, label: str, cluster: _RawCluster) -> None:
+        """
+        Keeps the cluster for session-level re-clustering, when enabled
+        """
+        cfg = self._config
+        if (
+            cfg.recluster_period_sec <= 0
+            or cluster.raw_embedding is None
+            or cluster.duration < cfg.min_update_sec
+        ):
+            return
+        tracks = self._state.tracks
+        tracks.append(
+            _Track(
+                cluster.raw_embedding.copy(),
+                cluster.duration,
+                cluster.last_end,
+                label,
+            )
+        )
+        if len(tracks) > cfg.max_tracks:
+            del tracks[: len(tracks) - cfg.max_tracks]
+
+    # ------------------------------------------------------------------
+    # Session-level re-clustering
+
+    def _maybe_recluster(  # pylint: disable=too-many-locals,too-many-branches
+        self, mapping: dict[str, str], now: float
+    ) -> None:
+        """
+        Every `recluster_period_sec` of session time: re-clusters the track
+        history with the model's clustering and brings the speaker memory
+        in line with it (merges and splits). The current run's mapping is
+        updated for merges; a split only affects later runs.
+        """
+        cfg = self._config
+        if cfg.recluster_period_sec <= 0 or self.clusterer is None:
+            return
+        if now - self._state.last_recluster_at < cfg.recluster_period_sec:
+            return
+        self._state.last_recluster_at = now
+        known = {s.label for s in self._state.speakers}
+        tracks = [t for t in self._state.tracks if t.label in known]
+        if len(tracks) < 2:
+            return
+        embeddings = np.stack([t.embedding for t in tracks]).astype(np.float32)
+        weights = np.asarray([t.duration for t in tracks], dtype=np.float32)
+        partition = np.asarray(self.clusterer(embeddings, weights)).reshape(-1)
+        if len(partition) != len(tracks):
+            return
+        self.reclusterings += 1
+
+        # Seconds of every speaker in every cluster
+        seconds: dict[str, dict[int, float]] = {}
+        for track, cluster in zip(tracks, partition):
+            per = seconds.setdefault(track.label, {})
+            per[int(cluster)] = per.get(int(cluster), 0.0) + track.duration
+        primary = {
+            label: max(per.items(), key=lambda kv: kv[1])[0]
+            for label, per in seconds.items()
+        }
+
+        # Merges: speakers whose speech mostly shares one cluster
+        by_cluster: dict[int, list[str]] = {}
+        for label, cluster in primary.items():
+            per = seconds[label]
+            if per[cluster] / sum(per.values()) >= cfg.recluster_merge_fraction:
+                by_cluster.setdefault(cluster, []).append(label)
+        for labels in by_cluster.values():
+            if len(labels) < 2:
+                continue
+            ordered = [s for s in self._state.speakers if s.label in labels]
+            senior = ordered[0]
+            for junior in ordered[1:]:
+                self._merge(junior, senior, mapping)
+                for track in tracks:
+                    if track.label == junior.label:
+                        track.label = senior.label
+                seconds[senior.label] = {
+                    k: seconds[senior.label].get(k, 0.0)
+                    + seconds[junior.label].get(k, 0.0)
+                    for k in set(seconds[senior.label])
+                    | set(seconds[junior.label])
+                }
+                del seconds[junior.label]
+        primary = {
+            label: max(per.items(), key=lambda kv: kv[1])[0]
+            for label, per in seconds.items()
+        }
+
+        # Splits: a speaker with a second cluster of its own, large enough
+        # and not the home of another speaker
+        for label, per in seconds.items():
+            if len(self._state.speakers) >= cfg.max_speakers:
+                break
+            homes = {c for lbl, c in primary.items() if lbl != label}
+            for cluster, duration in sorted(per.items(), key=lambda kv: -kv[1]):
+                if cluster == primary[label] or cluster in homes:
+                    continue
+                if duration < cfg.recluster_min_split_sec:
+                    continue
+                leaving = [
+                    t
+                    for t, c in zip(tracks, partition)
+                    if t.label == label and int(c) == cluster
+                ]
+                staying = [
+                    t
+                    for t, c in zip(tracks, partition)
+                    if t.label == label and int(c) != cluster
+                ]
+                child = self._split(label, leaving, staying)
+                if child is None:
+                    break
+                for track in leaving:
+                    track.label = child
+                homes.add(cluster)
+
+    def _split(
+        self, label: str, leaving: list[_Track], staying: list[_Track]
+    ) -> str | None:
+        """
+        Mints a speaker for the `leaving` tracks and rebuilds the parent's
+        centroid from the `staying` ones. Returns the child label
+        """
+        child_centroid = _weighted_centroid(leaving)
+        parent_centroid = _weighted_centroid(staying)
+        if child_centroid is None or parent_centroid is None:
+            return None
+        parent = self._speaker(label)
+        child = self._mint(child_centroid)
+        child_memory = self._speaker(child)
+        child_memory.weight = min(
+            sum(t.duration for t in leaving), self._config.centroid_memory_sec
+        )
+        child_memory.total_sec = sum(t.duration for t in leaving)
+        child_memory.last_seen = max(t.end for t in leaving)
+        parent.centroid = parent_centroid
+        parent.weight = min(
+            sum(t.duration for t in staying), self._config.centroid_memory_sec
+        )
+        parent.total_sec = max(0.0, parent.total_sec - child_memory.total_sec)
+        self.last_splits.append((label, child))
+        return child
 
     def _merge_similar_speakers(self, mapping: dict[str, str]) -> None:
         """

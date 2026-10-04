@@ -7,10 +7,12 @@ from .pyannote_diarization_context import (
     PyannoteDiarizationContext,
     PyannoteDiarizationModelType,
     PyannoteDiarizationService,
+    build_track_clusterer,
 )
 
 __all__ = [
     "DiarizationPass",
+    "build_track_clusterer",
     "PyannoteDiarizationContext",
     "PyannoteDiarizationModelType",
     "PyannoteDiarizationService",

@@ -9,7 +9,8 @@
     "container runs are the only gated environment.",
     "replay.memory_growth_mb_total is deliberately not gated: over a 120 s replay it mostly measures the rolling window filling from 5 s to 30 s, and natively the preceding offline pass is still releasing memory, so the number can even be negative. Peak RSS is gated; leaks are the soak harness's job (benchmark_diarization_soak).",
     "Phase 2a adds the label-latency and diarization-cost metrics (caption.on.label.*, caption.on.diarization.*). They are gated against the baseline once a Phase 2a baseline is committed; before that they are SKIPPED (missing on the baseline side) and acceptance.py checks their absolute targets.",
-    "Phase 2b adds the end-of-stream and overlap-aware DER views, the speaker-count-within-one fraction, revisions and merges. end_of_stream and speaker count are gated; the overlap-aware views, revisions and merges are informational."
+    "Phase 2b adds the end-of-stream and overlap-aware DER views, the speaker-count-within-one fraction, revisions and merges. end_of_stream and speaker count are gated; the overlap-aware views, revisions and merges are informational.",
+    "Phase 2c: labels per speaker is gated two-sided through replay.labels_per_speaker_deviation (|mean ratio - 1|); the raw ratio stays informational. The speaker-count fractions use reference speakers with >= 5 s of speech. The classroom case (classroom.*) is gated on the fraction of questions that get their own label."
   ],
   "rules": {
     "replay.offline.der": {
@@ -56,6 +57,34 @@
       "direction": "lower",
       "abs": 0.5
     },
+    "replay.labels_per_speaker_deviation": {
+      "direction": "lower",
+      "abs": 0.1
+    },
+    "replay.speaker_count_exact_fraction": {
+      "direction": "higher",
+      "abs": 0.1
+    },
+    "replay.session_labels_split": {
+      "direction": "lower",
+      "abs": 2
+    },
+    "classroom.questions_own_label_fraction": {
+      "direction": "higher",
+      "abs": 0.0
+    },
+    "classroom.question_seconds_as_instructor_fraction": {
+      "direction": "lower",
+      "abs": 0.05
+    },
+    "classroom.settled_der": {
+      "direction": "lower",
+      "abs": 0.02
+    },
+    "classroom.labels_minted": {
+      "direction": "lower",
+      "abs": 1
+    },
     "replay.label_latency_p50_sec": {
       "direction": "lower",
       "abs": 1.0,
@@ -73,10 +102,6 @@
     "replay.label_flip_rate_after_first_shown": {
       "direction": "lower",
       "abs": 0.05
-    },
-    "replay.labels_minted_per_reference_speaker": {
-      "direction": "lower",
-      "abs": 0.25
     },
     "replay.tick_cost_p95_sec": {
       "direction": "lower",

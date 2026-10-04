@@ -44,6 +44,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from eval_sets import SETS, missing_in, set_wavs  # noqa: E402
 from bench_common import (  # noqa: E402
     ROOT,
     SAMPLE_RATE,
@@ -70,6 +71,7 @@ from src.shared.utils.speaker_attribution import (  # noqa: E402
 )
 from src.shared.utils.speaker_reconciler import (  # noqa: E402
     SpeakerReconciler,
+    SpeakerReconcilerConfig,
     SpeakerSegment,
 )
 
@@ -180,12 +182,20 @@ def build_metrics():
     }
 
 
-def speakers_in(reference, start: float, end: float) -> int:
-    """Reference speakers with any speech inside [start, end)."""
+def speakers_in(
+    reference, start: float, end: float, min_speech_sec: float = 0.0
+) -> int:
+    """
+    Reference speakers with at least `min_speech_sec` of speech inside
+    [start, end) (any speech at all when 0).
+    """
     from pyannote.core import Segment
 
     cropped = reference.crop(Segment(start, end), mode="intersection")
-    return len(cropped.labels())
+    if min_speech_sec <= 0.0:
+        return len(cropped.labels())
+    chart = cropped.chart()
+    return sum(1 for _, seconds in chart if seconds >= min_speech_sec)
 
 
 def run_offline(service, samples: np.ndarray) -> tuple[list, float]:
@@ -212,8 +222,16 @@ class _Chain:
     sequence of passes, collecting the three hypotheses a viewer could see.
     """
 
-    def __init__(self, tick_sec: float, edge_margin_sec: float):
-        self.reconciler = SpeakerReconciler()
+    def __init__(
+        self,
+        tick_sec: float,
+        edge_margin_sec: float,
+        reconciler_config: SpeakerReconcilerConfig | None = None,
+        clusterer=None,
+    ):
+        self.reconciler = SpeakerReconciler(
+            config=reconciler_config, clusterer=clusterer
+        )
         # Unbounded history: the replay reads the whole timeline at the end
         self.attacher = SpeakerLabelAttacher(
             edge_margin_sec=edge_margin_sec, attach_gap_sec=0.0, history_sec=1e9
@@ -224,6 +242,7 @@ class _Chain:
         self.settled_through = 0.0
         self.labels_used: set[str] = set()
         self.merges = 0
+        self.splits = 0
         self.reconciler_costs: list[float] = []
         self.last_reconciled: list[SpeakerSegment] = []
 
@@ -234,6 +253,7 @@ class _Chain:
         self.last_reconciled = reconciled
         self.labels_used.update(s.speaker for s in reconciled)
         self.merges += len(self.reconciler.last_merges)
+        self.splits += len(self.reconciler.last_splits)
         before = self.attacher.covered_through
         self.attacher.add_coverage(
             reconciled,
@@ -271,6 +291,8 @@ class _Chain:
             "labels_minted": self.reconciler.labels_minted,
             "labels_used": len(self.labels_used),
             "merges": self.merges,
+            "splits": self.splits,
+            "reclusterings": self.reconciler.reclusterings,
             "revisions": revisions,
             "revised_sec": round(revised_sec, 1),
         }
@@ -316,6 +338,9 @@ def run_streaming(
     stream_sec: float | None,
     reference,
     edge_margin_sec: float = 0.5,
+    reconciler_config: SpeakerReconcilerConfig | None = None,
+    min_speaker_sec: float = 0.0,
+    keep_hypotheses: bool = False,
 ):
     """
     Replay the job loop through the production path: each tick diarizes
@@ -346,8 +371,11 @@ def run_streaming(
     rss_min = float("inf")
     rss_max = 0.0
     tick_costs: list[float] = []
-    chain = _Chain(tick_sec, edge_margin_sec)
-    overlap_chain = _Chain(tick_sec, edge_margin_sec)
+    clusterer = getattr(service, "track_clusterer", None)
+    chain = _Chain(tick_sec, edge_margin_sec, reconciler_config, clusterer)
+    overlap_chain = _Chain(
+        tick_sec, edge_margin_sec, reconciler_config, clusterer
+    )
     region_label_history: dict[int, list[str | None]] = {}
     onset_latency: list[float] = []
 
@@ -446,13 +474,30 @@ def run_streaming(
                 regions_flipped += 1
     minutes = limit / SAMPLE_RATE / 60.0
     streamed_sec = limit / SAMPLE_RATE
-    reference_speakers_streamed = speakers_in(reference, 0.0, streamed_sec)
+    reference_speakers_all = speakers_in(reference, 0.0, streamed_sec)
+    # Speaker counts are judged against the people who actually spoke for
+    # at least `min_speaker_sec` in the streamed part: a reference speaker
+    # with a couple of seconds in ten minutes cannot be expected to earn
+    # a label (the minting minimum alone is 2.5 s of evidence). The raw
+    # count is reported beside it.
+    reference_speakers_streamed = speakers_in(
+        reference, 0.0, streamed_sec, min_speaker_sec
+    )
     labels_used = chain_report["labels_used"]
     labels_minted = chain_report["labels_minted"]
+    count_error = labels_used - reference_speakers_streamed
 
     return {
         "hypotheses": chain_report["hypotheses"],
         "overlap_hypotheses": overlap_report["hypotheses"],
+        "settled_timeline": (
+            [
+                [round(s.start, 3), round(s.end, 3), s.speaker]
+                for s in chain_report["hypotheses"]["settled"]
+            ]
+            if keep_hypotheses
+            else None
+        ),
         "streamed_sec": round(streamed_sec, 1),
         "ticks": len(tick_costs),
         "tick_cost_sec": {
@@ -497,6 +542,8 @@ def run_streaming(
         "session_labels_minted": labels_minted,
         "session_labels_used": labels_used,
         "session_labels_merged": chain_report["merges"],
+        "session_labels_split": chain_report["splits"],
+        "reclusterings": chain_report["reclusterings"],
         "revisions": chain_report["revisions"],
         "revised_sec": chain_report["revised_sec"],
         "revised_fraction": (
@@ -506,15 +553,17 @@ def run_streaming(
         ),
         "overlap_labels_minted": overlap_report["labels_minted"],
         "reference_speakers_streamed": reference_speakers_streamed,
+        "reference_speakers_streamed_all": reference_speakers_all,
+        "min_speaker_sec": min_speaker_sec,
         "labels_minted_per_reference_speaker": (
             round(labels_minted / reference_speakers_streamed, 2)
             if reference_speakers_streamed
             else None
         ),
-        "speaker_count_error": labels_used - reference_speakers_streamed,
-        "speaker_count_within_1": bool(
-            abs(labels_used - reference_speakers_streamed) <= 1
-        ),
+        "speaker_count_error": count_error,
+        "speaker_count_error_all": labels_used - reference_speakers_all,
+        "speaker_count_within_1": bool(abs(count_error) <= 1),
+        "speaker_count_exact": bool(count_error == 0),
         "memory": {
             "rss_after_first_tick_mb": round(rss_start, 1),
             "rss_end_mb": round(rss_end, 1),
@@ -601,6 +650,38 @@ def main():
         default=None,
         help="explicit WAV stems to run (default: every *<suffix>.wav)",
     )
+    parser.add_argument(
+        "--set",
+        choices=SETS,
+        default=None,
+        help="named evaluation set (eval_sets.py); overrides --data/--files",
+    )
+    parser.add_argument(
+        "--offline-set",
+        choices=SETS,
+        default=None,
+        help="run the offline pass only on this set's files (the full-file "
+        "offline pass costs minutes per file on CPU); default: every file",
+    )
+    parser.add_argument(
+        "--min-speaker-sec",
+        type=float,
+        default=5.0,
+        help="a reference speaker counts for the speaker-count metrics only "
+        "with at least this much speech in the streamed part",
+    )
+    parser.add_argument(
+        "--reconciler-json",
+        default=None,
+        help="JSON object of SpeakerReconcilerConfig fields overriding the "
+        "defaults for the replay (before/after comparisons)",
+    )
+    parser.add_argument(
+        "--keep-hypotheses",
+        action="store_true",
+        help="store each file's settled label timeline in the report (for "
+        "classroom_score.py)",
+    )
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--tick-sec", type=float, default=5.0)
     parser.add_argument(
@@ -650,7 +731,15 @@ def main():
     hygiene = None if args.no_hygiene else hygiene_check()
 
     data = Path(args.data)
-    if args.files:
+    if args.set:
+        wavs = set_wavs(args.set)
+        missing = missing_in(wavs)
+        if missing:
+            raise SystemExit(
+                f"set {args.set} is missing {[str(m) for m in missing]}; "
+                "run make benchmark_diarization_data"
+            )
+    elif args.files:
         wavs = [data / f"{stem}.wav" for stem in args.files]
         missing = [w for w in wavs if not w.exists()]
         if missing:
@@ -659,6 +748,16 @@ def main():
         wavs = sorted(data.glob(f"*{args.suffix}.wav"))
     if not wavs:
         raise SystemExit(f"No *{args.suffix}.wav files in {data}")
+    offline_wavs = (
+        {w.resolve() for w in set_wavs(args.offline_set)}
+        if args.offline_set
+        else None
+    )
+    reconciler_config = (
+        SpeakerReconcilerConfig(**json.loads(args.reconciler_json))
+        if args.reconciler_json
+        else None
+    )
 
     if args.threads:
         threads = args.threads
@@ -720,7 +819,10 @@ def main():
             "reference_speakers": len(reference.labels()),
         }
 
-        if not args.skip_offline:
+        run_offline_here = not args.skip_offline and (
+            offline_wavs is None or wav.resolve() in offline_wavs
+        )
+        if run_offline_here:
             timed.reset()
             segments, wall = run_offline(service, samples)
             hyp = to_annotation(segments, stem)
@@ -754,6 +856,9 @@ def main():
                 args.max_buffer_sec,
                 stream_sec,
                 reference,
+                reconciler_config=reconciler_config,
+                min_speaker_sec=args.min_speaker_sec,
+                keep_hypotheses=args.keep_hypotheses,
             )
             from pyannote.core import Segment, Timeline
 
@@ -791,7 +896,10 @@ def main():
                 f"{stream['tick_cost_sec']['p95']:.2f}s worst "
                 f"{stream['tick_cost_sec']['worst']:.2f}s, labels "
                 f"{stream['session_labels_minted']} for "
-                f"{stream['reference_speakers_streamed']} speakers, "
+                f"{stream['reference_speakers_streamed']} speakers "
+                f"({stream['reference_speakers_streamed_all']} with any "
+                f"speech, offline "
+                f"{entry.get('offline', {}).get('hypothesis_speakers', '-')}), "
                 f"label latency p50 {stream['label_latency_sec']['p50']}s, "
                 f"end-of-stream DER {stream['end_of_stream']['der']['value']:.3f}, "
                 f"overlap-aware settled DER "
@@ -807,7 +915,7 @@ def main():
         }
 
     aggregate_report: dict = {}
-    if not args.skip_offline:
+    if not args.skip_offline and any("offline" in f for f in files):
         aggregate_report["offline"] = aggregate(offline_metrics) | {
             "speaker_count_abs_error_mean": _mean_of(
                 [
@@ -818,6 +926,7 @@ def main():
                 ["v"],
             ),
             "rtf_mean": _mean_of(files, ["offline", "rtf"], 4),
+            "files_scored": sum(1 for f in files if "offline" in f),
         }
     if not args.skip_streaming:
         aggregate_report["streaming_first_seen"] = aggregate(first_seen_metrics)
@@ -887,8 +996,76 @@ def main():
                 ],
                 ["v"],
             ),
+            "speaker_count_exact_fraction": _mean_of(
+                [
+                    {"v": 1.0 if f["streaming"]["speaker_count_exact"] else 0.0}
+                    for f in files
+                    if "streaming" in f
+                ],
+                ["v"],
+            ),
+            "speaker_count_signed_error_mean": _mean_of(
+                [
+                    {"v": f["streaming"]["speaker_count_error"]}
+                    for f in files
+                    if "streaming" in f
+                ],
+                ["v"],
+            ),
+            "meetings_under_counted": sum(
+                1
+                for f in files
+                if "streaming" in f
+                and f["streaming"]["speaker_count_error"] < 0
+            ),
+            "meetings_over_counted": sum(
+                1
+                for f in files
+                if "streaming" in f
+                and f["streaming"]["speaker_count_error"] > 0
+            ),
+            "labels_per_speaker_deviation": (
+                round(
+                    abs(
+                        _mean_of(
+                            files,
+                            [
+                                "streaming",
+                                "labels_minted_per_reference_speaker",
+                            ],
+                            4,
+                        )
+                        - 1.0
+                    ),
+                    3,
+                )
+            ),
+            "speaker_counts": [
+                {
+                    "file": f["file"],
+                    "reference": f["streaming"]["reference_speakers_streamed"],
+                    "reference_any_speech": f["streaming"][
+                        "reference_speakers_streamed_all"
+                    ],
+                    "predicted": f["streaming"]["session_labels_used"],
+                    "minted": f["streaming"]["session_labels_minted"],
+                    "offline": f.get("offline", {}).get("hypothesis_speakers"),
+                }
+                for f in files
+                if "streaming" in f
+            ],
             "session_labels_merged": sum(
                 f["streaming"]["session_labels_merged"]
+                for f in files
+                if "streaming" in f
+            ),
+            "session_labels_split": sum(
+                f["streaming"]["session_labels_split"]
+                for f in files
+                if "streaming" in f
+            ),
+            "reclusterings": sum(
+                f["streaming"]["reclusterings"]
                 for f in files
                 if "streaming" in f
             ),
@@ -929,6 +1106,15 @@ def main():
             "der_convention": "pyannote default: no collar, overlap scored",
             "data": rel_path(data),
             "suffix": args.suffix,
+            "set": args.set,
+            "offline_set": args.offline_set,
+            "files": [rel_path(w) for w in wavs],
+            "min_speaker_sec": args.min_speaker_sec,
+            "reconciler_overrides": (
+                json.loads(args.reconciler_json)
+                if args.reconciler_json
+                else None
+            ),
         },
         "model_load_sec": round(load_sec, 1),
         "warmup_pass_sec": round(warm_sec, 2),
@@ -940,7 +1126,24 @@ def main():
     out = Path(args.out)
     write_json(out, report)
     print(f"\nWrote {out}")
-    print(json.dumps(report["aggregate"], indent=2))
+    counts = aggregate_report.get("streaming", {}).get("speaker_counts")
+    if counts:
+        print(
+            f"\n{'file':24s} {'ref':>4} {'any':>4} {'pred':>5} {'mint':>5} {'offline':>7}"
+        )
+        for row in counts:
+            print(
+                f"{row['file']:24s} {row['reference']:>4} "
+                f"{row['reference_any_speech']:>4} {row['predicted']:>5} "
+                f"{row['minted']:>5} {str(row['offline'] or '-'):>7}"
+            )
+    print(
+        json.dumps(
+            {k: v for k, v in report["aggregate"].items()},
+            indent=2,
+            default=str,
+        )
+    )
     print(f"peak RSS {report['peak_rss_mb']:.0f} MB")
 
 
