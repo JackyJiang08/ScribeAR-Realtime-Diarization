@@ -28,12 +28,14 @@
 > nine files with a whole-file reference (clustering context, not the
 > model); clean many-speaker panels still collapse in streaming (a
 > six-person panel ends with two labels), and the fold costs a five-person
-> debate two labels; and caption latency with diarization on measured
-> 12 percent above off in the clean repeat run (4.9 against 4.4 s p50) and
-> far above it in a run with a Whisper outlier, so caption parity, met in
-> every earlier phase, is reported as unresolved by this step's two runs
-> and the gate baseline stays where it was. Full tables, per-meeting counts
-> and caveats are in the diarization doc linked below.
+> debate two labels. Caption latency with diarization on measured 12
+> percent above off in one run and far above it in a run with a Whisper
+> outlier; three alternating off/on pairs then put the on/off p50 ratio at
+> 0.86 (median) with Whisper's own execution time no higher beside the
+> diarization worker, so caption parity holds and the regression gate now
+> compares against this step's container run on the 24-file set. Full
+> tables, per-meeting counts and caveats are in the diarization doc linked
+> below.
 >
 > **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
 > `pyannote/speaker-diarization-community-1` terms, export

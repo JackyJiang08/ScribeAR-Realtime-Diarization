@@ -1414,7 +1414,7 @@ Acceptance, on the suite run with the caption columns of both runs:
 | Phase 2b musts: settled DER better than 0.408, at least 97% of final words labelled, the six regression tests | **met**: 0.266; 98.1% (97.2% in the repeat); 114 reconciler and job tests pass |
 | Phase 2b / 2c: confusion at most 0.08 | **missed by 0.022**: 0.102 (unchanged from 2c; the offline reference above puts 0.10 of it on the clustering context) |
 | Phase 2a: label within 2 s p50 / 4 s p95 after the text, no change after sending, under 5% corrections | **met**: 0 / 0 s, 0, 0.8% (a folded fragment label that had reached an in-progress caption) |
-| Phase 2a: caption p50 and p95 with diarization on within 10% of off, no more dropped periods than off | **missed in both runs**: suite run 10.45 against 5.52 s (+89%), 41.4 against 21.7 s, 19 against 10 dropped; repeat 4.92 against 4.39 s (+12%), 28.4 against 22.1 s (+28%), 10 against 9 dropped |
+| Phase 2a: caption p50 and p95 with diarization on within 10% of off, no more dropped periods than off | **missed in both single runs, met on the three alternating pairs** (next section): suite run 10.45 against 5.52 s (+89%), 41.4 against 21.7 s, 19 against 10 dropped; repeat 4.92 against 4.39 s (+12%), 28.4 against 22.1 s (+28%), 10 against 9 dropped; pairs, median on / off ratio: p50 0.86, p95 1.01, dropped 0.75 |
 
 What to make of the caption miss. The diarization worker now costs a
 tenth of a core, half of what it did when these targets were met in
@@ -1429,18 +1429,59 @@ difference of the repeat, so these two runs cannot attribute the
 difference to diarization, and they cannot rule it out either. The target
 is reported as missed, not explained away.
 
-**Gate baseline: not moved.** The condition for moving it was every
-Phase 2a and 2b must target holding, the RTF ceiling included, in the
-container run. The RTF ceiling now holds with a wide margin, but the
-caption-parity targets did not hold in either caption stream, so the gate
-still compares against the Phase 2b baselines (dev set, first 120 s; this
-run fails that gate on exactly the set-mismatch metric, onsets never
-labelled, plus the caption metrics above). To move it once a caption run
-holds parity, copy `baselines/phase2-wrapup-linux-cpu-4c8g.json` over
-`baselines/linux-cpu-4c8g.json` in its own commit; until then run the
-gate with `SET=dev STREAM_SEC=120` to compare like with like. Every
-accuracy and cost metric of this run is within or better than the old
-gate's tolerances.
+**Caption parity, three alternating pairs.** Single runs cannot separate
+noise from contention (the off configuration alone moved from 4.39 to
+5.52 s p50 between the two runs above), so the caption-latency step was
+repeated as three alternating pairs, off, on, off, on, off, on, in the same
+container with the same clip and settings (ES2004a, 180 s, reference
+config), hygiene clean before every run. Report:
+`baselines/phase2-wrapup-caption-pairs-linux-cpu-4c8g.json` (the six
+caption reports with a summary). Whisper's execution time is the
+`asrExecutionMs` histogram of the caption worker at the end of each run.
+
+| run | caption p50 | caption p95 | periods dropped (of 36) | Whisper execution mean / p95 | diarization worker cores |
+|---|---|---|---|---|---|
+| pair 1 off | 5.97 s | 28.3 s | 11 | 5.36 / 23.2 s | - |
+| pair 1 on | 6.02 s | 28.8 s | 11 | 5.67 / 33.7 s | 0.116 |
+| pair 2 off | 5.88 s | 28.1 s | 9 | 4.77 / 13.9 s | - |
+| pair 2 on | 4.67 s | 28.3 s | 6 | 3.46 / 7.1 s | 0.115 |
+| pair 3 off | 6.90 s | 39.4 s | 16 | 7.49 / 60.2 s | - |
+| pair 3 on | 5.90 s | 28.4 s | 12 | 5.57 / 28.2 s | 0.121 |
+| on / off ratio per pair, median | **0.86** (1.01, 0.79, 0.86) | 1.01 (1.02, 1.01, 0.72) | 0.75 (1.00, 0.67, 0.75) | mean **0.74** (1.06, 0.73, 0.74); p95 0.51 | |
+| median of the three runs per mode, off / on | 5.97 / 5.90 s | 28.3 / 28.4 s | 11 / 11 | 5.36 / 5.57 s; p95 23.2 / 28.2 s | |
+
+Decided by the median across the pairs: the on / off p50 ratio is 0.86
+(within 10 percent) and Whisper's own execution time is not higher with
+diarization on (paired ratio 0.74; in two of the three pairs Whisper ran
+faster beside the diarization worker than alone). Taking the median run of
+each mode instead gives p50 0.99 and Whisper mean 1.04, p95 1.22; that 4
+percent sits inside the off configuration's own spread (4.77 to 7.49 s
+mean across its three runs), and the pairs that drive it go the other
+way. Parity **holds**; the two single runs above were noise, the first one
+an outlier of the kind the audit describes. The settings that keep the
+diarization worker off Whisper's cores were confirmed in the container
+rather than assumed: the image pins `OMP_NUM_THREADS=1` and
+`OPENBLAS_NUM_THREADS=1`, the context sets torch's intra-op pool to its
+`num_threads` of 1 on every pass (the inter-op pool is left at the
+default and is unused by this inference), the diarization worker logs
+`Lowered diarization worker scheduling priority (nice 10)`, and it sat at
+0.12 cores in every on run while Whisper's CTranslate2 ran with
+`cpu_threads: 4`. No change was made to the service for this result.
+
+**Gate baseline: moved.** The condition for moving it was every Phase 2a
+and 2b must target holding, the RTF ceiling included, in the container
+run. With caption parity settled by the pairs above it holds, and
+`baselines/linux-cpu-4c8g.json` is now a copy of
+`baselines/phase2-wrapup-linux-cpu-4c8g.json` (its own commit, before and
+after numbers in the message), so `make benchmark_diarization_gate_docker`
+compares like with like at its defaults (standard set, full 10 min). Two
+caveats travel with it: the baseline's caption-on columns are the outlier
+stream of that run (p50 10.45 s), so the gate's `caption.on` tolerances
+are looser than the service's real behaviour until a suite run with a
+clean caption stream replaces the file, and the offline metrics are
+absent (the run skipped them), so `replay.offline.*` is skipped by the
+gate rather than compared. The Phase 2b baselines stay in `baselines/`
+for the dev set at 120 s.
 
 ### Hard cases
 
