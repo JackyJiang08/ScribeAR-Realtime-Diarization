@@ -85,8 +85,27 @@ class WhisperStreamingProviderConfig(BaseModel):
     diarization_min_mint_sec: float = _RECONCILER_DEFAULTS.min_mint_duration_sec
     diarization_max_session_speakers: int = _RECONCILER_DEFAULTS.max_speakers
     # Two speakers whose centroids reach this similarity are merged (1.0
-    # disables).
+    # disables), the junior label folding into the senior one. With
+    # `merge_max_age_sec` above 0 only a speaker minted within that many
+    # seconds can be the junior: a fresh label that converges to an existing
+    # speaker is merged back before its captions settle, and two established
+    # speakers are never merged (Phase 2 wrap-up in docs/speaker_diarization.md).
     diarization_merge_threshold: float = _RECONCILER_DEFAULTS.merge_threshold
+    diarization_merge_max_age_sec: float = (
+        _RECONCILER_DEFAULTS.merge_max_age_sec
+    )
+    # A label minted within `fragment_fold_sec` whose audio the next pass
+    # (the overlapping window) re-labels as another speaker, for at least
+    # `fragment_fold_fraction` of that audio, is folded into that speaker
+    # before its captions settle; the default is one and a half diarization
+    # periods at the default 5 s period (the next pass only) and should scale
+    # with `diarization_period_ms`. 0 disables.
+    diarization_fragment_fold_sec: float = (
+        _RECONCILER_DEFAULTS.fragment_fold_sec
+    )
+    diarization_fragment_fold_fraction: float = (
+        _RECONCILER_DEFAULTS.fragment_fold_fraction
+    )
     diarization_overlap_bonus: float = _RECONCILER_DEFAULTS.overlap_bonus
     # Guards against merging different people into one label (Phase 2c). A
     # voice that keeps scoring between the new-speaker and the match
@@ -238,9 +257,15 @@ class WhisperStreamingProviderConfig(BaseModel):
             "diarization_reconnect_grace_sec",
             "diarization_sustained_split_sec",
             "diarization_recluster_period_sec",
+            "diarization_merge_max_age_sec",
+            "diarization_fragment_fold_sec",
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} must not be negative")
+        if not 0.0 < self.diarization_fragment_fold_fraction <= 1.0:
+            raise ValueError(
+                "diarization_fragment_fold_fraction must be in (0, 1]"
+            )
 
 
 whisper_streaming_config_adapter = TypeAdapter[WhisperStreamingProviderConfig](

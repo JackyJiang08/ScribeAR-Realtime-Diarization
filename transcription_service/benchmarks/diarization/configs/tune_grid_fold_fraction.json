@@ -1,0 +1,8 @@
+{
+  "_comment": ["Phase 2 wrap-up: fragment_fold_fraction sweep at the default 7.5 s fold window, folded labels parked."],
+  "grid": {
+    "match_threshold": [0.4], "new_speaker_threshold": [0.3], "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5], "overlap_bonus": [0.15], "revision_margin": [0.1], "merge_threshold": [1.0],
+    "fragment_fold_sec": [7.5], "fragment_fold_fraction": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  }
+}

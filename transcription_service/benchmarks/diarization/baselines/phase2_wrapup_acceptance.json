@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "Phase 2 wrap-up acceptance targets (RTF headroom and classroom",
+    "over-splitting), checked by acceptance.py against a run_suite.py report",
+    "from the Linux CPU reference container made with SET=standard, on top",
+    "of every Phase 2a, 2b and 2c target. Labels per speaker and per person",
+    "are counted on settled captions (what a viewer sees): a label the",
+    "fragment fold removes before its audio settles is minted but never",
+    "shown, and the minted ratio is reported beside it. Speaker counts use",
+    "reference speakers with at least 5 s of speech; the any-speech",
+    "variants are reported for transparency. A missed target is reported by",
+    "how much, never relaxed here."
+  ],
+  "targets": {
+    "diarization real-time factor at most 0.25": {
+      "metric": "caption.on.diarization.rtf",
+      "max": 0.25,
+      "note": "with the 5 s period kept; the Phase 2a ceiling is 0.3"
+    },
+    "classroom: at most 1.5 labels per person on settled captions": {
+      "metric": "classroom.labels_per_person_settled",
+      "max": 1.5
+    },
+    "classroom: at least 80% of questions get a label other than the instructor's": {
+      "metric": "classroom.questions_own_label_fraction",
+      "min": 0.8
+    },
+    "labels on settled captions per real speaker between 0.8 and 1.2 (standard set)": {
+      "metric": "replay.labels_settled_per_reference_speaker",
+      "min": 0.8,
+      "max": 1.2
+    },
+    "speaker count on settled captions within one on at least 80% of meetings": {
+      "metric": "replay.speaker_count_settled_within_1_fraction",
+      "min": 0.8
+    },
+    "must: at least 97% of final words labelled": {
+      "metric": "caption.on.final_words_labelled_fraction",
+      "min": 0.97
+    },
+    "labels never change after being sent": {
+      "metric": "caption.on.label_changes_after_sent",
+      "max": 0
+    },
+    "label corrections before finalization at most 5%": {
+      "metric": "caption.on.label_changes_before_final_fraction",
+      "max": 0.05,
+      "note": "a folded fragment may have been shown on an in-progress caption"
+    }
+  }
+}

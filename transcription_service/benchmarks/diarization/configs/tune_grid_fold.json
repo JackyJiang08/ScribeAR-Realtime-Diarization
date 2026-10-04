@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Phase 2 wrap-up grid for tune_reconciler.py: folding fragments. A",
+    "label minted within fragment_fold_sec whose audio the next window",
+    "re-labels as another speaker (at least fragment_fold_fraction of the",
+    "fragment's audio inside that window) is folded into that speaker",
+    "before its captions settle. 5.5 s = the next pass only at a 5 s",
+    "period, 10.5 s = the next two passes. Phase 2b defaults otherwise."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.3],
+    "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5],
+    "overlap_bonus": [0.15],
+    "revision_margin": [0.1],
+    "merge_threshold": [1.0],
+    "fragment_fold_sec": [0.0, 5.5, 10.5],
+    "fragment_fold_fraction": [0.5, 0.7, 0.9]
+  }
+}

@@ -71,6 +71,9 @@ RECONCILER_KEYS = {
     "min_mint_duration_sec",
     "max_speakers",
     "merge_threshold",
+    "merge_max_age_sec",
+    "fragment_fold_sec",
+    "fragment_fold_fraction",
     "overlap_bonus",
     "min_update_sec",
     "centroid_memory_sec",
@@ -132,6 +135,7 @@ def build_cache(args, wavs: list[Path]) -> dict:
             "segmentation_step": args.step,
             "clustering_threshold": args.clustering_threshold,
             "local_speakers": not args.no_local_speakers,
+            "shared_embeddings": not args.no_shared_embeddings,
             "num_threads": None,
             "nice": 0,
         },
@@ -152,6 +156,9 @@ def build_cache(args, wavs: list[Path]) -> dict:
             "local_speakers": not args.no_local_speakers,
             "stream_sec": args.stream_sec,
         },
+        # Not part of `config`: the shared pass gives the same output as the
+        # pipeline pass, so caches built either way may be merged
+        "build": {"shared_embeddings": not args.no_shared_embeddings},
         "files": {},
     }
     for wav in wavs:
@@ -261,6 +268,9 @@ def replay(
         "end_of_stream": end_of_stream,
         "labels_minted": reconciler.labels_minted,
         "labels_used": len(labels_used),
+        # Labels a viewer ends up seeing: a label merged away before its
+        # audio settled never appears here
+        "labels_settled": len({s.speaker for s in settled}),
         "merges": merges,
         "splits": splits,
         "reclusterings": reconciler.reclusterings,
@@ -306,6 +316,10 @@ def evaluate(
     count_errors = []
     signed_errors = []
     minted_ratio = []
+    settled_errors = []
+    settled_ratio = []
+    count_errors_all = []
+    minted_ratio_all = []
     revised = []
     merges = 0
     splits = 0
@@ -336,8 +350,12 @@ def evaluate(
         entry["reference_speakers_speaking"] = ref_speaking
         entry["labels_minted"] = result["labels_minted"]
         entry["labels_used"] = result["labels_used"]
+        entry["labels_settled"] = result["labels_settled"]
         entry["speaker_count_error"] = result["labels_used"] - ref_speaking
         entry["speaker_count_error_all"] = result["labels_used"] - ref_speakers
+        entry["speaker_count_settled_error"] = (
+            result["labels_settled"] - ref_speaking
+        )
         entry["merges"] = result["merges"]
         entry["splits"] = result["splits"]
         entry["reclusterings"] = result["reclusterings"]
@@ -347,6 +365,10 @@ def evaluate(
         count_errors.append(abs(entry["speaker_count_error"]))
         signed_errors.append(entry["speaker_count_error"])
         minted_ratio.append(result["labels_minted"] / max(1, ref_speaking))
+        settled_errors.append(abs(entry["speaker_count_settled_error"]))
+        settled_ratio.append(result["labels_settled"] / max(1, ref_speaking))
+        count_errors_all.append(abs(entry["speaker_count_error_all"]))
+        minted_ratio_all.append(result["labels_minted"] / max(1, ref_speakers))
         revised.append(result["revised_sec"] / max(1.0, streamed))
         merges += result["merges"]
         splits += result["splits"]
@@ -378,6 +400,25 @@ def evaluate(
         ),
         "labels_minted_per_reference_speaker": round(
             float(np.mean(minted_ratio)), 3
+        ),
+        "labels_settled_per_reference_speaker": round(
+            float(np.mean(settled_ratio)), 3
+        ),
+        "speaker_count_settled_within_1_fraction": round(
+            float(np.mean([e <= 1 for e in settled_errors])), 3
+        ),
+        "speaker_count_settled_exact_fraction": round(
+            float(np.mean([e == 0 for e in settled_errors])), 3
+        ),
+        # Against every reference speaker, however briefly they spoke
+        "labels_minted_per_reference_speaker_all": round(
+            float(np.mean(minted_ratio_all)), 3
+        ),
+        "speaker_count_within_1_fraction_all": round(
+            float(np.mean([e <= 1 for e in count_errors_all])), 3
+        ),
+        "speaker_count_exact_fraction_all": round(
+            float(np.mean([e == 0 for e in count_errors_all])), 3
         ),
         "revised_fraction_of_audio": round(float(np.mean(revised)), 4),
         "merges": merges,
@@ -431,6 +472,12 @@ def main():
         action="store_true",
         help="use the pipeline's clustered output on one-chunk windows "
         "instead of the segmentation's local speaker tracks",
+    )
+    parser.add_argument(
+        "--no-shared-embeddings",
+        action="store_true",
+        help="build the cache with the pipeline's one embedding pass per "
+        "speaker slot instead of the shared frame pass (same output)",
     )
     parser.add_argument("--tick-sec", type=float, default=5.0)
     parser.add_argument("--stream-sec", type=float, default=0.0)
@@ -555,8 +602,8 @@ def main():
 
     header = (
         f"{'first':>6} {'settl':>6} {'end':>6} {'conf':>6} {'miss':>6} "
-        f"{'fa':>6} {'mint/ref':>8} {'cnt±1':>6} {'cnt=':>5} {'signed':>6} "
-        f"{'rev%':>6} {'merg':>5} {'split':>5}  config"
+        f"{'fa':>6} {'mint/ref':>8} {'vis/ref':>7} {'cnt±1':>6} {'vis±1':>6} "
+        f"{'cnt=':>5} {'signed':>6} {'rev%':>6} {'merg':>5} {'split':>5}  config"
     )
     print(header)
     for row in rows[: args.top]:
@@ -566,7 +613,9 @@ def main():
             f"{agg['end_of_stream']['der']:6.3f} {agg['settled']['confusion']:6.3f} "
             f"{agg['settled']['missed']:6.3f} {agg['settled']['false_alarm']:6.3f} "
             f"{row['labels_minted_per_reference_speaker']:8.2f} "
+            f"{row['labels_settled_per_reference_speaker']:7.2f} "
             f"{row['speaker_count_within_1_fraction']:6.2f} "
+            f"{row['speaker_count_settled_within_1_fraction']:6.2f} "
             f"{row['speaker_count_exact_fraction']:5.2f} "
             f"{row['speaker_count_signed_error_mean']:+6.2f} "
             f"{100 * row['revised_fraction_of_audio']:6.2f} {row['merges']:5d} "

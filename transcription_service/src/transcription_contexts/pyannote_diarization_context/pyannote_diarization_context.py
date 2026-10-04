@@ -7,7 +7,10 @@ diarization pipeline in WorkerProcess
 # torch and pyannote are only imported when a diarization context is used,
 # so deployments without the pyannote-diarization extra never load them
 
+import math
 import os
+import time
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -75,11 +78,17 @@ class PyannoteDiarizationService:
         num_threads: int | None = None,
         overlap_aware: bool = False,
         local_speakers: bool = True,
+        shared_embeddings: bool = True,
     ):
         self._pipeline = pipeline
         self._num_threads = num_threads
         self._overlap_aware = overlap_aware
         self._local_speakers = local_speakers
+        self._shared_embeddings = shared_embeddings
+        # Per-stage seconds of the last `diarize` call when the shared pass
+        # ran it (the pipeline's own hooks time the other path). Read by the
+        # benchmark harness; empty after a pipeline pass
+        self.last_stage_times: dict[str, float] = {}
 
     @property
     def num_threads(self) -> int | None:
@@ -129,6 +138,12 @@ class PyannoteDiarizationService:
         waveform = torch.from_numpy(
             np.ascontiguousarray(samples, dtype=np.float32)
         ).unsqueeze(0)
+
+        self.last_stage_times = {}
+        if self._local_speakers and self._shared_embeddings:
+            shared = self._shared_local_pass(waveform, sample_rate)
+            if shared is not None:
+                return shared
 
         kwargs: dict[str, int] = {}
         if min_speakers is not None:
@@ -226,6 +241,168 @@ class PyannoteDiarizationService:
             embeddings=self._local_embeddings(embeddings, mapping),
             overlap_segments=overlap_segments,
         )
+
+    def _shared_local_pass(  # pylint: disable=too-many-locals
+        self, waveform: Any, sample_rate: int
+    ) -> DiarizationPass | None:
+        """
+        The local pass of a one-chunk window with the embedding network run
+        once: segmentation, speaker counting, then one forward pass of the
+        embedding model's frame stage over the window and its pooling stage
+        once per active speaker track.
+
+        pyannote's own pipeline runs the whole embedding network once per
+        (chunk, speaker slot): three times per 10 s window for community-1,
+        inactive slots included, on the same waveform each time, because the
+        speaker mask only enters the final statistics-pooling layer. Running
+        the frame stage once and pooling per active track is the same
+        computation (measured identical to 1.4e-6 relative on AMI audio) at
+        about a third of the cost. The clustering stage is skipped because
+        the local pass never used its output.
+
+        Returns:
+            The pass, or None when the window is longer than one
+            segmentation chunk or the pipeline does not expose the stages,
+            so the caller runs the full pipeline instead
+        """
+        pipeline = self._pipeline
+        inference = getattr(pipeline, "_segmentation", None)
+        embedding = getattr(pipeline, "_embedding", None)
+        model = getattr(embedding, "model_", None)
+        if (
+            inference is None
+            or model is None
+            or not hasattr(model, "forward_frames")
+            or not hasattr(model, "forward_embedding")
+        ):
+            return None
+        chunk_samples = int(round(float(inference.duration) * sample_rate))
+        if waveform.shape[-1] > chunk_samples:
+            return None
+
+        file = {"waveform": waveform, "sample_rate": sample_rate, "uri": "w"}
+        started = time.perf_counter()
+        segmentations = pipeline.get_segmentations(file)
+        if segmentations.data.shape[0] != 1:
+            return None
+        if inference.model.specifications.powerset:
+            binarized = segmentations
+        else:
+            from pyannote.audio.utils.signal import binarize
+
+            binarized = binarize(
+                segmentations,
+                onset=pipeline.segmentation.threshold,
+                initial_state=False,
+            )
+        count = pipeline.speaker_count(
+            binarized, inference.model.receptive_field, warm_up=(0.0, 0.0)
+        )
+        segmentation_sec = time.perf_counter() - started
+
+        started = time.perf_counter()
+        raw = self._shared_embeddings_for(pipeline, embedding, file, binarized)
+        embedding_sec = time.perf_counter() - started
+
+        started = time.perf_counter()
+        if np.nanmax(count.data) == 0.0:
+            result = DiarizationPass(segments=[], embeddings={})
+        else:
+            overlap = self._local_annotation(
+                segmentations, count, exclusive=False
+            )
+            exclusive = self._local_annotation(
+                segmentations, count, exclusive=True
+            )
+            mapping = {
+                label: f"LOCAL_{label}"
+                for label in set(overlap.labels()) | set(exclusive.labels())
+            }
+            overlap_segments = _annotation_segments(
+                overlap.rename_labels(mapping=mapping)
+            )
+            embeddings = {}
+            for label, name in mapping.items():
+                vector = raw.get(int(label))
+                if vector is not None and _usable(vector):
+                    embeddings[name] = vector.reshape(-1).copy()
+            result = DiarizationPass(
+                segments=(
+                    overlap_segments
+                    if self._overlap_aware
+                    else _annotation_segments(
+                        exclusive.rename_labels(mapping=mapping)
+                    )
+                ),
+                embeddings=embeddings,
+                overlap_segments=overlap_segments,
+            )
+        other_sec = time.perf_counter() - started
+        self.last_stage_times = {
+            "segmentation": segmentation_sec,
+            "embeddings": embedding_sec,
+            "clustering_and_other": other_sec,
+            "total": segmentation_sec + embedding_sec + other_sec,
+        }
+        return result
+
+    @staticmethod
+    def _shared_embeddings_for(  # pylint: disable=too-many-locals
+        pipeline: Any, embedding: Any, file: dict, binarized: Any
+    ) -> dict[int, np.ndarray]:
+        """
+        One embedding per active speaker slot of the single chunk, with the
+        pipeline's own mask rule (`embedding_exclude_overlap`: the slot's
+        non-overlapping frames when there are enough of them, else all its
+        frames) and one forward pass of the network's frame stage
+
+        Returns:
+            Slot index -> embedding, in the model's own scale
+        """
+        import torch
+
+        duration = float(binarized.sliding_window.duration)
+        _, num_frames, num_speakers = binarized.data.shape
+        data = np.nan_to_num(binarized.data[0], nan=0.0).astype(np.float32)
+        active = [s for s in range(num_speakers) if float(data[:, s].sum()) > 0]
+        if not active:
+            return {}
+        if getattr(pipeline, "embedding_exclude_overlap", False):
+            min_num_frames = math.ceil(
+                num_frames
+                * embedding.min_num_samples
+                / (duration * embedding.sample_rate)
+            )
+            clean = data * (data.sum(axis=1, keepdims=True) < 2)
+        else:
+            min_num_frames = -1
+            clean = data
+        masks = np.stack(
+            [
+                (
+                    clean[:, slot]
+                    if float(clean[:, slot].sum()) > min_num_frames
+                    else data[:, slot]
+                )
+                for slot in active
+            ]
+        )
+        chunk = next(iter(binarized))[0]
+        chunk_waveform, _ = (
+            pipeline._audio.crop(  # pylint: disable=protected-access
+                file, chunk, mode="pad"
+            )
+        )
+        device = embedding.device
+        model = embedding.model_
+        with torch.inference_mode(), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            frames = model.forward_frames(chunk_waveform[None].to(device))
+            vectors = model.forward_embedding(
+                frames, weights=torch.from_numpy(masks)[None].to(device)
+            )
+        vectors = vectors[0].cpu().numpy()
+        return {slot: vectors[index] for index, slot in enumerate(active)}
 
     def _local_annotation(
         self, segmentations: Any, count: Any, exclusive: bool
@@ -406,6 +583,14 @@ class PyannoteDiarizationContextConfig(BaseModel):
     # distance, 0.6 in the shipped community-1 config; lower splits more
     # readily inside a window). None keeps the model's value.
     clustering_threshold: float | None = None
+    # With `local_speakers`, run the embedding network's frame stage once
+    # per window and pool it once per active speaker track, instead of the
+    # pipeline's one full pass per speaker slot (three per window, inactive
+    # slots included). Same embeddings (the mask only enters the pooling
+    # layer), about a third of the pass cost; the Phase 2 wrap-up in
+    # docs/speaker_diarization.md records the measurement. Off runs the
+    # pipeline unchanged.
+    shared_embeddings: bool = True
 
 
 pyannote_diarization_context_config_adapter = TypeAdapter(
@@ -488,6 +673,7 @@ class PyannoteDiarizationContext(
             self._config.num_threads,
             self._config.overlap_aware,
             self._config.local_speakers,
+            self._config.shared_embeddings,
         )
 
     def _apply_clustering_threshold(self, pipeline: Any) -> None:

@@ -1,0 +1,1 @@
+{"grid": {"match_threshold": [0.4], "new_speaker_threshold": [0.3], "attach_threshold": [0.2], "min_mint_duration_sec": [2.5], "overlap_bonus": [0.15], "merge_threshold": [1.0], "revision_margin": [0.1], "overlap_aware": [false, true]}}

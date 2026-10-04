@@ -28,7 +28,10 @@ chunks:
    the pyannote context reports the segmentation model's own speaker
    tracks, each with its centroid embedding, rather than the pipeline's
    clustered output (which collapses such a window to one speaker; see
-   "Phase 2b results"). `SpeakerReconciler` then maps the pass's tracks
+   "Phase 2b results"), and runs the embedding network once per window,
+   pooling it once per active track, instead of once per speaker slot
+   (same embeddings at a third of the cost; see "Phase 2 wrap-up
+   results"). `SpeakerReconciler` then maps the pass's tracks
    onto stable session labels by **speaker-embedding memory**: it keeps one
    running centroid per session speaker, in memory only, and attaches each
    track to the speaker whose centroid it resembles the most, wherever and
@@ -37,7 +40,12 @@ chunks:
    only for a track that is clearly far from every known speaker and has
    enough speech behind it; shorter unknown voices are pooled until they
    have been heard enough, and backchannels attach to the best match or
-   stay unlabelled. The pass reports the labelled segments, the score each
+   stay unlabelled. Because consecutive windows overlap, the audio a new
+   label was minted on is diarized again by the next pass: when that pass
+   labels most of it as an existing speaker, the new label was a split of
+   that speaker and is **folded** into it before its captions settle (its
+   centroid is parked, so a voice that does come back takes its label
+   back). The pass reports the labelled segments, the score each
    label was attached with, the window it covered and how old the audio
    was when the labels were ready (the **diarization lag**).
 
@@ -166,7 +174,10 @@ and this is the whole of their lifetime.
    | `diarization_attach_threshold` | 0.2 | a track too short to mint attaches to the best speaker at or above this; below it the track stays unlabelled and is pooled |
    | `diarization_min_mint_sec` | 2.5 | speech a voice needs, in one pass or accumulated over the passes that heard it, before it can mint a label |
    | `diarization_max_session_speakers` | 32 | bound on labels (and centroids) per session |
-   | `diarization_merge_threshold` | 1.0 (off) | two speakers whose centroids reach this similarity are merged |
+   | `diarization_merge_threshold` | 1.0 (off) | two speakers whose centroids reach this similarity are merged; re-tested in "Phase 2 wrap-up results" (never removes a fragment, merges real people below 0.5) |
+   | `diarization_merge_max_age_sec` | 20 | with merging on, only a speaker minted within this many seconds can be merged away (0 = any age), so two established speakers are never joined |
+   | `diarization_fragment_fold_sec` | 7.5 | a label minted within this many seconds whose audio the next pass re-labels as another speaker is folded into that speaker before its captions settle; 7.5 s is one and a half periods at the default 5 s period (exactly the next pass), scale it with `diarization_period_ms`; 0 disables. Measured in "Phase 2 wrap-up results" |
+   | `diarization_fragment_fold_fraction` | 0.8 | fraction of the fragment's audio inside the next window that other speakers must cover for the fold |
    | `diarization_overlap_bonus` | 0.15 | added to the score in proportion to the time overlap with the previous pass's labels (consecutive windows share audio); also carries identity when a pass has no embeddings |
    | `diarization_sustained_split_sec` | 0 (off) | a voice that keeps scoring between the new-speaker and the match threshold against its best speaker mints its own label after this many seconds of such evidence; measured in "Phase 2c results" (adds labels, never finds a second person on the benchmark set) |
    | `diarization_recluster_period_sec` | 0 (off) | every this many seconds of session time the session's track history is re-clustered with the PLDA/VBx clustering shipped with the model, merging and splitting speakers to follow it; sent labels never change. Measured in "Phase 2c results" |
@@ -190,6 +201,7 @@ Context settings:
 | `local_speakers` | `true` | on a one-chunk window (10 s or less) report the segmentation model's speaker tracks with their embeddings instead of the pipeline's clustered output, which collapses such a window to one speaker. Longer windows always use the pipeline's clustering. |
 | `overlap_aware` | `false` | report pyannote's overlap-aware turns instead of the exclusive ones; words are attributed to the speaker overlapping them the most either way. Measured in "Phase 2b results". |
 | `clustering_threshold` | `null` (model 0.6) | override of the pipeline's VBx clustering threshold; only matters for windows longer than one chunk. |
+| `shared_embeddings` | `true` | with `local_speakers`, run the embedding network's frame stage once per window and pool it per active speaker track instead of pyannote's one full pass per speaker slot (three per window). Same embeddings, about a third of the pass cost; `false` runs the pipeline unchanged. Measured in "Phase 2 wrap-up results". |
 
 ## Wire format
 
@@ -409,8 +421,16 @@ Per file and aggregated, in `report.replay`:
 - `labels_minted_per_reference_speaker`: session labels the reconciler
   created divided by the people actually speaking in the streamed part
   (at least 5 s). Two-sided since Phase 2c: the acceptance band is 0.8 to
-  1.2 and the gate tracks `labels_per_speaker_deviation` (its distance
-  from 1), because "at most 1.2" could not catch under-counting.
+  1.2, because "at most 1.2" could not catch under-counting. Since the
+  Phase 2 wrap-up every count metric also exists on the labels present on
+  **settled captions** (`labels_settled_per_reference_speaker`,
+  `speaker_count_settled_within_1_fraction`,
+  `speaker_count_settled_exact_fraction`): a label the fragment fold
+  removes before its audio settles is minted but never shown, so these
+  are what a viewer sees and what the band and the gate
+  (`labels_settled_per_speaker_deviation`, distance from 1) use. The
+  `*_all` variants count every reference speaker however briefly they
+  spoke, beside the 5 s rule.
 - `tick_cost_sec` (mean / p50 / p95 / worst against the period budget),
   `stage_cost_sec` per pyannote stage (segmentation, embeddings,
   clustering and other) and `reconciler_cost_sec`.
@@ -466,9 +486,12 @@ then commit it.
 `make benchmark_diarization_acceptance RESULT=<report>` checks the Phase 2a
 targets in `baselines/phase2a_acceptance.json` and reports each with its
 margin, or by how much it was missed; `TARGETS=` points it at the Phase 2b
-(`phase2b_acceptance.json`) and Phase 2c (`phase2c_acceptance.json`, with
-the two-sided labels-per-speaker band and the classroom target) files. A
-missed target is never relaxed in the file; it is reported.
+(`phase2b_acceptance.json`), Phase 2c (`phase2c_acceptance.json`, with
+the two-sided labels-per-speaker band and the classroom target) and
+Phase 2 wrap-up (`phase2_wrapup_acceptance.json`: RTF at most 0.25, at
+most 1.5 labels per person on the classroom's settled captions, the band
+and the count on settled captions) files. A missed target is never
+relaxed in the file; it is reported.
 
 The committed baselines are the official Phase 2 starting point measured on
 the unmodified, synchronous pipeline (commit recorded in each file's
@@ -1095,6 +1118,226 @@ gate with `SET=dev STREAM_SEC=120` to compare like with like. The
 Phase 2b thresholds and defaults are unchanged, so the Phase 2b baseline
 is still what this code produces on that set.
 
+### Phase 2 wrap-up results
+
+RTF headroom and classroom over-splitting, measured 2026-10-04 on top of
+the Phase 2c code. Two open items from Phase 2c are addressed here: the
+diarization real-time factor sat at 0.301 against the 0.3 ceiling (the gate
+baseline was therefore not moved), and the classroom case minted 8 labels
+for 4 people. Every replay number below comes from the cached pyannote
+passes of Phase 2c (`results/phase2c/cache_*.pkl`, 10 s window, 5 s period)
+through the production reconciler and attacher, so a configuration costs
+seconds to score and the pyannote stage is identical across rows; the
+container run at the end measures the service itself.
+
+**Where the pass cost goes.** In the Phase 2c container run a pass cost
+1.41 s, of which the embedding stage took 1.34 s (95 percent), segmentation
+0.13 s and clustering 0.002 s. pyannote's pipeline extracts one embedding
+per (chunk, speaker slot): for community-1 that is three slots per 10 s
+window, inactive slots included, and each one is a full forward pass of the
+WeSpeaker ResNet34 over the same 10 s waveform, because the speaker mask
+only enters the network's final statistics-pooling layer. The context now
+runs the network's frame stage once per window and pools it once per
+**active** speaker track (`shared_embeddings`, on by default), and skips
+the pipeline's clustering stage, whose output the local pass never used.
+
+| | pipeline pass (Phase 2c) | shared pass (default now) |
+|---|---|---|
+| embedding network forward passes per window | 3 (one per slot) | 1 (frame stage) + one pooling per active track |
+| native pass cost, mean over 24 ES2004a windows, 1 thread | 0.52 s (0.75 s on windows with speech) | 0.20 s (0.27 s) |
+| native tick cost, dev set, 360 passes, 2 threads (cache build) | 0.709 s mean / 0.815 s p95 | 0.200 s mean / 0.243 s p95 |
+| native replay tick, dev set at 120 s, suite run | - | 0.174 s mean / 0.238 s p95 (embeddings 0.126 s, segmentation 0.047 s) |
+| embeddings | - | identical: largest relative difference 1.7e-6 over 468 embeddings, lowest cosine 0.9999998 |
+| exclusive segments (what captions use) | - | identical in 360 of 360 passes |
+| settled DER / confusion, dev set at 120 s | 0.313 / 0.021 | 0.313 / 0.021 |
+
+Accuracy is unchanged by construction and by measurement: the dev-set
+cache rebuilt with the shared pass gives the same segments and the same
+embeddings to float precision, and the suite's replay on the dev set at the
+gate horizon reproduces the Phase 2b numbers exactly.
+
+*Why not a per-chunk cache.* The idea was to cache segmentation and
+embeddings per audio offset and compute only the new 5 s of each window.
+It cannot save anything here: the 10 s window **is** one segmentation
+chunk, the segmentation model's output for [t - 10, t] is not composed from
+the outputs for [t - 10, t - 5] and [t - 5, t], and the embedding is pooled
+over the whole chunk. Consecutive windows share audio, not model
+computation, and a cache keyed by offset would never hit at a 5 s period
+because the chunk boundaries move by 5 s every tick. It would only pay if
+windows were tiled without overlap (period = window), which doubles label
+latency. The reuse that does exist is inside a window, across speaker
+slots, and that is what the shared pass takes.
+
+*Cheap wins checked and not taken* (native, 1 thread, frame stage over a
+10 s window; `results/phase2d/onnx_quant_check.log`): batch size is moot
+once the network runs once per window; skipping embeddings for inactive
+slots is part of the shared pass (on the dev set 1.2 of 3 slots are active
+on average, and windows without speech never reach the embedding stage);
+ONNX Runtime fp32 runs the frame stage in 214 ms against 231 ms for torch
+(7 percent, relative difference 5.8e-6), not worth a second inference
+runtime and an export step; ONNX Runtime dynamic int8 takes 1306 ms (six
+times slower on this CPU, which has no int8 kernels for these
+convolutions) and moves the embeddings to cosine 0.94 against fp32;
+torch's dynamic int8 quantisation touches only `Linear` layers, of which
+the frame stage has none.
+
+*A measurement fix that came with it.* The old local pass read pyannote's
+`speaker_counting` hook artefact after the pipeline had finished, and the
+pipeline's own `to_diarization` had by then capped that count in place to
+its cluster count (one on a one-chunk window). The exclusive turns were
+unaffected, but the "overlap-aware" turns the context reported were capped
+to one speaker per frame as well, which is why every `overlap_*` metric of
+Phase 2c equals its exclusive counterpart. The shared pass computes the
+count itself, so the `overlap_aware` context option now really reports
+overlapping turns. On the dev set (full 10 min, from the rebuilt cache)
+the overlap-aware output scores settled DER 0.262 and confusion 0.054
+against 0.279 and 0.061 for the exclusive output, with 1.08 instead of
+0.92 labels minted per speaker. The default stays exclusive in this step
+(words are attributed to one speaker either way); the standard-set
+measurement of the corrected option is in the known limitations.
+
+**Merging converged speakers, re-tested.** The merge path that shipped
+disabled in Phase 2b (`diarization_merge_threshold`: two speakers whose
+centroids reach this cosine are merged) was swept together with a new age
+limit (`diarization_merge_max_age_sec`: only a speaker minted within this
+many seconds may be merged away, so two established speakers are never
+joined). Thresholds 0.7 to 0.35, ages 0 (any), 10, 15, 20, 30 and 60 s:
+
+| set | threshold 0.7 to 0.5 | 0.45 | 0.40 | 0.35, any age |
+|---|---|---|---|---|
+| dev + classroom: merges / confusion (0.061 without) | 0 to 1 / 0.061 | 0 to 4 / 0.061 to 0.091 | 1 to 5 / 0.076 to 0.099 | 8 / 0.107 |
+| classroom labels on settled captions (8 without) | 8 | 8 | 8 | 8 |
+| standard set: merges / confusion (0.103 without) | 0 to 3 / 0.103 to 0.105 | 1 to 8 / 0.105 to 0.110 | 5 to 12 / 0.107 to 0.111 | 21 / 0.113 |
+| standard set: labels on settled captions per speaker (1.14 without) | 1.14 | 1.13 | 1.11 to 1.12 | 1.12 |
+
+It never removes a classroom label: the extra labels there are not voices
+that converge on an existing speaker. Below 0.5 it starts merging real
+people (confusion up, speaker count within one down to 19 of 24 at 0.35
+with no age limit) for at most 0.03 fewer visible labels per speaker. It
+stays disabled; the age limit ships at 20 s for a deployment that enables
+it (at 0.40 it halves the confusion cost of merging, 0.107 against 0.111).
+
+**What the classroom's extra labels are.** Replaying the classroom cache
+with the production reconciler and tracing every minted label
+(`results/phase2d/`; the diagnostic is in the Phase 2 wrap-up log) gives
+four real labels and four fragments:
+
+| label | who | minted on | speech it got | heard again | what the next pass did with its audio |
+|---|---|---|---|---|---|
+| spk_0 | instructor | pass 0, the padded first 5 s window | 5.0 s | in 8 of 110 later passes | relabelled all 5 s as spk_1 (3 s) and spk_2 (2 s) |
+| spk_1 | instructor | pass 1, split of the instructor | 4.0 s | never | relabelled the 1 s inside the next window as spk_2 |
+| spk_2 | instructor | pass 1 | 848 s | 99 passes | confirmed |
+| spk_3 | questioner FEE016 | pass 11 | 44.5 s | 8 passes | confirmed |
+| spk_4 | instructor | pass 23, split of the instructor | 5.0 s | never | relabelled 4.6 of 4.6 s as spk_2 |
+| spk_5 | questioner MEO015 (question 3) | pass 32 | 6.3 s | 3 passes, 0.1 s | relabelled 2.1 of 2.6 s as the instructor |
+| spk_6 | questioner MEO015 | pass 43 | 50.5 s | 7 passes | confirmed |
+| spk_7 | questioner MEE014 | pass 77 | 41.5 s | 7 passes | confirmed |
+
+The fragments' centroids are far from everyone at minting (cosine 0.06 to
+0.26 to the speaker they belong to; the padded first window's embedding is
+unreliable) and they get no further audio to move them, so no centroid
+convergence can catch them. What does identify them is the next pass: the
+windows overlap by 5 s, so the audio a label was minted on is diarized
+again one period later with context on both sides, and in every fragment's
+case that pass labels the same audio as an existing speaker, while every
+real speaker is heard again under its own label.
+
+**Fragment fold.** That observation is now a rule in the reconciler
+(`diarization_fragment_fold_sec`, default 7.5 s, and
+`diarization_fragment_fold_fraction`, default 0.8): a label minted within
+`fragment_fold_sec` of session time whose audio inside the current window
+the current pass covers with other speakers' labels, for at least the
+fraction of it, is folded into the speaker covering most of it. The fold
+is reported to the attacher like a merge (`relabel`), which relabels the
+fragment's spans before they settle, so the extra label never reaches a
+settled caption; the fragment's label and centroid are **parked** rather
+than discarded, and a voice that later matches a parked centroid takes its
+old label back instead of minting a new one (this keeps the audit's six
+regression cases passing: a real second voice that one window missed
+returns under the label it had). 7.5 s is one and a half diarization
+periods: exactly the next pass, and nothing later, may fold a label; scale
+it with `diarization_period_ms`. The target's centroid is left as it is.
+A fragment the next window does not reach is left alone (no evidence
+either way).
+
+Sweep (`configs/tune_grid_fold*.json`, fold window 5.5 s = next pass,
+10.5 s = next two passes, fractions 0.5 to 1.0):
+
+| configuration | classroom labels minted / on settled captions (4 people) | questions with own label | dev + classroom settled DER / confusion | standard set: settled DER / confusion | labels on settled captions per speaker | settled count within one / exact |
+|---|---|---|---|---|---|---|
+| no fold (Phase 2c) | 8 / 8 (2.0 per person) | 8 of 9 | 0.231 / 0.061 | 0.267 / 0.103 | 1.14 | 20 of 24 / 10 of 24 |
+| **next pass, fraction 0.8 (default)** | **8 / 6 (1.5 per person)** | **8 of 9** | **0.228 / 0.058** | **0.266 / 0.102** | **1.06** | **19 of 24 / 11 of 24** |
+| next pass, fraction 0.5 | 8 / 6 | 8 of 9 | 0.228 / 0.058 | 0.267 / 0.103 | 1.06 | 19 / 11 |
+| next pass, fraction 1.0 | 8 / 6 | 8 of 9 | 0.228 / 0.058 | 0.266 / 0.102 | 1.10 | 19 / 10 |
+| next two passes, fraction 0.5 (no parking) | 11 / 7 | 8 of 9 | 0.232 / 0.062 | 0.267 / 0.103 | 1.02 | 22 / 12 |
+
+The classroom ends with 6 labels on settled captions for 4 people (1.5
+per person, the target's edge): spk_0, spk_1 and spk_4 fold into the
+instructor and spk_5 into the instructor as well (question 3 was already
+scored as the instructor's), 8 of 9 questions keep a non-instructor label
+and the instructor's label covers 97.7 percent of the lecture time (96.5
+before). The two labels left over are confirmed voices: an instructor
+fragment the next window heard again for 0.4 s (spk_5 in the folded run,
+6.9 s on settled captions) and the noisy questioner's second label on
+question 9 (cosine 0.28 to that questioner's first label, just under the
+new-speaker threshold). On the dev set nothing folds (ES2004a's fifth label
+was already off settled captions). On the standard set the fold changes
+six files: EN2002a and EN2002b lose 0.004 to 0.005 DER, jwggf 0.008 and
+its confusion halves, uicid (one speaker) and ylgug (two) end with the
+right count, and **epygx**, a five-person debate, drops from 5 to 3
+visible labels (DER 0.196 to 0.204): two real speakers whose first turns
+the next window re-labelled as another panelist, the known cost of the
+rule. Net on 24 files: settled DER 0.267 to 0.266, confusion 0.103 to
+0.102, labels on settled captions per speaker 1.14 to 1.06 (band 0.8 to
+1.2), exact count 10 to 11 of 24, count within one 20 to 19 of 24 (79
+percent, so the Phase 2c "80 percent" target is missed by one meeting,
+epygx). Labels minted per speaker stays 1.17 either way: the fold does not
+change what is minted, only what reaches the screen, which is why the
+labels-per-speaker metrics now come in two kinds (below).
+
+In the live service the fold arrives one period after the fragment's
+label was computed, so a fragment label can still reach an **in-progress**
+caption for up to a period and be corrected on finalization; a label
+already sent on a finalized caption is never changed (the attacher's rule),
+so a fragment whose caption finalized within that period stays. The
+container run measures both (`label_changes_before_final_fraction`, target
+at most 5 percent, and `label_changes_after_sent`, must be 0).
+
+**Two kinds of label count.** Since this step every count metric exists
+twice: on the labels the reconciler minted or used in any pass, and on the
+labels present on **settled captions** (what a viewer ends up seeing; a
+folded fragment is in the first and not the second). The acceptance band
+0.8 to 1.2 and the gate now use the settled-caption versions
+(`replay.labels_settled_per_reference_speaker`,
+`replay.speaker_count_settled_within_1_fraction`,
+`replay.speaker_count_settled_exact_fraction`,
+`classroom.labels_per_person_settled`); the minted and used versions stay
+in the report. And, as asked, every count is reported both against the
+reference speakers with at least 5 s of speech and against every reference
+speaker however briefly they spoke (`*_all`). Standard set, final
+configuration:
+
+| reference speakers counted | labels minted per speaker | labels on settled captions per speaker | count within one | exact |
+|---|---|---|---|---|
+| at least 5 s of speech (the default since Phase 2c) | 1.17 | 1.06 | 19 of 24 (settled), 20 of 24 (any pass) | 11 of 24 (settled), 8 of 24 (any pass) |
+| any speech | 1.05 | - | 19 of 24 (any pass) | 10 of 24 (any pass) |
+
+The two references differ on six files (IS1009b 3 against 4 speakers,
+IS1009c 2 against 4, TS3003a 2 against 4, TS3003b 3 against 4, jwggf 3
+against 5, ylgug 2 against 3): people with under 5 s in ten minutes, who
+cannot earn a label at a 2.5 s minting minimum.
+
+**Offline reference (the model's ceiling).** Pending the whole-file
+offline pass on the remaining 15 files of the standard set (9 are done:
+the dev meetings and the six decisive files of Phase 2c); see the
+container run note below.
+
+**Container run and gate baseline.** Pending the Linux reference container
+run of this configuration (`make benchmark_diarization_gate_docker
+SET=standard STREAM_SEC=0 SUITE_ARGS=--skip-offline`); the baseline moves
+only when every Phase 2a and 2b must target, the RTF ceiling included,
+holds in that run.
+
 ### Hard cases
 
 `make benchmark_diarization_hardcases` prepares and replays the six cases in
@@ -1146,11 +1389,15 @@ terms accepted, the `pyannote-diarization` extra installed
 
 ## Performance notes
 
-Diarization costs one pass per period on its own worker. On the 4-CPU
-reference container a 10 s window costs about 1.3 s per 5 s period (RTF
-0.27) at one torch thread and holds about 0.6 GB; see "Phase 2a results"
-for the measured per-session cost and how many sessions the container
-sustains. The caption worker is never slowed by it: if the diarization
+Diarization costs one pass per period on its own worker. Up to Phase 2c a
+10 s window cost about 1.4 s per 5 s period on the 4-CPU reference
+container (RTF 0.30) at one torch thread, 95 percent of it in the
+embedding network, which pyannote ran three times per window; since the
+Phase 2 wrap-up the network runs once per window (native pass 0.52 s to
+0.20 s, same embeddings; the container figure is in "Phase 2 wrap-up
+results"). The worker holds about 0.85 GB; see "Phase 2a results" for the
+per-session cost and how many sessions the container sustains. The
+caption worker is never slowed by it: if the diarization
 worker falls behind it skips audio (unlabelled, counted) rather than
 queueing. Measure real hardware with `benchmarks/diarization/` before
 enabling in production.
@@ -1188,9 +1435,9 @@ Everything the fork adds can be verified from a clean clone of
 
 | Layer | Change |
 |---|---|
-| `transcription_service` | `PyannoteDiarizationContext`: optional worker-pool context running `pyannote/speaker-diarization-community-1` (CPU by default, CUDA-ready) with its own thread cap, nice and segmentation step |
+| `transcription_service` | `PyannoteDiarizationContext`: optional worker-pool context running `pyannote/speaker-diarization-community-1` (CPU by default, CUDA-ready) with its own thread cap, nice and segmentation step; on one-chunk windows it reports the segmentation's local speaker tracks and runs the embedding network once per window (a third of the pipeline's pass cost, same embeddings) |
 | `transcription_service` | `DiarizationJob`: a second worker-pool job per session on the diarization worker, newest-window passes, skip-based back-pressure, lag and uncovered-audio counters |
-| `transcription_service` | `SpeakerReconciler`: maps per-pass labels to session-wide labels by overlap voting, so one voice keeps one label across passes |
+| `transcription_service` | `SpeakerReconciler`: maps per-pass labels to session-wide labels by speaker-embedding memory plus overlap voting, so one voice keeps one label across passes; folds a fresh label the next pass re-labels as an existing speaker before it settles (parking it for revival) |
 | `transcription_service` | `SpeakerLabelAttacher`: joins captions and labels in the session without ever holding a caption; frozen label timeline, late `speakers_update`s, timeout |
 | `transcription_service` | Diarization metrics on `/metrics/status`, folded apart from the caption series |
 | Wire format | Optional `speakers` and `sequence_id` on transcript sequences and the `speakers_update` message, end to end through the WebSocket messages and the shared TypeScript schemas; all null or absent when diarization is off |
@@ -1208,26 +1455,73 @@ all rights to the original code.
 
 ## Known limitations
 
-- Speaker identity rests on one centroid embedding per speaker and a
-  single set of thresholds, confirmed on 24 meetings in Phase 2c. The
-  typical error on far-field audio is one person split into several
-  labels (fragments on a speaker's first seconds, a questioner's second
-  question under a new label), not two people under one; the exception is
-  a many-speaker panel in clean audio (VoxConverse hhepf: two labels for
-  six people, where the offline pipeline finds all six). The tradeoff is measured in "Phase 2b results" and "Phase 2c
-  results"; the thresholds and the two optional guards are
-  configuration.
-- A new speaker is labelled only after about `diarization_min_mint_sec`
-  of speech; their first words attach to the nearest known speaker or stay
+Plain-language notes for deployers, each with its measured size (AMI
+far-field meetings and VoxConverse panels, first 10 minutes, 10 s window,
+5 s period; "Phase 2c results" and "Phase 2 wrap-up results" hold the
+tables).
+
+- **Far-field rooms under-count quiet or brief speakers.** With one
+  distant microphone, a person who speaks little may never get a label:
+  TS3003a's second speaker (11.6 s in ten minutes) stays inside the main
+  speaker's label, and EN2002d ends with 3 labels for 4 people. Offline
+  pyannote over the whole file lands in the same place on both, so this is
+  the model and the recording, not the streaming path. On the 24-file set,
+  5 meetings end with fewer labels on screen than people who spoke 5 s or
+  more, 8 with more.
+- **Clean panels of many short-turn speakers collapse in streaming.**
+  Where offline pyannote separates every voice with the whole file in
+  hand, the 10 s windows plus the session memory merge people: the
+  six-person news panel hhepf ends with 2 labels (confusion 0.36 of its
+  speech), the three-person iacod with 2, and the five-person debate
+  epygx with 3 since the fragment fold (5 before it; two of its speakers'
+  first turns were re-labelled as another panelist by the next window).
+  This is the one real streaming-pipeline under-count and it is open.
+- **One person can still appear as two labels.** The typical far-field
+  error is a split, not a merge: 1.17 labels are minted per real speaker
+  on the set and 1.06 reach settled captions (1.14 before the fold); 11 of
+  24 meetings end with exactly the right count, 19 within one. The
+  classroom case ends with 6 labels for 4 people: an instructor fragment
+  the next window heard again and a second label for the noisy
+  questioner. A new label is minted only after about 2.5 s of a voice, so
+  a person's first words attach to the nearest known speaker or stay
   unlabelled.
-- Words already finalized keep the label they were finalized with; later,
-  better speaker evidence revises only words not yet finalized. That is by
-  design: a label shown on a finalized caption never changes.
-- After the caption worker drops audio (its buffer was full for longer
-  than it holds), the drop is placed at the newest Whisper time the session
-  had seen, so words between the drop and the next result can be a few
-  seconds off against the diarization clock.
-- Accuracy degrades with heavily overlapping speech and far-field audio.
-- GPU deployments can set `"device": "cuda"` in the context config; a
-  streaming-native alternative (NVIDIA Streaming Sortformer) can be added as
-  another context implementation without touching the provider wiring.
+- **Wrong-person labels on far-field audio.** Speaker confusion is 0.10 of
+  reference speech over the set (ES2004c 0.30, TS3003c 0.26, TS3003d 0.21;
+  the clean VoxConverse files 0.00 to 0.09): in a noisy far-field meeting
+  about one word in ten carries another participant's label. The
+  offline-pipeline ceiling on the same files is reported in "Phase 2
+  wrap-up results" as it is measured.
+- **Heavy noise merges voices.** Pink noise at 5 dB signal-to-noise on
+  the hard-case clip turns four voices into two labels (settled DER 0.569
+  against 0.392 for the clean clip). In the classroom case the questioner
+  under the same noise still gets a non-instructor label on all three
+  questions, but one of them under a second label.
+- **Overlapping speech shows one speaker.** Words spoken over someone
+  else take the dominant speaker's label, and missed speech (0.12 of
+  reference speech on the set, mostly overlap and far-field pauses) is
+  the segmentation model's, with no threshold to lower. The context can
+  report overlapping turns (`overlap_aware`); on the dev set that output
+  scores settled DER 0.262 against 0.279, and it is not the default yet.
+- **A fragment label can flash on an in-progress caption.** The fold
+  that removes a split label arrives one period after it was minted, so
+  such a label can show on the in-progress tail for up to 5 s and is
+  corrected at finalization; a label already sent on a finalized caption
+  never changes, by design, so a fragment whose caption finalized inside
+  that period stays. The first window of a session (5 s, padded to the
+  model's 10 s) gives the least reliable embedding and is the usual
+  source of such a label.
+- **Labels are frozen once final.** Words already finalized keep the
+  label they were finalized with; later, better speaker evidence revises
+  only words not yet finalized.
+- **Clock shift after a caption-side audio drop.** After the caption
+  worker drops audio (its buffer was full for longer than it holds), the
+  drop is placed at the newest Whisper time the session had seen, so words
+  between the drop and the next result can be a few seconds off against
+  the diarization clock.
+- **Capacity.** The 4-CPU reference container sustains one diarized
+  session, limited by Whisper, not diarization (see "Phase 2a results");
+  the diarization worker falls behind only at four sessions and then skips
+  audio (shown unlabelled, counted) rather than delaying captions. GPU
+  deployments can set `"device": "cuda"` in the context config; a
+  streaming-native alternative (NVIDIA Streaming Sortformer) can be added
+  as another context implementation without touching the provider wiring.

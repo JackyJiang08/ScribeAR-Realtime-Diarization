@@ -3,6 +3,11 @@ Defines SpeakerReconciler for keeping speaker labels stable across
 repeated diarization runs, with a per-session memory of speaker embeddings
 """
 
+# pylint: disable=too-many-lines
+# One class with its session memory, scoring, minting, folding, merging and
+# re-clustering; splitting it would scatter the invariants its docstrings
+# state in one place.
+
 from dataclasses import dataclass, field, replace
 from typing import Callable
 
@@ -71,6 +76,28 @@ class SpeakerReconcilerConfig:
                                     at least this similar are merged (the
                                     junior label maps onto the senior one);
                                     1.0 disables merging
+        merge_max_age_sec       - Only a speaker minted within this many
+                                    seconds of session time may be merged
+                                    away as the junior: a new label that
+                                    converges to an existing speaker is
+                                    folded back before its audio settles on
+                                    screen, while two long-established
+                                    speakers are never merged. 0 puts no age
+                                    limit on merging
+        fragment_fold_sec       - A label minted within this many seconds
+                                    whose audio the current run (the next,
+                                    overlapping window) re-labels as another
+                                    speaker is folded into that speaker: the
+                                    run's view of the same audio decides
+                                    what the new voice was. The fragment's
+                                    label never reaches settled captions;
+                                    its centroid is parked rather than
+                                    merged, so a voice that does come back
+                                    clearly gets its label back instead of
+                                    minting another. 0 disables
+        fragment_fold_fraction  - Fraction of the fragment's audio inside
+                                    the current window that other speakers
+                                    must cover for the fold
         centroid_memory_sec     - Cap on the weight of a centroid, so a
                                     speaker's centroid can still follow the
                                     voice after this much speech
@@ -114,7 +141,10 @@ class SpeakerReconcilerConfig:
 
     # Tuned 2026-10-03 on the three AMI meetings (full 10 min, 10 s window,
     # 5 s period): benchmarks/diarization/tune_reconciler.py, grids in
-    # benchmarks/diarization/configs/tune_grid*.json.
+    # benchmarks/diarization/configs/tune_grid*.json. The fragment fold
+    # (2026-10-04, Phase 2 wrap-up) defaults to one and a half diarization
+    # periods at the default 5 s period, so exactly the next pass may fold a
+    # fresh label; scale it with `diarization_period_ms`.
     label_prefix: str = "spk_"
     match_threshold: float = 0.4
     new_speaker_threshold: float = 0.3
@@ -124,6 +154,9 @@ class SpeakerReconcilerConfig:
     max_speakers: int = 32
     max_candidates: int = 8
     merge_threshold: float = 1.0
+    merge_max_age_sec: float = 20.0
+    fragment_fold_sec: float = 7.5
+    fragment_fold_fraction: float = 0.8
     centroid_memory_sec: float = 120.0
     overlap_bonus: float = 0.15
     min_update_sec: float = 0.5
@@ -146,6 +179,8 @@ class SpeakerMemory:
         weight      - Seconds of speech behind the centroid, capped
         total_sec   - Seconds of speech attributed to the speaker so far
         last_seen   - Session time the speaker was last heard
+        minted_at   - Session time the label was minted (end of the run that
+                        minted it)
     """
 
     label: str
@@ -153,6 +188,7 @@ class SpeakerMemory:
     weight: float
     total_sec: float
     last_seen: float
+    minted_at: float = 0.0
 
 
 @dataclass(eq=False)
@@ -194,6 +230,9 @@ class SpeakerReconcilerState:
     """
 
     speakers: list[SpeakerMemory] = field(default_factory=list)
+    # Speakers folded as fragments (`fragment_fold_sec`), kept with their
+    # label and centroid so the voice can take its label back
+    parked: list[SpeakerMemory] = field(default_factory=list)
     candidates: list[_Candidate] = field(default_factory=list)
     # Voices heard near, but never clearly matching, a known speaker
     # (`sustained_split_sec`)
@@ -306,6 +345,8 @@ class SpeakerReconciler:
         # must not pull the speaker's centroid towards a voice that may be
         # someone else's (see `sustained_split_sec`)
         self._hold_centroid: set[str] = set()
+        # Session time of the current run (end of its newest segment)
+        self._now = 0.0
 
     @property
     def labels_minted(self) -> int:
@@ -342,6 +383,10 @@ class SpeakerReconciler:
                     ),
                 )
                 for s in self._state.speakers
+            ],
+            parked=[
+                replace(s, centroid=s.centroid.copy())
+                for s in self._state.parked
             ],
             candidates=[
                 replace(c, centroid=c.centroid.copy())
@@ -390,6 +435,7 @@ class SpeakerReconciler:
         if len(segments) == 0:
             return []
 
+        self._now = max(s.end for s in segments)
         clusters = self._clusters(segments, embeddings or {})
         overlap = self._overlap_fractions(clusters)
         mapping = self._assign_strong_matches(clusters, overlap)
@@ -404,6 +450,7 @@ class SpeakerReconciler:
                 self.last_mapping[cluster.label] = None
                 continue
             label, confidence = decision
+            self._revive(label)
             mapping[cluster.label] = label
             self.last_confidence[label] = max(
                 self.last_confidence.get(label, 0.0), confidence
@@ -417,8 +464,11 @@ class SpeakerReconciler:
                     label, cluster, cluster.label not in self._hold_centroid
                 )
                 self._remember_track(label, cluster)
+        self._fold_fragments(mapping, segments)
         self._merge_similar_speakers(mapping)
         self._maybe_recluster(mapping, max(c.last_end for c in clusters))
+        # A merge re-points raw labels of this run at the senior speaker
+        self.last_mapping.update(mapping)
 
         reconciled = [
             replace(segment, speaker=mapping[segment.speaker])
@@ -440,13 +490,14 @@ class SpeakerReconciler:
         claimed: set[str] = set()
         scored = []
         for cluster in clusters:
-            for speaker in self._state.speakers:
+            for speaker in self._state.speakers + self._state.parked:
                 score = self._score(cluster, speaker, overlap)
                 if score is not None and score >= self._config.match_threshold:
                     scored.append((score, cluster.label, speaker.label))
         for score, raw, label in sorted(scored, key=lambda s: -s[0]):
             if raw in mapping or label in claimed:
                 continue
+            self._revive(label)
             mapping[raw] = label
             claimed.add(label)
             self.last_confidence[label] = max(
@@ -543,7 +594,7 @@ class SpeakerReconciler:
     ) -> tuple[str | None, float]:
         best_label = None
         best_score = -1.0
-        for speaker in self._state.speakers:
+        for speaker in self._state.speakers + self._state.parked:
             score = self._score(cluster, speaker, overlap)
             if score is not None and score > best_score:
                 best_label, best_score = speaker.label, score
@@ -659,6 +710,7 @@ class SpeakerReconciler:
                 weight=0.0,
                 total_sec=0.0,
                 last_seen=0.0,
+                minted_at=self._now,
             )
         )
         return label
@@ -847,10 +899,124 @@ class SpeakerReconciler:
         self.last_splits.append((label, child))
         return child
 
+    def _fold_fragments(  # pylint: disable=too-many-locals
+        self, mapping: dict[str, str], segments: list[SpeakerSegment]
+    ) -> None:
+        """
+        Folds labels minted by the previous run(s) whose audio this run
+        re-labels as someone else. Consecutive windows overlap, so the
+        audio a new label was minted on is diarized again by the next pass
+        with more context on both sides; when that pass covers most of it
+        with another speaker, the new label was a split of that speaker
+        (or a padded first window's unreliable voice) and is folded into
+        it before the audio settles on screen. A voice the next pass hears
+        again under its own label is confirmed and kept, and a fragment
+        the next window does not reach is left alone.
+        """
+        cfg = self._config
+        if cfg.fragment_fold_sec <= 0 or not self._state.previous:
+            return
+        window_start = min(s.start for s in segments)
+        window_end = max(s.end for s in segments)
+        current = [
+            replace(segment, speaker=mapping[segment.speaker])
+            for segment in segments
+            if segment.speaker in mapping
+        ]
+        for junior in list(self._state.speakers):
+            age = self._now - junior.minted_at
+            if age <= 0.0 or age > cfg.fragment_fold_sec:
+                continue
+            spans = [
+                s for s in self._state.previous if s.speaker == junior.label
+            ]
+            inside = sum(
+                max(0.0, min(s.end, window_end) - max(s.start, window_start))
+                for s in spans
+            )
+            if inside <= 0.0:
+                continue
+            cover: dict[str, float] = {}
+            for span in spans:
+                for seg in current:
+                    overlap = min(span.end, seg.end) - max(
+                        span.start, seg.start
+                    )
+                    if overlap > 0.0:
+                        cover[seg.speaker] = (
+                            cover.get(seg.speaker, 0.0) + overlap
+                        )
+            others = {k: v for k, v in cover.items() if k != junior.label}
+            if not others:
+                continue
+            target_label, covered = max(others.items(), key=lambda kv: kv[1])
+            if sum(others.values()) < cfg.fragment_fold_fraction * inside:
+                continue
+            del covered
+            target = self._speaker(target_label)
+            self._fold(junior, target, mapping)
+            current = [
+                (
+                    replace(s, speaker=target.label)
+                    if s.speaker == junior.label
+                    else s
+                )
+                for s in current
+            ]
+
+    def _revive(self, label: str) -> None:
+        """
+        Returns a parked speaker to the active memory when a run matches
+        its voice again; a no-op for an active label
+        """
+        for parked in self._state.parked:
+            if parked.label == label:
+                self._state.parked.remove(parked)
+                self._state.speakers.append(parked)
+                return
+
+    def _fold(
+        self, junior: SpeakerMemory, target: SpeakerMemory, mapping: dict
+    ) -> None:
+        """
+        Parks `junior` and re-points its label at `target` for this run and
+        the previous one; the target's centroid is left as it is (the
+        fragment's voice is the unreliable one). The parked speaker keeps
+        its centroid, so the voice can reclaim the label if it does come
+        back clearly
+        """
+        cfg = self._config
+        target.total_sec += junior.total_sec
+        target.last_seen = max(target.last_seen, junior.last_seen)
+        self._state.speakers.remove(junior)
+        if junior.centroid is not None:
+            parked = self._state.parked
+            parked.append(junior)
+            if len(parked) > cfg.max_candidates:
+                parked.sort(key=lambda s: s.last_seen)
+                del parked[0]
+        for raw, label in list(mapping.items()):
+            if label == junior.label:
+                mapping[raw] = target.label
+        self._state.previous = [
+            replace(s, speaker=target.label) if s.speaker == junior.label else s
+            for s in self._state.previous
+        ]
+        if junior.label in self.last_confidence:
+            self.last_confidence[target.label] = max(
+                self.last_confidence.get(target.label, 0.0),
+                self.last_confidence.pop(junior.label),
+            )
+        self.last_merges.append((junior.label, target.label))
+
     def _merge_similar_speakers(self, mapping: dict[str, str]) -> None:
         """
         Merges speakers whose centroids have converged: the junior label is
-        mapped onto the senior one for this run and from now on
+        mapped onto the senior one for this run and from now on. With
+        `merge_max_age_sec` only a recently minted junior can be merged, so
+        the rule folds a new label back into the speaker it turned out to be
+        while its audio is still unsettled, and never joins two established
+        speakers
         """
         cfg = self._config
         if cfg.merge_threshold >= 1.0:
@@ -864,6 +1030,11 @@ class SpeakerReconciler:
                     continue
                 for junior in speakers[i + 1 :]:
                     if junior.centroid is None:
+                        continue
+                    if (
+                        cfg.merge_max_age_sec > 0
+                        and self._now - junior.minted_at > cfg.merge_max_age_sec
+                    ):
                         continue
                     similarity = float(np.dot(senior.centroid, junior.centroid))
                     if similarity < cfg.merge_threshold:

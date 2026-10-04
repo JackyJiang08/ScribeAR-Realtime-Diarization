@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Phase 2 wrap-up grid for tune_reconciler.py: merging converged",
+    "speakers (merge_threshold on the cosine of two centroids) limited to",
+    "recently minted juniors (merge_max_age_sec; 0 = any age), on top of",
+    "the Phase 2b defaults. Judged on labels visible on settled captions",
+    "per person (classroom), labels per speaker in the 0.8..1.2 band and",
+    "confusion on the standard set, and the fraction of classroom",
+    "questions that keep a non-instructor label."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.3],
+    "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5],
+    "overlap_bonus": [0.15],
+    "revision_margin": [0.1],
+    "merge_threshold": [1.0, 0.7, 0.6, 0.5, 0.45, 0.4, 0.35],
+    "merge_max_age_sec": [0.0, 10.0, 15.0, 20.0, 30.0, 60.0]
+  }
+}

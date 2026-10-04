@@ -127,6 +127,15 @@ class TimedPipeline:
     def __getattr__(self, name):
         return getattr(self._pipeline, name)
 
+    def record(self, stage_times: dict) -> None:
+        """
+        Stage seconds a pass reported itself (the context's shared local
+        pass runs the stages without going through the pipeline call)
+        """
+        self.last = {k: float(v) for k, v in stage_times.items()}
+        for name, seconds in self.last.items():
+            self.stage_times[name].append(seconds)
+
     def reset(self):
         self.stage_times = defaultdict(list)
 
@@ -290,6 +299,9 @@ class _Chain:
             },
             "labels_minted": self.reconciler.labels_minted,
             "labels_used": len(self.labels_used),
+            # What a viewer ends up seeing: a label merged away before its
+            # audio settled never appears here
+            "labels_settled": len({s.speaker for s in self.settled}),
             "merges": self.merges,
             "splits": self.splits,
             "reclusterings": self.reconciler.reclusterings,
@@ -391,6 +403,10 @@ def run_streaming(
         result = service.diarize(window, SAMPLE_RATE)
         cost = time.perf_counter() - started
         tick_costs.append(cost)
+        if timed_pipeline is not None:
+            own_stages = getattr(service, "last_stage_times", None)
+            if own_stages:
+                timed_pipeline.record(own_stages)
         rss_now = current_rss_mb()
         if rss_start is None:
             rss_start = rss_now
@@ -485,7 +501,9 @@ def run_streaming(
     )
     labels_used = chain_report["labels_used"]
     labels_minted = chain_report["labels_minted"]
+    labels_settled = chain_report["labels_settled"]
     count_error = labels_used - reference_speakers_streamed
+    settled_count_error = labels_settled - reference_speakers_streamed
 
     return {
         "hypotheses": chain_report["hypotheses"],
@@ -541,6 +559,7 @@ def run_streaming(
         "regions_labelled": regions_labelled,
         "session_labels_minted": labels_minted,
         "session_labels_used": labels_used,
+        "session_labels_settled": labels_settled,
         "session_labels_merged": chain_report["merges"],
         "session_labels_split": chain_report["splits"],
         "reclusterings": chain_report["reclusterings"],
@@ -560,10 +579,27 @@ def run_streaming(
             if reference_speakers_streamed
             else None
         ),
+        "labels_settled_per_reference_speaker": (
+            round(labels_settled / reference_speakers_streamed, 2)
+            if reference_speakers_streamed
+            else None
+        ),
+        "labels_minted_per_reference_speaker_all": (
+            round(labels_minted / reference_speakers_all, 2)
+            if reference_speakers_all
+            else None
+        ),
         "speaker_count_error": count_error,
         "speaker_count_error_all": labels_used - reference_speakers_all,
+        "speaker_count_settled_error": settled_count_error,
         "speaker_count_within_1": bool(abs(count_error) <= 1),
         "speaker_count_exact": bool(count_error == 0),
+        "speaker_count_within_1_all": bool(
+            abs(labels_used - reference_speakers_all) <= 1
+        ),
+        "speaker_count_exact_all": bool(labels_used == reference_speakers_all),
+        "speaker_count_settled_within_1": bool(abs(settled_count_error) <= 1),
+        "speaker_count_settled_exact": bool(settled_count_error == 0),
         "memory": {
             "rss_after_first_tick_mb": round(rss_start, 1),
             "rss_end_mb": round(rss_end, 1),
@@ -602,6 +638,14 @@ def _mean_of(files: list[dict], path: list[str], digits: int = 3):
                 break
         if isinstance(node, (int, float)):
             values.append(float(node))
+    return round(float(np.mean(values)), digits) if values else None
+
+
+def _fraction_of(files: list[dict], flag: str, digits: int = 3):
+    """
+    Fraction of files whose streaming entry has `flag` set
+    """
+    values = [1.0 if f["streaming"].get(flag) else 0.0 for f in files if "streaming" in f]
     return round(float(np.mean(values)), digits) if values else None
 
 
@@ -707,6 +751,12 @@ def main():
     parser.add_argument("--skip-streaming", action="store_true")
     parser.add_argument("--skip-offline", action="store_true")
     parser.add_argument(
+        "--no-shared-embeddings",
+        action="store_true",
+        help="run pyannote's one embedding pass per speaker slot instead of "
+        "the context's shared frame pass (same output, about 3x the cost)",
+    )
+    parser.add_argument(
         "--threads",
         type=int,
         default=None,
@@ -775,6 +825,7 @@ def main():
             "device": args.device,
             "token_env_var": token_var,
             "segmentation_step": args.segmentation_step,
+            "shared_embeddings": not args.no_shared_embeddings,
             # The benchmark sets torch threads itself above and must not
             # be reniced: it is the measurement, not a worker.
             "num_threads": None,
@@ -974,6 +1025,38 @@ def main():
             "labels_minted_per_reference_speaker": _mean_of(
                 files, ["streaming", "labels_minted_per_reference_speaker"], 2
             ),
+            "labels_settled_per_reference_speaker": _mean_of(
+                files, ["streaming", "labels_settled_per_reference_speaker"], 2
+            ),
+            "labels_minted_per_reference_speaker_all": _mean_of(
+                files,
+                ["streaming", "labels_minted_per_reference_speaker_all"],
+                2,
+            ),
+            "speaker_count_settled_within_1_fraction": _fraction_of(
+                files, "speaker_count_settled_within_1"
+            ),
+            "speaker_count_settled_exact_fraction": _fraction_of(
+                files, "speaker_count_settled_exact"
+            ),
+            "speaker_count_within_1_fraction_all": _fraction_of(
+                files, "speaker_count_within_1_all"
+            ),
+            "speaker_count_exact_fraction_all": _fraction_of(
+                files, "speaker_count_exact_all"
+            ),
+            "meetings_under_counted_all": sum(
+                1
+                for f in files
+                if "streaming" in f
+                and f["streaming"]["speaker_count_error_all"] < 0
+            ),
+            "meetings_over_counted_all": sum(
+                1
+                for f in files
+                if "streaming" in f
+                and f["streaming"]["speaker_count_error_all"] > 0
+            ),
             "speaker_count_abs_error_mean": _mean_of(
                 [
                     {"v": abs(f["streaming"]["speaker_count_error"])}
@@ -1040,6 +1123,22 @@ def main():
                     3,
                 )
             ),
+            "labels_settled_per_speaker_deviation": (
+                round(
+                    abs(
+                        _mean_of(
+                            files,
+                            [
+                                "streaming",
+                                "labels_settled_per_reference_speaker",
+                            ],
+                            4,
+                        )
+                        - 1.0
+                    ),
+                    3,
+                )
+            ),
             "speaker_counts": [
                 {
                     "file": f["file"],
@@ -1049,6 +1148,7 @@ def main():
                     ],
                     "predicted": f["streaming"]["session_labels_used"],
                     "minted": f["streaming"]["session_labels_minted"],
+                    "settled": f["streaming"]["session_labels_settled"],
                     "offline": f.get("offline", {}).get("hypothesis_speakers"),
                 }
                 for f in files

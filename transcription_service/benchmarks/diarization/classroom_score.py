@@ -170,6 +170,21 @@ def score(report: dict, questions_doc: dict) -> dict:
             if q["label_shared_with_other_questioner"]
         ),
         "labels_minted": entry["streaming"]["session_labels_minted"],
+        # Labels a viewer saw on settled captions (a label merged away
+        # before its audio settled is not among them), and both counts per
+        # person in the room (instructor plus questioners)
+        "labels_settled": len({label for _, _, label in timeline}),
+        "people": len({r["speaker"] for r in rows} | {instructor}),
+        "labels_per_person_minted": round(
+            entry["streaming"]["session_labels_minted"]
+            / len({r["speaker"] for r in rows} | {instructor}),
+            2,
+        ),
+        "labels_per_person_settled": round(
+            len({label for _, _, label in timeline})
+            / len({r["speaker"] for r in rows} | {instructor}),
+            2,
+        ),
         "settled_der": entry["streaming"]["settled"]["der"]["value"],
         "settled_confusion": entry["streaming"]["settled"]["der"].get(
             "confusion"
@@ -194,7 +209,10 @@ def main():
     print(
         f"instructor {result['instructor']} -> {result['instructor_label']} "
         f"({result['instructor_label_share_of_lecture']} of lecture time); "
-        f"labels minted {result['labels_minted']}; settled DER {result['settled_der']}"
+        f"labels minted {result['labels_minted']}, on settled captions "
+        f"{result['labels_settled']} for {result['people']} people "
+        f"({result['labels_per_person_settled']} per person); "
+        f"settled DER {result['settled_der']}"
     )
     print(
         f"{'#':>2} {'speaker':8s} {'noisy':5s} {'start':>7} {'len':>5} {'label':8s} verdict"

@@ -1,0 +1,18 @@
+{
+  "_comment": [
+    "Phase 2 wrap-up before/after rows: the Phase 2b defaults with the",
+    "fragment fold off (0) and at its default (7.5 s = the next pass at a",
+    "5 s period, fraction 0.8, folded labels parked for revival)."
+  ],
+  "grid": {
+    "match_threshold": [0.4],
+    "new_speaker_threshold": [0.3],
+    "attach_threshold": [0.2],
+    "min_mint_duration_sec": [2.5],
+    "overlap_bonus": [0.15],
+    "revision_margin": [0.1],
+    "merge_threshold": [1.0],
+    "fragment_fold_sec": [0.0, 7.5],
+    "fragment_fold_fraction": [0.8]
+  }
+}
