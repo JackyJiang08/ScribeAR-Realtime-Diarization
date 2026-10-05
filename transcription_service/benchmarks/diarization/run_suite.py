@@ -32,6 +32,7 @@ Usage (from transcription_service/):
 
 import argparse
 import json
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -116,6 +117,68 @@ def diarization_settings(config_path: Path, provider: str) -> dict:
         ),
         "segmentation_step": step,
     }
+
+
+def paired_caption_key_metrics(prefix: str, reports: list[dict]) -> dict:
+    """
+    The caption key metrics of several runs of one mode folded into one
+    value per metric: the median across runs (None where no run had the
+    value). With one run it is that run's metrics. The gate compares these
+    medians, so a single noisy run (the VM's slowest tick landing in one
+    stream) cannot decide caption latency or dropped periods on its own.
+    """
+    per_run = [caption_key_metrics(prefix, r) for r in reports if r]
+    if not per_run:
+        return {}
+    keys = []
+    for metrics in per_run:
+        for key in metrics:
+            if key not in keys:
+                keys.append(key)
+    out: dict = {}
+    for key in keys:
+        values = [
+            m[key]
+            for m in per_run
+            if isinstance(m.get(key), (int, float))
+            and not isinstance(m.get(key), bool)
+        ]
+        if values:
+            out[key] = statistics.median(values)
+        else:
+            out[key] = per_run[-1].get(key)
+    return out
+
+
+def pair_ratio_key_metrics(pairs: list[dict]) -> dict:
+    """
+    Per pair, diarization-on over diarization-off for the metrics the parity
+    targets read, then the median ratio across pairs. Informational beside
+    the medians (how the parity step of the Phase 2 wrap-up decided).
+    """
+    ratios: dict[str, list[float]] = {}
+    for pair in pairs:
+        on = caption_key_metrics("x", pair.get("on"))
+        off = caption_key_metrics("x", pair.get("off"))
+        for name in (
+            "chunk_id.in_progress.p50",
+            "chunk_id.in_progress.p95",
+            "chunk_id.final.p50",
+            "dropped_periods",
+            "exec_ms_p95",
+            "audio_dropped_buffer_full_sec",
+        ):
+            a, b = on.get(f"x.{name}"), off.get(f"x.{name}")
+            if (
+                isinstance(a, (int, float))
+                and isinstance(b, (int, float))
+                and b
+            ):
+                ratios.setdefault(name, []).append(a / b)
+    out = {"caption.pairs": len(pairs)}
+    for name, values in ratios.items():
+        out[f"caption.pair_ratio.{name}"] = round(statistics.median(values), 3)
+    return out
 
 
 def caption_key_metrics(prefix: str, report: dict | None) -> dict:
@@ -432,6 +495,15 @@ def main():
     )
     parser.add_argument("--caption-audio", default=None)
     parser.add_argument("--caption-seconds", type=float, default=180.0)
+    parser.add_argument(
+        "--caption-pairs",
+        type=int,
+        default=3,
+        help="how many alternating off/on pairs the caption step runs with "
+        "the reference config; the gated caption.on.* and caption.off.* "
+        "key metrics are the medians across the pairs (1 = one run per "
+        "mode, the behaviour before the production-readiness step)",
+    )
     parser.add_argument("--chunk-ms", type=int, default=500)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument(
@@ -528,6 +600,7 @@ def main():
             "classroom_data": rel_path(classroom_data),
             "caption_audio": rel_path(caption_audio),
             "caption_seconds": args.caption_seconds,
+            "caption_pairs": args.caption_pairs,
             "chunk_ms": args.chunk_ms,
             "sessions_sweep": args.sessions_sweep,
             "steps": sorted(steps),
@@ -667,11 +740,28 @@ def main():
         return json.loads(out_path.read_text(encoding="utf-8"))
 
     if "caption" in steps:
-        report["caption_latency"] = {"reference": {}}
-        for mode in ("on", "off"):
-            report["caption_latency"]["reference"][mode] = caption_run(
-                f"caption_reference_{mode}", args.reference_config, mode, 1
-            )
+        # Alternating off, on pairs (off first, as the parity step of the
+        # Phase 2 wrap-up ran them): `pairs` holds every run, `on` and
+        # `off` the last pair's for readers that want one report per mode.
+        pairs = []
+        for index in range(max(1, args.caption_pairs)):
+            suffix = f"_pair{index + 1}" if args.caption_pairs > 1 else ""
+            pair = {}
+            for mode in ("off", "on"):
+                pair[mode] = caption_run(
+                    f"caption_reference_{mode}{suffix}",
+                    args.reference_config,
+                    mode,
+                    1,
+                )
+            pairs.append(pair)
+        report["caption_latency"] = {
+            "reference": {
+                "pairs": pairs,
+                "on": pairs[-1]["on"],
+                "off": pairs[-1]["off"],
+            }
+        }
         if args.with_dev_vad:
             report["caption_latency"]["secondary_dev_vad"] = {}
             for mode in ("on", "off"):
@@ -701,12 +791,23 @@ def main():
     reference_runs = (
         _get(report, "caption_latency", "reference", default={}) or {}
     )
-    key_metrics.update(
-        caption_key_metrics("caption.on", reference_runs.get("on"))
+    reference_pairs = reference_runs.get("pairs") or (
+        [{"on": reference_runs.get("on"), "off": reference_runs.get("off")}]
+        if reference_runs
+        else []
     )
     key_metrics.update(
-        caption_key_metrics("caption.off", reference_runs.get("off"))
+        paired_caption_key_metrics(
+            "caption.on", [p.get("on") for p in reference_pairs]
+        )
     )
+    key_metrics.update(
+        paired_caption_key_metrics(
+            "caption.off", [p.get("off") for p in reference_pairs]
+        )
+    )
+    if reference_pairs:
+        key_metrics.update(pair_ratio_key_metrics(reference_pairs))
     if report.get("concurrency"):
         key_metrics.update(
             concurrency_key_metrics(

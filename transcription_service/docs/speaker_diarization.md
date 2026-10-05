@@ -498,7 +498,13 @@ process:
    the Phase 2a/2b baselines used 120).
 2. **Caption latency** (`caption_latency.py`): starts the real service with
    the reference config, streams ES2004a at real time in 0.5 s SAFP frames
-   for `CAPTION_SEC` seconds (default 180), diarization **on** and **off**.
+   for `CAPTION_SEC` seconds (default 180), diarization **on** and **off**,
+   as `CAPTION_PAIRS` alternating off/on pairs (default 3; the gate reads
+   the **median** of each caption metric across the pairs, so one noisy
+   stream cannot decide latency or dropped periods; `CAPTION_PAIRS=1` is
+   the single run every suite before the production-readiness step made).
+   Every run's report is kept under `caption_latency.reference.pairs`, and
+   `caption.pair_ratio.*` records the median per-pair on/off ratio.
 3. **Classroom case** (`classroom_score.py` over a replay of
    `data/classroom`, see "Phase 2c results"): whether each short question
    gets a label other than the instructor's.
@@ -587,7 +593,10 @@ In `report.caption_latency.reference.{on,off}`:
 `make benchmark_diarization_gate` (or `_docker`) runs the suite and then
 `compare_baseline.py`, which picks `baselines/<environment.baseline_key>.json`
 and fails (exit 1) when any gated metric is worse than the baseline beyond
-`max(abs, rel * |baseline|)` from `baselines/gate_rules.json`. Accuracy
+`max(abs, rel * |baseline|)` from `baselines/gate_rules.json`. The caption
+metrics on both sides are the medians of the suite's paired runs since
+the production-readiness step; the baseline committed on 2026-10-05 is the
+last single-run suite, and the first paired suite run replaces it. Accuracy
 metrics carry an absolute tolerance of 0.02, timing metrics 15 to 20
 percent, counts a small absolute margin; metrics without a rule are printed
 for information only. To move the baseline after an accepted change, run

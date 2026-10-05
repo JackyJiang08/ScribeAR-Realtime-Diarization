@@ -64,6 +64,8 @@ test_integration:
 #   STREAM_SEC=...  streaming replay length per file (default 0 = full 10 min;
 #                   the Phase 2a/2b baselines used 120)
 #   CAPTION_SEC=... seconds streamed in the end-to-end caption probe (180)
+#   CAPTION_PAIRS=  alternating off/on caption runs; the gated caption
+#                   metrics are medians across them (3; 1 = a single run)
 #   LABEL=...       free-text label stored in the report
 #   SUITE_ARGS=...  extra run_suite.py flags, e.g. --with-dev-vad --skip-offline
 #   BENCH_CPUS / BENCH_MEMORY_GB  container limits for the *_docker targets (4 / 8)
@@ -77,6 +79,7 @@ STREAM_SEC ?= 0
 # benchmark_diarization_offline_counts.
 OFFLINE_SET ?= dev
 CAPTION_SEC ?= 180
+CAPTION_PAIRS ?= 3
 LABEL ?=
 SUITE_ARGS ?=
 GATE_BASELINE ?= auto
@@ -124,6 +127,7 @@ benchmark_diarization_suite: benchmark_diarization_data
 	uv run python $(BENCH_DIR)/run_suite.py \
 		--set $(SET) --offline-set $(OFFLINE_SET) \
 		--stream-sec $(STREAM_SEC) --caption-seconds $(CAPTION_SEC) \
+		--caption-pairs $(CAPTION_PAIRS) \
 		--label "$(LABEL)" --out $(RESULT) $(SUITE_ARGS)
 
 # The standard suite inside upstream's Linux CPU image with fixed limits
@@ -132,6 +136,7 @@ benchmark_diarization_suite_docker: benchmark_diarization_data
 	$(BENCH_DIR)/docker/run_in_docker.sh \
 		--set $(SET) --offline-set $(OFFLINE_SET) \
 		--stream-sec $(STREAM_SEC) --caption-seconds $(CAPTION_SEC) \
+		--caption-pairs $(CAPTION_PAIRS) \
 		--label "$(LABEL)" --out $(subst $(BENCH_DIR)/,/app/$(BENCH_DIR)/,$(RESULT)) $(SUITE_ARGS)
 
 # Regression gate: run the suite, then fail if any gated key metric is worse
