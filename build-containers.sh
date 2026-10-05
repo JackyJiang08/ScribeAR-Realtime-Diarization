@@ -144,3 +144,33 @@ else
       "$ROOT/transcription_service" -t "scribear/transcription-service-$device:$TAG"
   done <<< "$CUDA_BUILDS"
 fi
+
+# Speaker-diarization variants (transcription-service-<device>-diarization):
+# the production image plus the pyannote extra and the gated model, baked in
+# at build time with a HuggingFace token passed as a BuildKit secret. Built
+# only when a token is in the environment, because the model cannot be
+# downloaded without one; the images without diarization are unaffected.
+# See deployment/DIARIZATION.md.
+HF_BUILD_TOKEN="${HUGGINGFACE_ACCESS_TOKEN:-${HF_TOKEN:-}}"
+if [ -z "$HF_BUILD_TOKEN" ]; then
+  echo "Skipping diarization images (set HUGGINGFACE_ACCESS_TOKEN to build them)"
+else
+  export SCRIBEAR_BUILD_HF_TOKEN="$HF_BUILD_TOKEN"
+  echo "Building transcription-service-cpu-diarization"
+  DOCKER_BUILDKIT=1 docker build -f "$ROOT/transcription_service/Dockerfile_diarization" \
+    --build-arg "BASE_IMAGE=scribear/transcription-service-cpu:$TAG" \
+    --build-arg TORCH_EXTRA=silero-vad-cpu \
+    --secret id=hf_token,env=SCRIBEAR_BUILD_HF_TOKEN \
+    "$ROOT/transcription_service" -t "scribear/transcription-service-cpu-diarization:$TAG"
+  if [ -n "$CUDA_BUILDS" ]; then
+    while IFS=$'\t' read -r device base_image; do
+      [ -n "$device" ] || continue
+      echo "Building transcription-service-$device-diarization"
+      DOCKER_BUILDKIT=1 docker build -f "$ROOT/transcription_service/Dockerfile_diarization" \
+        --build-arg "BASE_IMAGE=scribear/transcription-service-$device:$TAG" \
+        --build-arg TORCH_EXTRA=silero-vad \
+        --secret id=hf_token,env=SCRIBEAR_BUILD_HF_TOKEN \
+        "$ROOT/transcription_service" -t "scribear/transcription-service-$device-diarization:$TAG"
+    done <<< "$CUDA_BUILDS"
+  fi
+fi

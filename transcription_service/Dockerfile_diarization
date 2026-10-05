@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+#
+# Speaker-diarization variant of a production transcription-service image.
+#
+# Layers the optional pyannote dependency group and the diarization model on
+# top of an already built production image (CPU or CUDA), so the Python
+# environment, thread caps, provenance labels and health check are exactly
+# the base image's. The model is downloaded ONCE, here, with a HuggingFace
+# token passed as a BuildKit secret (never written to a layer), into a plain
+# directory the service loads from at runtime: a running container needs no
+# network and no HF_TOKEN. See deployment/DIARIZATION.md.
+#
+# Build (from transcription_service/), CPU:
+#   docker build -f Dockerfile_CPU -t scribear/transcription-service-cpu:dev .
+#   docker build -f Dockerfile_diarization \
+#       --build-arg BASE_IMAGE=scribear/transcription-service-cpu:dev \
+#       --secret id=hf_token,env=HUGGINGFACE_ACCESS_TOKEN \
+#       -t scribear/transcription-service-cpu-diarization:dev .
+# CUDA (the torch extra must match the base: the CUDA bases install
+# `silero-vad`, the CPU base `silero-vad-cpu`):
+#   docker build -f Dockerfile_diarization \
+#       --build-arg BASE_IMAGE=scribear/transcription-service-cuda:dev \
+#       --build-arg TORCH_EXTRA=silero-vad \
+#       --secret id=hf_token,env=HUGGINGFACE_ACCESS_TOKEN \
+#       -t scribear/transcription-service-cuda-diarization:dev .
+# build-containers.sh does both when HUGGINGFACE_ACCESS_TOKEN is set.
+ARG BASE_IMAGE=scribear/transcription-service-cpu:latest
+FROM ${BASE_IMAGE}
+
+# `silero-vad-cpu` on the CPU base, `silero-vad` on a CUDA base. The two are
+# declared conflicting in pyproject.toml, so naming the wrong one here would
+# resolve a second torch; the lockfile is the same frozen one the base used.
+ARG TORCH_EXTRA=silero-vad-cpu
+# The gated model to bake. Only the default is wired to
+# SCRIBEAR_DIARIZATION_MODEL_DIR below; another id needs `model` in the
+# context config to name the directory instead.
+ARG DIARIZATION_MODEL=pyannote/speaker-diarization-community-1
+
+# ffmpeg: shared libraries torchcodec (a pyannote.audio 4 dependency) loads
+# at import time. Audio decoding itself stays with the service's own decoder.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Same extras as the base image plus pyannote, from the same frozen lockfile,
+# into the same /app/.venv (UV_PROJECT_ENVIRONMENT on the CUDA base, the
+# default on the CPU base).
+RUN uv sync --frozen --no-editable \
+    --extra faster-whisper \
+    --extra ${TORCH_EXTRA} \
+    --extra pyannote-diarization
+
+# Where the model lives in the image. The pyannote context loads the default
+# model from this directory whenever the variable is set (no token, no
+# network), and fails start-up with a clear message if it is incomplete.
+ENV SCRIBEAR_DIARIZATION_MODEL_DIR=/opt/scribear/models/pyannote/speaker-diarization-community-1
+ENV HF_HUB_DISABLE_TELEMETRY=1
+
+COPY scripts/bake_diarization_model.py ./scripts/bake_diarization_model.py
+
+# Download with the token from the BuildKit secret, verify the pipeline loads
+# from the directory alone, and leave no token behind. The secret mount only
+# exists for this RUN. `--mount=type=secret,required=true` makes a build
+# without the secret fail here, loudly, instead of producing an image that
+# fails at start-up.
+RUN --mount=type=secret,id=hf_token,required=true \
+    /app/.venv/bin/python scripts/bake_diarization_model.py \
+        --model "${DIARIZATION_MODEL}" \
+        --dest "${SCRIBEAR_DIARIZATION_MODEL_DIR}" \
+        --token-file /run/secrets/hf_token
+
+LABEL org.scribear.diarization.model="${DIARIZATION_MODEL}" \
+      org.scribear.diarization.model-license="CC-BY-4.0 (https://huggingface.co/pyannote/speaker-diarization-community-1)"
