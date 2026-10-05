@@ -157,3 +157,53 @@ Things that would help pin it down upstream:
 The full reports with every counter are in this fork under
 `transcription_service/benchmarks/diarization/baselines/linux-cpu-4c8g.json`
 (`caption_latency.reference.off`) and `native-darwin-arm64.json`.
+
+---
+
+## Issue 4: in the client and kiosk webapps no caption text ever reaches the screen-reader live region
+
+**Where.** `libs/ui/transcription-display-ui/src/components/transcription-display-container.tsx`
+puts the **committed sections** inside the `role="log"` `aria-live="polite"`
+region and everything else, the active section's finalized sequences and the
+interim text, inside an `aria-hidden="true"` block (by design: interim text is
+rewritten several times a second). Committed sections are created only by the
+content store's `commitParagraphBreak` action, and the only code that
+dispatches it is the standalone webapp's WebSpeech provider middleware
+(`apps/standalone-webapp/src/features/transcription-providers/stores/provider-service-middleware.ts`,
+on the provider's `commitParagraphBreak` event and on provider switches).
+`apps/client-webapp` and `apps/kiosk-webapp` handle `transcript` events with
+`handleTranscript` alone and never commit a paragraph.
+
+**What happens.** In the two networked apps, `commitedSections` stays empty
+for the whole session: every finalized caption lives in the active section,
+which is hidden from assistive technology. A screen-reader or braille user
+joining a room through the client webapp hears nothing at all, for the whole
+session, while a sighted viewer sees every caption. axe does not catch it,
+because the markup is correct; the region is simply never written to. (The
+translated-captions panel has the same live-region shape and the same
+problem is avoided there only because every translated segment is appended
+directly into its region.)
+
+**Confirmed how.** By code inspection on upstream `staging` (5f01575): a
+search over `apps/` and `libs/` finds `commitParagraphBreak` dispatched only
+in the standalone provider middleware, and the client and kiosk transcript
+handlers only call `handleTranscript` / `applySpeakersUpdate`, which append
+to the active section. Feeding `handleTranscript` events into the content
+reducer leaves `commitedSections` empty (the fork's
+`paragraph-commit-middleware.test.ts` asserts exactly that without the
+middleware installed), and the container renders only `commitedSections`
+inside the `role="log"` element. Not verified with a screen reader by the
+fork's author; the markup makes the outcome deterministic.
+
+**Suggestion.** Dispatch paragraph commits in the client and kiosk apps on
+natural boundaries: a pause in finalized text (a few seconds without a new
+final), a cap on sequences per paragraph (so an uninterrupted monologue is
+still announced in pieces), and, where the provider labels speakers, a
+change of speaker. The fork does this with a store middleware
+(`createParagraphCommitMiddleware` in
+`libs/store/transcription-content-store`, installed by the client and kiosk
+stores; defaults: speaker change, 8 s idle, 6 sequences), and threads the
+previous speaker across committed paragraphs so a speaker is named once per
+turn and not again at every paragraph top. The fix is small and independent
+of diarization; an idle-plus-length rule alone closes the gap for upstream.
+
