@@ -105,6 +105,23 @@ not a hardcoded UID — this is what makes the dashboard both auto-provision
 cleanly here and import cleanly into any other Grafana that has a Prometheus
 datasource, whatever it happens to be named there.
 
+## Speaker diarization panels (fork)
+
+With a `*-diarization` transcription image and `diarization_detector` on, the
+sidecar publishes `scribear_diarization_*` series (guarded by
+`scribear_diarization_supported`) and the fleet dashboard shows two more
+panels: **Speaker diarization: pass cost and label lag (p95)** (healthy: a
+pass well under the 5 s period, about 0.7 s on a 4-CPU CPU host, and a lag
+near 1 s) and **Speaker diarization: audio skipped, dropped periods, failed
+passes** (healthy: all zero; skipped audio shows viewers `Speaker ?`). The
+`diarizationBehindRule` alert fires on skipped audio or lag, with thresholds
+`MONITORING_DIARIZATION_UNCOVERED_RATIO`, `MONITORING_DIARIZATION_MIN_AUDIO_SECONDS`
+and `MONITORING_DIARIZATION_LAG_P95_MS` in `.env`. The service's
+`/metrics/status` also carries `deviceFallbacks` (a GPU request served from
+the CPU) and `workerRestarts` (worker processes replaced after dying); both
+are read by the sidecar's poller as optional fields and are available for a
+custom panel. The operator's guide is [`../DIARIZATION.md`](../DIARIZATION.md).
+
 ## What's exported, and the one known gap
 
 `monitoring-sidecar`'s `/metrics` endpoint is the single source for every

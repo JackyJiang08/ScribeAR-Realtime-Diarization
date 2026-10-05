@@ -12,6 +12,40 @@ lists every key the current `compose.yml` understands.
 
 ---
 
+## Unreleased — speaker diarization images (fork, optional)
+
+**Nothing to do unless you want speaker labels.** No new required key; a
+stock deployment that keeps `TRANSCRIPTION_DEVICE=cpu` is unchanged.
+
+To turn diarization on, see [`DIARIZATION.md`](DIARIZATION.md):
+
+1. Set `TRANSCRIPTION_DEVICE=cpu-diarization` (or `cuda-diarization`,
+   `cuda128-diarization`) in `.env`. The image carries the pyannote model
+   baked in; the container needs no network access and no HuggingFace token.
+2. Point `PROVIDER_CONFIG_PATH` at a copy of
+   [`provider_config.diarization.template.json`](provider_config.diarization.template.json)
+   (two workers, the pyannote context on its own worker,
+   `diarization_detector: true`) and set `TRANSCRIPTION_PROVIDER_IDS` to the
+   provider keys it defines.
+3. `docker compose up -d`. Readiness stays 503 and the log names the fix if
+   the config is wrong (wrong tag, missing model, missing extra): the
+   service no longer starts and then drops every session with a `1011`.
+
+Budget about 0.12 CPU cores and 0.7 GB of RAM for the diarization worker
+per container, beside the caption worker's usual cost; a 4-CPU box still
+serves one session, limited by Whisper. The monitoring sidecar gains three
+optional thresholds (`MONITORING_DIARIZATION_UNCOVERED_RATIO`,
+`MONITORING_DIARIZATION_MIN_AUDIO_SECONDS`, `MONITORING_DIARIZATION_LAG_P95_MS`)
+with defaults; `/metrics/status` gains `deviceFallbacks` and
+`workerRestarts`, both optional in the sidecar's schema.
+
+The model, `pyannote/speaker-diarization-community-1`, is CC BY 4.0 and
+gated: the account whose token builds the image accepts its terms, and the
+deployment's documentation or about screen must credit the model
+(`DIARIZATION.md`, "Licensing and privacy").
+
+---
+
 ## Unreleased — the site root now opens the client webapp
 
 **Image-only change: pull the new `scribear-nginx` image and
