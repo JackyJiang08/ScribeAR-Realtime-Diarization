@@ -1,0 +1,377 @@
+{
+  "label": "phase2c-prod: 30 min, diarization on, same clip and container, paired with the off run for the audio-drop comparison; drift scored with the caption clock corrected for dropped audio",
+  "generated_at": "2026-10-05T00:03:01+0000",
+  "code_revision": "fd47fc8",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "hygiene": {
+    "state": {
+      "taken_at": "2026-10-04T23:32:35+0000",
+      "free_memory_mb": 7026,
+      "swap_used_mb": 0,
+      "load_1m": 1.55,
+      "load_5m": 1.43,
+      "load_15m": 1.52
+    },
+    "warnings": [],
+    "clean": true
+  },
+  "config": {
+    "audio": "benchmarks/diarization/data/soak/soak_60min.wav",
+    "reference": "benchmarks/diarization/data/soak/soak_60min.rttm",
+    "minutes": 30,
+    "diarization": "on",
+    "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "kill_worker_at_sec": 0.0,
+    "bin_min": 5.0,
+    "memory_window_sec": 600.0,
+    "effective_provider_config": {
+      "whisper_context_tag": "whisper_context",
+      "silero_context_tag": "silero_vad",
+      "job_period_ms": 5000,
+      "max_buffer_len_sec": 30,
+      "local_agree_dim": 2,
+      "diarization_detector": true,
+      "diarization_context_tag": "pyannote_diarization",
+      "diarization_period_ms": 5000,
+      "diarization_window_sec": 10,
+      "diarization_edge_margin_sec": 0.5,
+      "diarization_label_timeout_sec": 15
+    },
+    "num_workers": 2
+  },
+  "service": {
+    "ready_after_sec": 6.6,
+    "exited_during_run": null,
+    "log": "benchmarks/diarization/results/phase2e/soak_30min_on_linux.service.log",
+    "workers": [
+      {
+        "pid": 24,
+        "rss_max_mb": 1018.9,
+        "cpu_sec": 2297.26,
+        "wall_sec": 1819.6,
+        "cores": 1.263,
+        "worker": 0
+      },
+      {
+        "pid": 40,
+        "rss_max_mb": 695.4,
+        "cpu_sec": 258.82,
+        "wall_sec": 1819.6,
+        "cores": 0.142,
+        "worker": 1
+      }
+    ],
+    "model_load_times_sec": [
+      3.3
+    ]
+  },
+  "stream": {
+    "late_sends": 0,
+    "max_send_lateness_sec": 0.0,
+    "chunks_sent": 3600,
+    "streamed_sec": 1800.0
+  },
+  "wall_sec": 1819.6,
+  "latency": {
+    "chunk_id_method": {
+      "in_progress": {
+        "count": 198,
+        "mean": 10.488,
+        "p50": 6.959,
+        "p95": 28.894,
+        "max": 41.515
+      },
+      "final": {
+        "count": 164,
+        "mean": 35.76,
+        "p50": 34.506,
+        "p95": 53.133,
+        "max": 67.738
+      }
+    },
+    "word_method": {
+      "first_shown": {
+        "count": 6264,
+        "mean": 31.039,
+        "p50": 31.019,
+        "p95": 52.952,
+        "max": 76.138
+      },
+      "finalized": {
+        "count": 3013,
+        "mean": 52.813,
+        "p50": 55.46,
+        "p95": 73.175,
+        "max": 89.016
+      }
+    },
+    "label_latency": {
+      "after_text_shown": {
+        "count": 2981,
+        "mean": 0.12,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 38.314
+      },
+      "after_finalized": {
+        "count": 2981,
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      }
+    },
+    "transcript_messages": 212,
+    "transcript_messages_with_text": 201,
+    "speakers_update_messages": 17,
+    "speakers_updates_for_unknown_sequence": 0,
+    "final_sequences_with_id": 164,
+    "final_sequences_settled": 17,
+    "final_words": 3013,
+    "final_words_labelled": 2981,
+    "final_words_labelled_fraction": 0.989,
+    "speaker_labels_seen": [
+      "spk_0",
+      "spk_1",
+      "spk_2",
+      "spk_3",
+      "spk_4",
+      "spk_5",
+      "spk_6"
+    ],
+    "label_changes_before_final": 4,
+    "label_changes_before_final_fraction": 0.0013,
+    "label_changes_after_sent": 0
+  },
+  "memory": {
+    "per_pid": {
+      "7": {
+        "role": "parent",
+        "alive_from_sec": 0.0,
+        "alive_to_sec": 1825.5,
+        "rss_first_window_mean_mb": 281.8,
+        "rss_last_window_mean_mb": 282.9,
+        "rss_max_mb": 282.9,
+        "growth_mb": 1.1,
+        "growth_fraction": 0.0039
+      },
+      "23": {
+        "role": "worker_replacement_or_other",
+        "alive_from_sec": 2.0,
+        "alive_to_sec": 1825.5,
+        "rss_first_window_mean_mb": 16.9,
+        "rss_last_window_mean_mb": 16.9,
+        "rss_max_mb": 16.9,
+        "growth_mb": 0.0,
+        "growth_fraction": 0.0
+      },
+      "24": {
+        "role": "caption_worker",
+        "alive_from_sec": 2.0,
+        "alive_to_sec": 1825.5,
+        "rss_first_window_mean_mb": 876.9,
+        "rss_last_window_mean_mb": 880.0,
+        "rss_max_mb": 1018.9,
+        "growth_mb": 3.1,
+        "growth_fraction": 0.0036
+      },
+      "40": {
+        "role": "diarization_worker",
+        "alive_from_sec": 3.0,
+        "alive_to_sec": 1825.5,
+        "rss_first_window_mean_mb": 651.3,
+        "rss_last_window_mean_mb": 657.7,
+        "rss_max_mb": 695.4,
+        "growth_mb": 6.4,
+        "growth_fraction": 0.0099
+      }
+    },
+    "window_sec": 600.0,
+    "service_tree": {
+      "rss_first_window_mean_mb": 1827.0,
+      "rss_last_window_mean_mb": 1837.5,
+      "rss_max_mb": 2004.3,
+      "growth_fraction": 0.0058
+    },
+    "streamed_sec": 1800.0
+  },
+  "drift": {
+    "bin_sec": 300.0,
+    "bins": [
+      {
+        "bin": 0,
+        "start_min": 0.0,
+        "majority_label": {
+          "FEE013": "spk_0",
+          "MEO015": "spk_2",
+          "FEE016": "spk_0"
+        },
+        "labelled_words": 279,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 1,
+        "start_min": 5.0,
+        "majority_label": {
+          "FEE016": "spk_3",
+          "MEO015": "spk_2",
+          "MEE014": "spk_4",
+          "FEE013": "spk_0"
+        },
+        "labelled_words": 324,
+        "unlabelled_words": 5
+      },
+      {
+        "bin": 2,
+        "start_min": 10.0,
+        "majority_label": {
+          "MEE014": "spk_4",
+          "FEE016": "spk_3",
+          "MEO015": "spk_2",
+          "FEE013": "spk_0"
+        },
+        "labelled_words": 705,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 3,
+        "start_min": 15.0,
+        "majority_label": {
+          "FEE016": "spk_3",
+          "FEE013": "spk_0",
+          "MEO015": "spk_2",
+          "MEE014": "spk_4"
+        },
+        "labelled_words": 494,
+        "unlabelled_words": 3
+      },
+      {
+        "bin": 4,
+        "start_min": 20.0,
+        "majority_label": {
+          "FEE013": "spk_0",
+          "FEE016": "spk_3",
+          "MEE014": "spk_4"
+        },
+        "labelled_words": 574,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 5,
+        "start_min": 25.0,
+        "majority_label": {
+          "MEE014": "spk_4",
+          "FEE013": "spk_3",
+          "MEO015": "spk_2"
+        },
+        "labelled_words": 506,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 6,
+        "start_min": 30.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 0
+      }
+    ],
+    "label_swaps": 2,
+    "label_swaps_per_hour": 4.0,
+    "swap_events": [
+      {
+        "bin": 1,
+        "minute": 5.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_0",
+        "to": "spk_3"
+      },
+      {
+        "bin": 5,
+        "minute": 25.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_0",
+        "to": "spk_3"
+      }
+    ],
+    "final_words_labelled": 2882,
+    "final_words_unlabelled": 8,
+    "final_words_labelled_fraction": 0.9972
+  },
+  "caption_clock_shift_sec_at_end": 20.0,
+  "caption_clock_samples": 363,
+  "kill": {
+    "requested_at_sec": 0.0
+  },
+  "recovery": null,
+  "service_counters_delta": {
+    "jobsCompletedTotal": 212.0,
+    "jobsFailedTotal": 0,
+    "asrAudioSecondsTotal": 1780.0,
+    "asrDroppedPeriodsTotal": 149.0,
+    "audioDroppedBufferFullTotal": 40.0,
+    "audioDroppedBufferFullSecondsTotal": 20.0,
+    "bufferOverflowTotal": 179.0,
+    "bufferOverflowSecondsTotal": 1545.78,
+    "vadNoSpeechTotal": 0,
+    "noWordsTotal": 14.0,
+    "temperatureFallbackTotal": 35.0,
+    "repeatedSegmentDetectedTotal": 0,
+    "diarizationRunsTotal": 360.0,
+    "diarizationSecondsTotal": 254.375,
+    "diarizationFailedTotal": 0,
+    "reconcilerSecondsTotal": 0.033,
+    "diarizationLabelsMintedTotal": 7.0,
+    "diarizationAudioSecondsTotal": 1800.0,
+    "diarizationUncoveredSecondsTotal": 0,
+    "diarizationDroppedPeriodsTotal": 0
+  },
+  "key_metrics": {
+    "memory.service_tree_growth_fraction": 0.0058,
+    "memory.diarization_worker_growth_fraction": 0.0099,
+    "memory.caption_worker_growth_fraction": 0.0036,
+    "drift.label_swaps": 2,
+    "drift.label_swaps_per_hour": 4.0,
+    "drift.final_words_labelled_fraction": 0.9972,
+    "labels_minted": 7.0,
+    "reference_speakers": 4,
+    "caption.audio_dropped_buffer_full_seconds": 20.0,
+    "caption.dropped_periods": 149.0,
+    "caption.chunk_id_in_progress_p50": 6.959,
+    "caption.chunk_id_in_progress_p95": 28.894,
+    "diarization.uncovered_seconds": 0,
+    "diarization.dropped_periods": 0,
+    "diarization.failed_passes": 0,
+    "diarization.rtf": 0.141,
+    "diarization.label_changes_after_sent": 0,
+    "recovery.captions_gap_around_kill_sec": null,
+    "recovery.labels_resumed_after_sec": null,
+    "recovery.labels_for_post_kill_audio_after_sec": null,
+    "recovery.job_reregistered_after_sec": null,
+    "recovery.model_load_after_kill_sec": null,
+    "model_load_startup_sec": 3.3
+  }
+}

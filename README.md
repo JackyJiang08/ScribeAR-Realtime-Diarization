@@ -1,52 +1,83 @@
 > **Fork notes — JackyJiang08/ScribeAR-Realtime-Diarization**
 >
 > This fork of [scribear/scribear](https://github.com/scribear/scribear) adds
-> **real-time speaker diarization**: the whisper-streaming provider can label
-> each word with a stable speaker (`spk_0`, `spk_1`, ...) and the viewer renders
-> colored `Speaker N:` labels. Everything else tracks upstream `staging`.
+> **real-time speaker diarization** as a deployable, optional feature of the
+> transcription service: the whisper-streaming provider labels each caption
+> word with a stable per-session speaker (`spk_0`, `spk_1`, ...), and the
+> client, kiosk and translated-caption views render `Speaker 1:`,
+> `Speaker 2:` in colours that stay readable on every theme. Everything else
+> tracks upstream `staging`. Off by default; a deployment that does not opt
+> in is unchanged.
 >
-> **Status (2026-10-04, Phase 2 wrap-up):** working end to end, optional,
-> off by default. Captions never wait for diarization: it runs as its own
-> worker-pool job on its own worker and labels reach already-shown captions
-> through a `speakers_update` message that fills a label slot in place.
-> Speaker identity rests on per-session embedding memory (in memory only,
-> kept 60 s for a reconnect). The wrap-up step cut the diarization pass to
-> a third of its cost by running the speaker-embedding network once per
-> window instead of once per speaker slot (identical embeddings): on
-> upstream's CPU image with 4 CPUs the diarization worker now takes 0.12
-> cores and 0.7 GB at a real-time factor of 0.13 (0.30 before). It also
-> folds a fresh speaker label that the next window re-labels as an existing
-> speaker before its captions settle, so the synthetic classroom case (one
-> instructor, three questioners, nine short questions, one under 5 dB pink
-> noise) shows 6 labels for 4 people instead of 8 while 8 of 9 questions
-> keep a non-instructor label. On the 24-file set (16 AMI test meetings and
-> an 8-file VoxConverse subset, full 10 minutes): settled DER 0.27,
-> confusion 0.10, 1.06 labels on settled captions per real speaker (band
-> 0.8 to 1.2), speaker count exact on 11 and within one on 19 of 24
-> meetings, 98 percent of finalized words labelled. Open: confusion 0.10
-> against the 0.08 target, which the offline pipeline puts at 0.03 on the
-> nine files with a whole-file reference (clustering context, not the
-> model); clean many-speaker panels still collapse in streaming (a
-> six-person panel ends with two labels), and the fold costs a five-person
-> debate two labels. Caption latency with diarization on measured 12
-> percent above off in one run and far above it in a run with a Whisper
-> outlier; three alternating off/on pairs then put the on/off p50 ratio at
-> 0.86 (median) with Whisper's own execution time no higher beside the
-> diarization worker, so caption parity holds and the regression gate now
-> compares against this step's container run on the 24-file set. Full
-> tables, per-meeting counts and caveats are in the diarization doc linked
-> below.
+> **What it does.** Diarization runs as its own worker-pool job on its own
+> worker process, so captions never wait for it: labels ride on the caption
+> when they are ready (almost always) and otherwise follow through a
+> `speakers_update` message that fills a label slot in place. Speaker
+> identity rests on per-session voice embeddings kept in memory only (dropped
+> 60 s after the session ends; nothing touches disk). Translated captions
+> carry the same labels, the transcript download writes one speaker turn per
+> line, and the client and kiosk webapps' screen-reader live region now
+> announces caption paragraphs with each speaker named once per turn (a gap
+> inherited from upstream, where only the standalone app ever fed that
+> region). A dead diarization worker is replaced by the pool within seconds
+> and the session's labels resume with the same identities; CUDA is probed
+> and falls back to the CPU with a warning rather than failing a session; a
+> bad diarization config fails at start-up with the fix in the message.
 >
-> **Enable:** `uv sync --extra pyannote-diarization`, accept the gated
-> `pyannote/speaker-diarization-community-1` terms, export
-> `HUGGINGFACE_ACCESS_TOKEN`, add the `pyannote-diarization` context to
-> `provider_config.json` on a worker of its own (`num_workers: 2`) and set
+> **Headline numbers** (Linux CPU reference container, 4 CPUs, 8 GB; 10 s
+> window, 5 s period; every table in the diarization doc): the diarization
+> worker costs 0.12 cores and 0.7 GB per container at a real-time factor of
+> 0.135; caption latency with diarization on is at parity with off (on/off
+> p50 ratio 0.86 over three alternating pairs); on the 24-file evaluation set
+> (16 AMI meetings and 8 VoxConverse files, 10 min each) settled DER 0.266,
+> speaker confusion 0.102, 1.06 labels on settled captions per real speaker,
+> speaker count exact on 11 and within one on 19 of 24, 98 percent of final
+> words labelled, labels 0 s after the caption text; warm model load 2.7 s
+> from the baked image. A two-hour soak in the same container with the diarization worker
+> killed at 60 min grew the service's memory 1.3 percent, kept every
+> diarization counter clean (no audio skipped, no failed pass, no label
+> changed after sending), replaced the worker in 7.5 s and had the
+> session's labels back 9 s after the kill; the final gate run passed
+> every gated metric against the previous baseline with a clean caption
+> stream (on 4.57 s against off 4.74 s p50) and the whole-file offline
+> pass included (model ceiling DER 0.190, confusion 0.025 on the set), and
+> is now the gate baseline. Still open and documented: confusion 0.10
+> against the 0.08 target (the clustering context, not the model), the
+> set's speaker count within one on 19 of 24 (the fragment fold costs a
+> five-person debate two labels), far-field under-counting and clean
+> many-speaker panels, a single-run dropped-period count of 10 against 5
+> with diarization on (inside the off configuration's own spread), and one
+> label flip in six five-minute bins of the paired 30-minute run.
+>
+> **Enable.** Deploy the `transcription-service-<device>-diarization` image
+> (`TRANSCRIPTION_DEVICE=cpu-diarization` in `deployment/.env`; the model is
+> baked in at build time, the container needs no network and no HuggingFace
+> token), point `PROVIDER_CONFIG_PATH` at a copy of
+> [`deployment/provider_config.diarization.template.json`](deployment/provider_config.diarization.template.json)
+> and set `TRANSCRIPTION_PROVIDER_IDS` to its keys. For development:
+> `uv sync --extra pyannote-diarization`, accept the gated model terms,
+> export `HUGGINGFACE_ACCESS_TOKEN`, add the `pyannote-diarization` context
+> on a worker of its own (`num_workers: 2`) and set
 > `"diarization_detector": true` on the whisper provider. Judge changes with
 > `make benchmark_diarization_gate_docker` and
 > `make benchmark_diarization_acceptance`.
 >
-> Design, configuration, testing and benchmark details:
-> [`transcription_service/docs/speaker_diarization.md`](transcription_service/docs/speaker_diarization.md).
+> **Model credit and license.** Speaker labels come from
+> [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1)
+> by pyannoteAI (Hervé Bredin and contributors), licensed **CC BY 4.0** and
+> distributed behind a gated access form, through the MIT-licensed
+> `pyannote.audio` library. Every model the service can load, with its
+> license and terms, is listed in `deployment/DIARIZATION.md` ("Licensing
+> and privacy").
+>
+> **Read next.** Deployment guide (images, every configuration key, cost per
+> session, verification, metrics and Grafana panels, licensing):
+> [`deployment/DIARIZATION.md`](deployment/DIARIZATION.md). Design,
+> measurements and **Known limitations** (far-field under-counting, clean
+> many-speaker panels, the fragment fold's trade-off, confusion against the
+> offline pipeline, what a dead worker costs):
+> [`transcription_service/docs/speaker_diarization.md`](transcription_service/docs/speaker_diarization.md#known-limitations).
+> Issues worth raising upstream: [`docs/upstream_issue_drafts.md`](docs/upstream_issue_drafts.md).
 > Upstream sync log: [`docs/upstream_sync_2026-10.md`](docs/upstream_sync_2026-10.md).
 
 # ScribeAR

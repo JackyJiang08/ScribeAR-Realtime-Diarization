@@ -1,0 +1,300 @@
+{
+  "label": "phase2c-prod: 30 min, diarization off, same clip and container, for the audio-drop comparison",
+  "generated_at": "2026-10-04T23:31:54+0000",
+  "code_revision": "fd47fc8",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "hygiene": {
+    "state": {
+      "taken_at": "2026-10-04T23:01:28+0000",
+      "free_memory_mb": 7020,
+      "swap_used_mb": 0,
+      "load_1m": 2.01,
+      "load_5m": 2.16,
+      "load_15m": 2.47
+    },
+    "warnings": [],
+    "clean": true
+  },
+  "config": {
+    "audio": "benchmarks/diarization/data/soak/soak_60min.wav",
+    "reference": "benchmarks/diarization/data/soak/soak_60min.rttm",
+    "minutes": 30,
+    "diarization": "off",
+    "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "kill_worker_at_sec": 0.0,
+    "bin_min": 5.0,
+    "memory_window_sec": 600.0,
+    "effective_provider_config": {
+      "whisper_context_tag": "whisper_context",
+      "silero_context_tag": "silero_vad",
+      "job_period_ms": 5000,
+      "max_buffer_len_sec": 30,
+      "local_agree_dim": 2,
+      "diarization_detector": false
+    },
+    "num_workers": 1
+  },
+  "service": {
+    "ready_after_sec": 6.8,
+    "exited_during_run": null,
+    "log": "benchmarks/diarization/results/phase2e/soak_30min_off_linux.service.log",
+    "workers": [
+      {
+        "pid": 37,
+        "rss_max_mb": 1018.8,
+        "cpu_sec": 2310.75,
+        "wall_sec": 1819.6,
+        "cores": 1.27,
+        "worker": 0
+      }
+    ],
+    "model_load_times_sec": []
+  },
+  "stream": {
+    "late_sends": 0,
+    "max_send_lateness_sec": 0.0,
+    "chunks_sent": 3600,
+    "streamed_sec": 1800.0
+  },
+  "wall_sec": 1819.6,
+  "latency": {
+    "chunk_id_method": {
+      "in_progress": {
+        "count": 185,
+        "mean": 10.572,
+        "p50": 6.826,
+        "p95": 27.029,
+        "max": 43.403
+      },
+      "final": {
+        "count": 154,
+        "mean": 36.237,
+        "p50": 34.433,
+        "p95": 52.543,
+        "max": 64.326
+      }
+    },
+    "word_method": {
+      "first_shown": {
+        "count": 6167,
+        "mean": 20.672,
+        "p50": 19.689,
+        "p95": 40.245,
+        "max": 63.821
+      },
+      "finalized": {
+        "count": 3004,
+        "mean": 43.004,
+        "p50": 41.192,
+        "p95": 59.219,
+        "max": 72.055
+      }
+    },
+    "label_latency": {
+      "after_text_shown": {
+        "count": 0,
+        "mean": null,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "after_finalized": {
+        "count": 0,
+        "mean": null,
+        "p50": null,
+        "p95": null,
+        "max": null
+      }
+    },
+    "transcript_messages": 198,
+    "transcript_messages_with_text": 190,
+    "speakers_update_messages": 0,
+    "speakers_updates_for_unknown_sequence": 0,
+    "final_sequences_with_id": 0,
+    "final_sequences_settled": 0,
+    "final_words": 3004,
+    "final_words_labelled": 0,
+    "final_words_labelled_fraction": 0.0,
+    "speaker_labels_seen": [],
+    "label_changes_before_final": 0,
+    "label_changes_before_final_fraction": 0.0,
+    "label_changes_after_sent": 0
+  },
+  "memory": {
+    "per_pid": {
+      "27": {
+        "role": "parent",
+        "alive_from_sec": 0.0,
+        "alive_to_sec": 1826.3,
+        "rss_first_window_mean_mb": 279.0,
+        "rss_last_window_mean_mb": 279.8,
+        "rss_max_mb": 280.1,
+        "growth_mb": 0.9,
+        "growth_fraction": 0.0031
+      },
+      "36": {
+        "role": "worker_replacement_or_other",
+        "alive_from_sec": 3.0,
+        "alive_to_sec": 1826.3,
+        "rss_first_window_mean_mb": 17.0,
+        "rss_last_window_mean_mb": 17.2,
+        "rss_max_mb": 17.2,
+        "growth_mb": 0.2,
+        "growth_fraction": 0.0137
+      },
+      "37": {
+        "role": "caption_worker",
+        "alive_from_sec": 3.0,
+        "alive_to_sec": 1826.3,
+        "rss_first_window_mean_mb": 758.8,
+        "rss_last_window_mean_mb": 880.0,
+        "rss_max_mb": 1018.8,
+        "growth_mb": 121.2,
+        "growth_fraction": 0.1597
+      }
+    },
+    "window_sec": 600.0,
+    "service_tree": {
+      "rss_first_window_mean_mb": 1054.2,
+      "rss_last_window_mean_mb": 1177.0,
+      "rss_max_mb": 1316.1,
+      "growth_fraction": 0.1165
+    },
+    "streamed_sec": 1800.0
+  },
+  "drift": {
+    "bin_sec": 300.0,
+    "bins": [
+      {
+        "bin": 0,
+        "start_min": 0.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 268
+      },
+      {
+        "bin": 1,
+        "start_min": 5.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 308
+      },
+      {
+        "bin": 2,
+        "start_min": 10.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 644
+      },
+      {
+        "bin": 3,
+        "start_min": 15.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 562
+      },
+      {
+        "bin": 4,
+        "start_min": 20.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 644
+      },
+      {
+        "bin": 5,
+        "start_min": 25.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 474
+      },
+      {
+        "bin": 6,
+        "start_min": 30.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 0
+      }
+    ],
+    "label_swaps": 0,
+    "label_swaps_per_hour": 0.0,
+    "swap_events": [],
+    "final_words_labelled": 0,
+    "final_words_unlabelled": 2900,
+    "final_words_labelled_fraction": 0.0
+  },
+  "kill": {
+    "requested_at_sec": 0.0
+  },
+  "recovery": null,
+  "service_counters_delta": {
+    "jobsCompletedTotal": 198.0,
+    "jobsFailedTotal": 0,
+    "asrAudioSecondsTotal": 1785.0,
+    "asrDroppedPeriodsTotal": 163.0,
+    "audioDroppedBufferFullTotal": 30.0,
+    "audioDroppedBufferFullSecondsTotal": 15.0,
+    "bufferOverflowTotal": 181.0,
+    "bufferOverflowSecondsTotal": 1591.16,
+    "vadNoSpeechTotal": 0,
+    "noWordsTotal": 14.0,
+    "temperatureFallbackTotal": 43.0,
+    "repeatedSegmentDetectedTotal": 0,
+    "diarizationRunsTotal": 0,
+    "diarizationSecondsTotal": 0,
+    "diarizationFailedTotal": 0,
+    "reconcilerSecondsTotal": 0,
+    "diarizationLabelsMintedTotal": 0,
+    "diarizationAudioSecondsTotal": 0,
+    "diarizationUncoveredSecondsTotal": 0,
+    "diarizationDroppedPeriodsTotal": 0
+  },
+  "key_metrics": {
+    "memory.service_tree_growth_fraction": 0.1165,
+    "memory.diarization_worker_growth_fraction": null,
+    "memory.caption_worker_growth_fraction": 0.1597,
+    "drift.label_swaps": 0,
+    "drift.label_swaps_per_hour": 0.0,
+    "drift.final_words_labelled_fraction": 0.0,
+    "labels_minted": 0,
+    "reference_speakers": 4,
+    "caption.audio_dropped_buffer_full_seconds": 15.0,
+    "caption.dropped_periods": 163.0,
+    "caption.chunk_id_in_progress_p50": 6.826,
+    "caption.chunk_id_in_progress_p95": 27.029,
+    "diarization.uncovered_seconds": 0,
+    "diarization.dropped_periods": 0,
+    "diarization.failed_passes": 0,
+    "diarization.rtf": null,
+    "diarization.label_changes_after_sent": 0,
+    "recovery.captions_gap_around_kill_sec": null,
+    "recovery.labels_resumed_after_sec": null,
+    "recovery.labels_for_post_kill_audio_after_sec": null,
+    "recovery.job_reregistered_after_sec": null,
+    "recovery.model_load_after_kill_sec": null,
+    "model_load_startup_sec": null
+  }
+}

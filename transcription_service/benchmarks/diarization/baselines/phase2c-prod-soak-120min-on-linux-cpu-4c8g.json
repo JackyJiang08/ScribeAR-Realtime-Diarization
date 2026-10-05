@@ -1,0 +1,974 @@
+{
+  "label": "phase2c-prod: 2 h soak, diarization on, diarization worker killed at 60 min, Linux CPU 4c8g",
+  "generated_at": "2026-10-04T22:59:31+0000",
+  "code_revision": "fd47fc8",
+  "code_dirty": null,
+  "environment": {
+    "machine": "aarch64",
+    "platform": "Linux-6.10.14-linuxkit-aarch64-with-glibc2.41",
+    "python": "3.12.11",
+    "device": "cpu",
+    "omp_num_threads": "1",
+    "openblas_num_threads": "1",
+    "resource_limits": {
+      "runner": "docker",
+      "requested_cpus": 4.0,
+      "requested_memory_gb": 8.0,
+      "cgroup_cpus": 4.0,
+      "cgroup_memory_gb": 8.0,
+      "host_cpus": 8,
+      "host_memory_gb": 7.65,
+      "effective_cpus": 4.0,
+      "effective_memory_gb": 8.0
+    },
+    "baseline_key": "linux-cpu-4c8g",
+    "torch": "2.13.0+cpu",
+    "torch_threads": 1,
+    "pyannote_audio": "4.0.7",
+    "faster_whisper": "1.2.1"
+  },
+  "hygiene": {
+    "state": {
+      "taken_at": "2026-10-04T20:58:44+0000",
+      "free_memory_mb": 6746,
+      "swap_used_mb": 0,
+      "load_1m": 2.14,
+      "load_5m": 0.62,
+      "load_15m": 0.21
+    },
+    "warnings": [],
+    "clean": true
+  },
+  "config": {
+    "audio": "benchmarks/diarization/data/soak/soak_120min.wav",
+    "reference": "benchmarks/diarization/data/soak/soak_120min.rttm",
+    "minutes": 120,
+    "diarization": "on",
+    "provider_config": "benchmarks/diarization/configs/reference_provider_config.json",
+    "kill_worker_at_sec": 3600.0,
+    "bin_min": 5.0,
+    "memory_window_sec": 600.0,
+    "effective_provider_config": {
+      "whisper_context_tag": "whisper_context",
+      "silero_context_tag": "silero_vad",
+      "job_period_ms": 5000,
+      "max_buffer_len_sec": 30,
+      "local_agree_dim": 2,
+      "diarization_detector": true,
+      "diarization_context_tag": "pyannote_diarization",
+      "diarization_period_ms": 5000,
+      "diarization_window_sec": 10,
+      "diarization_edge_margin_sec": 0.5,
+      "diarization_label_timeout_sec": 15
+    },
+    "num_workers": 2
+  },
+  "service": {
+    "ready_after_sec": 16.7,
+    "exited_during_run": null,
+    "log": "benchmarks/diarization/results/phase2e/soak_120min_on_linux.service.log",
+    "workers": [
+      {
+        "pid": 38,
+        "rss_max_mb": 1024.6,
+        "cpu_sec": 9945.34,
+        "wall_sec": 7219.6,
+        "cores": 1.378,
+        "worker": 0
+      },
+      {
+        "pid": 47,
+        "rss_max_mb": 696.7,
+        "cpu_sec": null,
+        "wall_sec": null,
+        "cores": null,
+        "worker": 1
+      },
+      {
+        "pid": 887,
+        "rss_max_mb": 700.8,
+        "cpu_sec": null,
+        "wall_sec": null,
+        "cores": null,
+        "worker": 2
+      }
+    ],
+    "model_load_times_sec": [
+      5.7,
+      6.2
+    ]
+  },
+  "stream": {
+    "late_sends": 11,
+    "max_send_lateness_sec": 3.198,
+    "chunks_sent": 14400,
+    "streamed_sec": 7200.0
+  },
+  "wall_sec": 7219.6,
+  "latency": {
+    "chunk_id_method": {
+      "in_progress": {
+        "count": 620,
+        "mean": 12.484,
+        "p50": 8.276,
+        "p95": 32.846,
+        "max": 107.116
+      },
+      "final": {
+        "count": 525,
+        "mean": 40.217,
+        "p50": 36.456,
+        "p95": 64.79,
+        "max": 146.112
+      }
+    },
+    "word_method": {
+      "first_shown": {
+        "count": 23736,
+        "mean": 296.492,
+        "p50": 343.121,
+        "p95": 387.634,
+        "max": 416.091
+      },
+      "finalized": {
+        "count": 12968,
+        "mean": 315.844,
+        "p50": 358.73,
+        "p95": 408.823,
+        "max": 435.088
+      }
+    },
+    "label_latency": {
+      "after_text_shown": {
+        "count": 12866,
+        "mean": 0.027,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 38.08
+      },
+      "after_finalized": {
+        "count": 12866,
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      }
+    },
+    "transcript_messages": 634,
+    "transcript_messages_with_text": 625,
+    "speakers_update_messages": 76,
+    "speakers_updates_for_unknown_sequence": 0,
+    "final_sequences_with_id": 525,
+    "final_sequences_settled": 76,
+    "final_words": 12968,
+    "final_words_labelled": 12866,
+    "final_words_labelled_fraction": 0.992,
+    "speaker_labels_seen": [
+      "spk_0",
+      "spk_1",
+      "spk_2",
+      "spk_3",
+      "spk_4",
+      "spk_5",
+      "spk_6"
+    ],
+    "label_changes_before_final": 43,
+    "label_changes_before_final_fraction": 0.0033,
+    "label_changes_after_sent": 0
+  },
+  "memory": {
+    "per_pid": {
+      "14": {
+        "role": "parent",
+        "alive_from_sec": 0.0,
+        "alive_to_sec": 7236.0,
+        "rss_first_window_mean_mb": 280.2,
+        "rss_last_window_mean_mb": 285.5,
+        "rss_max_mb": 285.5,
+        "growth_mb": 5.3,
+        "growth_fraction": 0.019
+      },
+      "37": {
+        "role": "worker_replacement_or_other",
+        "alive_from_sec": 6.0,
+        "alive_to_sec": 7236.0,
+        "rss_first_window_mean_mb": 17.0,
+        "rss_last_window_mean_mb": 17.2,
+        "rss_max_mb": 17.2,
+        "growth_mb": 0.2,
+        "growth_fraction": 0.0093
+      },
+      "38": {
+        "role": "caption_worker",
+        "alive_from_sec": 6.0,
+        "alive_to_sec": 7236.0,
+        "rss_first_window_mean_mb": 879.4,
+        "rss_last_window_mean_mb": 890.5,
+        "rss_max_mb": 1024.6,
+        "growth_mb": 11.1,
+        "growth_fraction": 0.0127
+      },
+      "47": {
+        "role": "diarization_worker",
+        "alive_from_sec": 11.0,
+        "alive_to_sec": 3617.8,
+        "rss_first_window_mean_mb": 652.8,
+        "rss_last_window_mean_mb": 658.7,
+        "rss_max_mb": 696.7,
+        "growth_mb": 5.9,
+        "growth_fraction": 0.0091
+      },
+      "887": {
+        "role": "worker_replacement_or_other",
+        "alive_from_sec": 3618.8,
+        "alive_to_sec": 7236.0,
+        "rss_first_window_mean_mb": 662.3,
+        "rss_last_window_mean_mb": 657.7,
+        "rss_max_mb": 700.8,
+        "growth_mb": -4.6,
+        "growth_fraction": -0.0069
+      }
+    },
+    "window_sec": 600.0,
+    "service_tree": {
+      "rss_first_window_mean_mb": 1827.2,
+      "rss_last_window_mean_mb": 1850.9,
+      "rss_max_mb": 2014.2,
+      "growth_fraction": 0.013
+    },
+    "streamed_sec": 7200.0
+  },
+  "drift": {
+    "bin_sec": 300.0,
+    "bins": [
+      {
+        "bin": 0,
+        "start_min": 0.0,
+        "majority_label": {
+          "FEE013": "spk_0",
+          "MEO015": "spk_2"
+        },
+        "labelled_words": 303,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 1,
+        "start_min": 5.0,
+        "majority_label": {
+          "FEE016": "spk_3",
+          "MEO015": "spk_2",
+          "MEE014": "spk_4",
+          "FEE013": "spk_3"
+        },
+        "labelled_words": 316,
+        "unlabelled_words": 42
+      },
+      {
+        "bin": 2,
+        "start_min": 10.0,
+        "majority_label": {
+          "MEE014": "spk_0",
+          "FEE016": "spk_3",
+          "FEE013": "spk_0",
+          "MEO015": "spk_0"
+        },
+        "labelled_words": 714,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 3,
+        "start_min": 15.0,
+        "majority_label": {
+          "FEE016": "spk_0",
+          "FEE013": "spk_4",
+          "MEO015": "spk_1",
+          "MEE014": "spk_0"
+        },
+        "labelled_words": 438,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 4,
+        "start_min": 20.0,
+        "majority_label": {
+          "FEE013": "spk_4",
+          "FEE016": "spk_4",
+          "MEE014": "spk_4"
+        },
+        "labelled_words": 413,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 5,
+        "start_min": 25.0,
+        "majority_label": {
+          "MEE014": "spk_2",
+          "FEE016": "spk_2",
+          "MEO015": "spk_3"
+        },
+        "labelled_words": 448,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 6,
+        "start_min": 30.0,
+        "majority_label": {
+          "MEO015": "spk_3",
+          "FEE013": "spk_3",
+          "FEE016": "spk_0",
+          "MEE014": "spk_0"
+        },
+        "labelled_words": 604,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 7,
+        "start_min": 35.0,
+        "majority_label": {
+          "FEE013": "spk_0",
+          "MEE014": "spk_0",
+          "MEO015": "spk_0",
+          "FEE016": "spk_4"
+        },
+        "labelled_words": 598,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 8,
+        "start_min": 40.0,
+        "majority_label": {
+          "FEE013": "spk_0",
+          "MEE014": "spk_0",
+          "FEE016": "spk_3",
+          "MEO015": "spk_0"
+        },
+        "labelled_words": 655,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 9,
+        "start_min": 45.0,
+        "majority_label": {
+          "FEE013": "spk_3",
+          "FEE016": "spk_2",
+          "MEE014": "spk_3",
+          "MEO015": "spk_0"
+        },
+        "labelled_words": 649,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 10,
+        "start_min": 50.0,
+        "majority_label": {
+          "FEE013": "spk_0",
+          "FEE016": "spk_0",
+          "MEO015": "spk_0"
+        },
+        "labelled_words": 285,
+        "unlabelled_words": 7
+      },
+      {
+        "bin": 11,
+        "start_min": 55.0,
+        "majority_label": {
+          "FEE013": "spk_4",
+          "FEE016": "spk_3"
+        },
+        "labelled_words": 389,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 12,
+        "start_min": 60.0,
+        "majority_label": {
+          "FEE016": "spk_4",
+          "MEO015": "spk_3",
+          "FEE013": "spk_4",
+          "MEE014": "spk_0"
+        },
+        "labelled_words": 561,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 13,
+        "start_min": 65.0,
+        "majority_label": {
+          "FEE013": "spk_4",
+          "MEE014": "spk_4",
+          "FEE016": "spk_4",
+          "MEO015": "spk_4"
+        },
+        "labelled_words": 675,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 14,
+        "start_min": 70.0,
+        "majority_label": {
+          "FEE013": "spk_3",
+          "FEE016": "spk_4",
+          "MEE014": "spk_4"
+        },
+        "labelled_words": 651,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 15,
+        "start_min": 75.0,
+        "majority_label": {
+          "MEE014": "spk_2",
+          "MEO015": "spk_2",
+          "FEE016": "spk_2",
+          "FEE013": "spk_2"
+        },
+        "labelled_words": 681,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 16,
+        "start_min": 80.0,
+        "majority_label": {
+          "MEE014": "spk_2",
+          "FEE016": "spk_2",
+          "FEE013": "spk_4",
+          "MEO015": "spk_0"
+        },
+        "labelled_words": 487,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 17,
+        "start_min": 85.0,
+        "majority_label": {
+          "MEO015": "spk_0",
+          "MEE014": "spk_2",
+          "FEE013": "spk_3",
+          "FEE016": "spk_0"
+        },
+        "labelled_words": 507,
+        "unlabelled_words": 8
+      },
+      {
+        "bin": 18,
+        "start_min": 90.0,
+        "majority_label": {
+          "FEE016": "spk_4",
+          "FEE013": "spk_4",
+          "MEO015": "spk_4",
+          "MEE014": "spk_4"
+        },
+        "labelled_words": 471,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 19,
+        "start_min": 95.0,
+        "majority_label": {
+          "FEE013": "spk_4",
+          "MEO015": "spk_4",
+          "MEE014": "spk_3"
+        },
+        "labelled_words": 349,
+        "unlabelled_words": 2
+      },
+      {
+        "bin": 20,
+        "start_min": 100.0,
+        "majority_label": {
+          "MEE014": "spk_3",
+          "FEE013": "spk_4",
+          "MEO015": "spk_4",
+          "FEE016": "spk_3"
+        },
+        "labelled_words": 362,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 21,
+        "start_min": 105.0,
+        "majority_label": {
+          "FEE016": "spk_3",
+          "FEE013": "spk_3",
+          "MEE014": "spk_3",
+          "MEO015": "spk_0"
+        },
+        "labelled_words": 385,
+        "unlabelled_words": 5
+      },
+      {
+        "bin": 22,
+        "start_min": 110.0,
+        "majority_label": {
+          "FEE016": "spk_0",
+          "FEE013": "spk_2",
+          "MEE014": "spk_3"
+        },
+        "labelled_words": 238,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 23,
+        "start_min": 115.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 0
+      },
+      {
+        "bin": 24,
+        "start_min": 120.0,
+        "majority_label": {},
+        "labelled_words": 0,
+        "unlabelled_words": 0
+      }
+    ],
+    "label_swaps": 50,
+    "label_swaps_per_hour": 25.0,
+    "swap_events": [
+      {
+        "bin": 1,
+        "minute": 5.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_0",
+        "to": "spk_3"
+      },
+      {
+        "bin": 2,
+        "minute": 10.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_4",
+        "to": "spk_0"
+      },
+      {
+        "bin": 2,
+        "minute": 10.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 2,
+        "minute": 10.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_2",
+        "to": "spk_0"
+      },
+      {
+        "bin": 3,
+        "minute": 15.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 3,
+        "minute": 15.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 3,
+        "minute": 15.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_0",
+        "to": "spk_1"
+      },
+      {
+        "bin": 4,
+        "minute": 20.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 4,
+        "minute": 20.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 5,
+        "minute": 25.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_4",
+        "to": "spk_2"
+      },
+      {
+        "bin": 5,
+        "minute": 25.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_4",
+        "to": "spk_2"
+      },
+      {
+        "bin": 5,
+        "minute": 25.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_1",
+        "to": "spk_3"
+      },
+      {
+        "bin": 6,
+        "minute": 30.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 6,
+        "minute": 30.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_2",
+        "to": "spk_0"
+      },
+      {
+        "bin": 6,
+        "minute": 30.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_2",
+        "to": "spk_0"
+      },
+      {
+        "bin": 7,
+        "minute": 35.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 7,
+        "minute": 35.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 7,
+        "minute": 35.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 8,
+        "minute": 40.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 9,
+        "minute": 45.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_0",
+        "to": "spk_3"
+      },
+      {
+        "bin": 9,
+        "minute": 45.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_3",
+        "to": "spk_2"
+      },
+      {
+        "bin": 9,
+        "minute": 45.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_0",
+        "to": "spk_3"
+      },
+      {
+        "bin": 10,
+        "minute": 50.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 10,
+        "minute": 50.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_2",
+        "to": "spk_0"
+      },
+      {
+        "bin": 11,
+        "minute": 55.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 11,
+        "minute": 55.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_0",
+        "to": "spk_3"
+      },
+      {
+        "bin": 12,
+        "minute": 60.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_3",
+        "to": "spk_4"
+      },
+      {
+        "bin": 12,
+        "minute": 60.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_0",
+        "to": "spk_3"
+      },
+      {
+        "bin": 12,
+        "minute": 60.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 13,
+        "minute": 65.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 13,
+        "minute": 65.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_3",
+        "to": "spk_4"
+      },
+      {
+        "bin": 14,
+        "minute": 70.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 15,
+        "minute": 75.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_4",
+        "to": "spk_2"
+      },
+      {
+        "bin": 15,
+        "minute": 75.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_4",
+        "to": "spk_2"
+      },
+      {
+        "bin": 15,
+        "minute": 75.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_4",
+        "to": "spk_2"
+      },
+      {
+        "bin": 15,
+        "minute": 75.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_3",
+        "to": "spk_2"
+      },
+      {
+        "bin": 16,
+        "minute": 80.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_2",
+        "to": "spk_4"
+      },
+      {
+        "bin": 16,
+        "minute": 80.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_2",
+        "to": "spk_0"
+      },
+      {
+        "bin": 17,
+        "minute": 85.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 17,
+        "minute": 85.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_2",
+        "to": "spk_0"
+      },
+      {
+        "bin": 18,
+        "minute": 90.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 18,
+        "minute": 90.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_3",
+        "to": "spk_4"
+      },
+      {
+        "bin": 18,
+        "minute": 90.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_0",
+        "to": "spk_4"
+      },
+      {
+        "bin": 18,
+        "minute": 90.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_2",
+        "to": "spk_4"
+      },
+      {
+        "bin": 19,
+        "minute": 95.0,
+        "reference_speaker": "MEE014",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 20,
+        "minute": 100.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 21,
+        "minute": 105.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_4",
+        "to": "spk_3"
+      },
+      {
+        "bin": 21,
+        "minute": 105.0,
+        "reference_speaker": "MEO015",
+        "from": "spk_4",
+        "to": "spk_0"
+      },
+      {
+        "bin": 22,
+        "minute": 110.0,
+        "reference_speaker": "FEE016",
+        "from": "spk_3",
+        "to": "spk_0"
+      },
+      {
+        "bin": 22,
+        "minute": 110.0,
+        "reference_speaker": "FEE013",
+        "from": "spk_3",
+        "to": "spk_2"
+      }
+    ],
+    "final_words_labelled": 11179,
+    "final_words_unlabelled": 64,
+    "final_words_labelled_fraction": 0.9943
+  },
+  "kill": {
+    "requested_at_sec": 3600.0,
+    "worker_pids_at_kill": [
+      38,
+      47
+    ],
+    "diarization_worker_pids_from_log": [
+      47
+    ],
+    "killed_pid": 47,
+    "messages_before": 260,
+    "labels_before": 7563,
+    "replacement_pid": 887,
+    "replacement_seen_after_sec": 3.5
+  },
+  "recovery": {
+    "captions_first_message_after_kill_sec": 4.15,
+    "captions_gap_around_kill_sec": 8.77,
+    "captions_typical_gap_before_kill": {
+      "count": 60,
+      "mean": 14.74,
+      "p50": 10.35,
+      "p95": 36.49,
+      "max": 58.27
+    },
+    "labels_resumed_after_sec": 4.15,
+    "labels_for_post_kill_audio_after_sec": 325.56,
+    "label_events_total": 48821,
+    "label_events_after_kill": 28307,
+    "label_events_on_post_kill_audio": 25382,
+    "replacement_seen_after_sec": 3.5,
+    "model_load_times_sec": [
+      5.7,
+      6.2
+    ],
+    "model_load_after_kill_sec": 6.2,
+    "worker_replaced_after_sec": 7.5,
+    "job_reregistered_after_sec": 9,
+    "killed_pid": 47,
+    "worker_pids_at_kill": [
+      38,
+      47
+    ]
+  },
+  "service_counters_delta": {
+    "jobsCompletedTotal": 634.0,
+    "jobsFailedTotal": 0,
+    "asrAudioSecondsTotal": 6836.7,
+    "asrDroppedPeriodsTotal": 808.0,
+    "audioDroppedBufferFullTotal": 728.0,
+    "audioDroppedBufferFullSecondsTotal": 363.3,
+    "bufferOverflowTotal": 583.0,
+    "bufferOverflowSecondsTotal": 6356.1,
+    "vadNoSpeechTotal": 0,
+    "noWordsTotal": 21.0,
+    "temperatureFallbackTotal": 68.0,
+    "repeatedSegmentDetectedTotal": 0,
+    "diarizationRunsTotal": 1436.0,
+    "diarizationSecondsTotal": 1278.29,
+    "diarizationFailedTotal": 0,
+    "reconcilerSecondsTotal": 0.242,
+    "diarizationLabelsMintedTotal": 8.0,
+    "diarizationAudioSecondsTotal": 7185.0,
+    "diarizationUncoveredSecondsTotal": 0,
+    "diarizationDroppedPeriodsTotal": 1.0
+  },
+  "key_metrics": {
+    "memory.service_tree_growth_fraction": 0.013,
+    "memory.diarization_worker_growth_fraction": 0.0091,
+    "memory.caption_worker_growth_fraction": 0.0127,
+    "drift.label_swaps": 50,
+    "drift.label_swaps_per_hour": 25.0,
+    "drift.final_words_labelled_fraction": 0.9943,
+    "labels_minted": 8.0,
+    "reference_speakers": 4,
+    "caption.audio_dropped_buffer_full_seconds": 363.3,
+    "caption.dropped_periods": 808.0,
+    "caption.chunk_id_in_progress_p50": 8.276,
+    "caption.chunk_id_in_progress_p95": 32.846,
+    "diarization.uncovered_seconds": 0,
+    "diarization.dropped_periods": 1.0,
+    "diarization.failed_passes": 0,
+    "diarization.rtf": 0.178,
+    "diarization.label_changes_after_sent": 0,
+    "recovery.captions_gap_around_kill_sec": 8.77,
+    "recovery.labels_resumed_after_sec": 4.15,
+    "recovery.labels_for_post_kill_audio_after_sec": 325.56,
+    "recovery.job_reregistered_after_sec": 9,
+    "recovery.model_load_after_kill_sec": 6.2,
+    "model_load_startup_sec": 5.7
+  }
+}
