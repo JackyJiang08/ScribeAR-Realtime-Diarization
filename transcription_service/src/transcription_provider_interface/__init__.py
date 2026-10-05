@@ -12,9 +12,12 @@ from .transcription_client_error import (
     TranscriptionClientError,
 )
 from .transcription_provider_interface import TranscriptionProviderInterface
-from .transcription_result import AudioChunkPayload, AudioStageReading, VadStats
-from .transcription_sequence import TranscriptionSequence
-from .transcription_session_interface import (
+from .transcription_result import (
+    AudioChunkPayload,
+    AudioStageReading,
     TranscriptionResult,
-    TranscriptionSessionInterface,
+    VadStats,
 )
+from .transcription_sequence import TranscriptionSequence
+from .transcription_session_events import TranscriptionSessionEvents
+from .transcription_session_interface import TranscriptionSessionInterface

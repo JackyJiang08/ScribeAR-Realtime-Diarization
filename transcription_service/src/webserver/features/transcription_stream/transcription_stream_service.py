@@ -8,11 +8,12 @@ lifecycle to this class.
 from typing import Any
 
 from src.shared.logger import Logger
-from src.shared.utils.event_emitter import Event, EventEmitter
+from src.shared.utils.event_emitter import EventEmitter
 from src.transcription_provider_interface import (
     SpeakerLabelUpdate,
     TranscriptionClientError,
     TranscriptionResult,
+    TranscriptionSessionEvents,
     TranscriptionSessionInterface,
 )
 from src.webserver.shared.transcription_provider_registry import (
@@ -20,7 +21,7 @@ from src.webserver.shared.transcription_provider_registry import (
 )
 
 
-class TranscriptionStreamService(EventEmitter):
+class TranscriptionStreamService(TranscriptionSessionEvents, EventEmitter):
     """
     Owns one transcription session for the duration of a single connection.
 
@@ -35,16 +36,9 @@ class TranscriptionStreamService(EventEmitter):
     for serializing emitted transcripts onto the wire.
     """
 
-    TranscriptionResultEvent = Event[TranscriptionResult](
-        "TRANSCRIPTION_RESULT"
-    )
-    TranscriptionErrorEvent = Event[TranscriptionClientError | Exception](
-        "TRANSCRIPTION_ERROR"
-    )
-    # Late speaker labels for a finalized sequence already forwarded. Only a
-    # diarizing session emits them; forwarded like results, and dropped
-    # once the service is closed for the same reason.
-    SpeakerLabelsEvent = Event[SpeakerLabelUpdate]("SPEAKER_LABELS")
+    # The three session events (results, errors, late speaker labels) are
+    # declared once on TranscriptionSessionEvents and forwarded here as the
+    # session emits them; all three are dropped once the service is closed.
 
     def __init__(
         self,

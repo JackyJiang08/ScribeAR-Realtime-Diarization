@@ -142,10 +142,16 @@ git checkout -b restore-pre-sync pre-upstream-sync-2026-10-01
 - Upstream's block (test:unit, testing-library/jsdom/axe devDependencies, MUI
   9) is used as is. The fork had widened `format`/`lint` to `./src ./tests`;
   that was tried and dropped, because upstream's own test files (`setup.ts`,
-  `render.tsx`, the control tests) do not pass upstream's eslint rules and
-  upstream does not lint them. The fork's tests are still run by `test:unit`
-  and formatted by prettier through the package's vitest and prettier
-  configs. The file ends up identical to upstream.
+  the control tests) do not pass upstream's eslint rules and upstream does
+  not lint them. Since the production-readiness step (2026-10-04) the
+  package's `lint` and `format` scripts cover `./src ./tests/unit
+  ./tests/render.tsx`: `tests/unit/` holds only the fork's tests (the
+  speaker-slot test moved there from `tests/components/`), `render.tsx` is
+  upstream's helper the fork modified, and upstream's other test files stay
+  unlinted as upstream leaves them. So the file differs from upstream in
+  those two scripts and in a declared dependency on
+  `@scribear/transcription-content-store` (now imported at runtime for the
+  shared speaker-name formatter).
 
 ### libs/ui/transcription-display-ui/src/index.ts
 

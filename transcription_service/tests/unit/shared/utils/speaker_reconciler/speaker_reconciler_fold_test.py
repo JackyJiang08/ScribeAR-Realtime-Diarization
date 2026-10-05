@@ -4,6 +4,8 @@ one pass whose audio the next, overlapping pass re-labels as another
 speaker is folded into that speaker before its captions settle
 """
 
+# pylint: disable=protected-access
+
 import numpy as np
 
 from src.shared.utils.speaker_reconciler import (
@@ -82,7 +84,7 @@ def test_a_voice_the_next_pass_hears_again_is_kept():
         {"A": _voice(0), "B": _voice(90)},
     )
     assert [s.speaker for s in out] == ["spk_0", "spk_1"]
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert reconciler.labels_minted == 2
 
 
@@ -100,7 +102,7 @@ def test_a_fragment_outside_the_next_window_is_left_alone():
         [SpeakerSegment(5.0, 15.0, "A")], {"A": _voice(0)}
     )
     assert [s.speaker for s in out] == ["spk_1"]
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert len(reconciler.speakers) == 2
 
 
@@ -120,7 +122,7 @@ def test_fold_needs_enough_of_the_fragment_covered():
         {"A": _voice(0)},
     )
     assert [s.speaker for s in out] == ["spk_0", "spk_0"]
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert len(reconciler.speakers) == 2
 
 
@@ -133,7 +135,7 @@ def test_an_older_label_is_never_folded():
     out = _split_then_rejoin(reconciler)
     # The fragment is 5 s old at the second pass, past the 4 s limit
     assert [s.speaker for s in out] == ["spk_0"]
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert len(reconciler.speakers) == 2
 
 
@@ -143,5 +145,5 @@ def test_fold_is_disabled_at_zero():
     """
     reconciler = SpeakerReconciler(config=_config(fragment_fold_sec=0.0))
     _split_then_rejoin(reconciler)
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert len(reconciler.speakers) == 2

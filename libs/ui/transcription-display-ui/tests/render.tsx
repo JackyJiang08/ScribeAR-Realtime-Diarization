@@ -28,7 +28,7 @@ export function withProviders(
   return (
     <ThemeProvider theme={testTheme}>
       <TranscriptionDisplayHeightContext.Provider
-        value={{ containerHeightPx, setContainerHeightPx: () => {} }}
+        value={{ containerHeightPx, setContainerHeightPx: () => undefined }}
       >
         {ui}
       </TranscriptionDisplayHeightContext.Provider>

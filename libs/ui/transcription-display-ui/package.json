@@ -24,10 +24,10 @@
   "scripts": {
     "build": "tsc --build",
     "dev": "tsc --build --watch",
-    "format": "prettier --check ./src",
-    "format:fix": "prettier --write ./src",
-    "lint": "eslint ./src",
-    "lint:fix": "eslint ./src --fix",
+    "format": "prettier --check ./src ./tests/unit ./tests/render.tsx",
+    "format:fix": "prettier --write ./src ./tests/unit ./tests/render.tsx",
+    "lint": "eslint ./src ./tests/unit ./tests/render.tsx",
+    "lint:fix": "eslint ./src ./tests/unit ./tests/render.tsx --fix",
     "test:unit": "vitest run --project unit"
   },
   "devDependencies": {

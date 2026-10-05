@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from 'vitest';
 
 import type {
   ActiveSection,
@@ -46,12 +46,17 @@ const slots = (container: HTMLElement) =>
 describe('speaker label slot', (it) => {
   it('shows a neutral placeholder for a caption whose label has not arrived', () => {
     const { container } = renderActive([
-      { id: 'a', text: [' Hello', ' there'], speakers: [null, null], sequenceId: 's0' },
+      {
+        id: 'a',
+        text: [' Hello', ' there'],
+        speakers: [null, null],
+        sequenceId: 's0',
+      },
     ]);
 
     const [slot] = slots(container);
     expect(slot).toBeDefined();
-    expect(slot?.textContent?.trim()).toBe(`${PENDING_SPEAKER_LABEL}:`);
+    expect(slot?.textContent.trim()).toBe(`${PENDING_SPEAKER_LABEL}:`);
     expect(slot).toHaveAttribute('data-speaker-slot', 'pending');
     // The change from placeholder to label must never be announced as a text
     // update: the slot opts out of the surrounding live region.
@@ -77,7 +82,7 @@ describe('speaker label slot', (it) => {
     const [slotAfter] = slots(container);
     // Same DOM node, new content: nothing was inserted before the text.
     expect(slotAfter).toBe(slotBefore);
-    expect(slotAfter?.textContent?.trim()).toBe('Speaker 2:');
+    expect(slotAfter?.textContent.trim()).toBe('Speaker 2:');
     expect(screen.getByText(/Hello there/)).toBe(textBefore);
     // No line break was inserted between the slot and its text.
     expect(container.querySelectorAll('br')).toHaveLength(0);
@@ -97,7 +102,7 @@ describe('speaker label slot', (it) => {
     const [slot] = slots(container);
     // The question mark never stays on screen: the slot keeps its width
     // (so nothing moves) but shows no label at all.
-    expect(slot?.textContent?.trim()).toBe('');
+    expect(slot?.textContent.trim()).toBe('');
     expect(slot).toHaveAttribute('data-speaker-slot', 'unattributed');
     expect(screen.getByText(/Hello/)).toBeInTheDocument();
   });
@@ -110,9 +115,9 @@ describe('speaker label slot', (it) => {
     ]);
 
     const [first, second, third] = slots(container);
-    expect(first?.textContent?.trim()).toBe('Speaker 1:');
-    expect(second?.textContent?.trim()).toBe('');
-    expect(third?.textContent?.trim()).toBe('Speaker 2:');
+    expect(first?.textContent.trim()).toBe('Speaker 1:');
+    expect(second?.textContent.trim()).toBe('');
+    expect(third?.textContent.trim()).toBe('Speaker 2:');
     // Every label-aware sequence after the first starts its own line.
     expect(container.querySelectorAll('br')).toHaveLength(2);
   });

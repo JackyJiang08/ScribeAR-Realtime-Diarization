@@ -6,11 +6,9 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 from src.shared.logger import Logger
-from src.shared.utils.event_emitter import Event, EventEmitter
+from src.shared.utils.event_emitter import EventEmitter
 
-from .speaker_label_update import SpeakerLabelUpdate
-from .transcription_client_error import TranscriptionClientError
-from .transcription_result import TranscriptionResult
+from .transcription_session_events import TranscriptionSessionEvents
 
 if TYPE_CHECKING:
     # Import-cycle-free because it is type-checking only: the provider
@@ -18,7 +16,9 @@ if TYPE_CHECKING:
     from .transcription_provider_interface import TranscriptionProviderInterface
 
 
-class TranscriptionSessionInterface(ABC, EventEmitter):
+class TranscriptionSessionInterface(
+    ABC, TranscriptionSessionEvents, EventEmitter
+):
     """
     Defines interface for providing transcriptions for a single transcription session
 
@@ -27,18 +27,8 @@ class TranscriptionSessionInterface(ABC, EventEmitter):
     Implementations can override end_session if resources need to be cleaned up
 
     When transcriptions are ready, implementations should emit a TranscriptionResultEvent
+    (the events are declared on TranscriptionSessionEvents)
     """
-
-    TranscriptionResultEvent = Event[TranscriptionResult](
-        "TRANSCRIPTION_RESULT"
-    )
-    TranscriptionErrorEvent = Event[TranscriptionClientError | Exception](
-        "TRANSCRIPTION_ERROR"
-    )
-    # Speaker labels for a finalized sequence that was already emitted.
-    # Only a provider that runs diarization ever emits this; the others never
-    # do, and a consumer that ignores it still gets every caption.
-    SpeakerLabelsEvent = Event[SpeakerLabelUpdate]("SPEAKER_LABELS")
 
     # Opaque identifiers passed into create_session(), stored uniformly here
     # rather than left to each implementation to invent its own attribute

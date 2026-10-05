@@ -84,7 +84,7 @@ def test_an_established_label_is_never_merged_under_the_age_limit():
 
     # spk_1 was minted at 10 s and the run ends at 25 s: 15 s old
     assert [s.speaker for s in last] == ["spk_1"]
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert [s.label for s in reconciler.speakers] == ["spk_0", "spk_1"]
 
 
@@ -108,7 +108,7 @@ def test_merging_is_off_by_default():
     _run(reconciler, 0.0, 5.0, "A", _voice(0))
     _run(reconciler, 5.0, 10.0, "B", _voice(80))
     _run(reconciler, 10.0, 15.0, "B", _voice(5))
-    assert reconciler.last_merges == []
+    assert not reconciler.last_merges
     assert reconciler.labels_minted == 2
 
 
