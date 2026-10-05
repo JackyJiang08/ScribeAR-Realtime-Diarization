@@ -19,7 +19,10 @@ import {
   reduxRememberReducer,
 } from '@scribear/redux-remember-store';
 import { themePreferencesReducer } from '@scribear/theme-customization-store';
-import { transcriptionContentReducer } from '@scribear/transcription-content-store';
+import {
+  createParagraphCommitMiddleware,
+  transcriptionContentReducer,
+} from '@scribear/transcription-content-store';
 import { transcriptionDisplayPreferencesReducer } from '@scribear/transcription-display-store';
 import {
   createUrlConfigMiddleware,
@@ -84,6 +87,10 @@ export const createAppStore = (microphoneService: MicrophoneService) => {
         .concat(createUrlConfigMiddleware(urlConfigSchemas))
         .concat(createMicrophoneServiceMiddleware(microphoneService))
         .concat(createKioskMiddleware(microphoneService))
+        // See client-webapp's store: paragraph commits are what the caption
+        // display's live region announces, with the speaker label once per
+        // turn.
+        .concat(createParagraphCommitMiddleware())
         .concat(createLiveTranslationMiddleware(translationService)),
     enhancers: (getDefaultEnhancers) =>
       getDefaultEnhancers().prepend(

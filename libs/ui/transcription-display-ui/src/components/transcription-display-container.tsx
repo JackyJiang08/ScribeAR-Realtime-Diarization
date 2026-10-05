@@ -33,16 +33,65 @@ interface CommittedSectionsProps {
   backgroundColor: string;
 }
 
+/**
+ * The last attributed speaker of a committed section, or `previous` when it
+ * attributes nothing.
+ */
+const lastSectionSpeaker = (
+  section: TranscriptionSection,
+  previous: string | null,
+): string | null => {
+  const runs = section.runs ?? [];
+  for (let i = runs.length - 1; i >= 0; i -= 1) {
+    const speaker = runs[i]?.speaker;
+    if (speaker !== null && speaker !== undefined) return speaker;
+  }
+  return previous;
+};
+
+/**
+ * The speaker attributed last across every committed section, which is what
+ * the active section's first sequence continues from.
+ */
+const lastCommittedSpeaker = (
+  sections: TranscriptionSection[],
+): string | null =>
+  sections.reduce<string | null>(
+    (previous, section) => lastSectionSpeaker(section, previous),
+    null,
+  );
+
+/**
+ * Pairs each committed section with the speaker attributed just before it, so
+ * a speaker change is labelled once, at the turn that starts it, and a speaker
+ * whose turn spans a paragraph commit (a pause, a long monologue) is not
+ * announced again at the top of the next paragraph.
+ */
+const buildCommittedItems = (
+  sections: TranscriptionSection[],
+): { section: TranscriptionSection; previousSpeaker: string | null }[] => {
+  const items: {
+    section: TranscriptionSection;
+    previousSpeaker: string | null;
+  }[] = [];
+  let previousSpeaker: string | null = null;
+  for (const section of sections) {
+    items.push({ section, previousSpeaker });
+    previousSpeaker = lastSectionSpeaker(section, previousSpeaker);
+  }
+  return items;
+};
+
 // Memoized so active section transcription updates don't update the full committed history.
 const CommittedSections = memo(
   ({ sections, textStyle, backgroundColor }: CommittedSectionsProps) => (
     <>
-      {sections.map((section) => (
+      {buildCommittedItems(sections).map(({ section, previousSpeaker }) => (
         <Typography key={section.id} color="transcriptionColor" sx={textStyle}>
           <SpeakerRunsText
             // Sections persisted before speaker support carry no runs.
             runs={section.runs ?? [{ speaker: null, text: section.text }]}
-            previousSpeaker={null}
+            previousSpeaker={previousSpeaker}
             backgroundColor={backgroundColor}
           />
         </Typography>
@@ -151,6 +200,7 @@ const lastAttributedSpeaker = (
  */
 const buildActiveSequenceItems = (
   sequences: TranscriptionSequence[],
+  speakerBefore: string | null,
 ): {
   sequence: TranscriptionSequence;
   previousSpeaker: string | null;
@@ -161,7 +211,7 @@ const buildActiveSequenceItems = (
     previousSpeaker: string | null;
     isFirst: boolean;
   }[] = [];
-  let previousSpeaker: string | null = null;
+  let previousSpeaker: string | null = speakerBefore;
   for (const sequence of sequences) {
     items.push({ sequence, previousSpeaker, isFirst: items.length === 0 });
     previousSpeaker = lastAttributedSpeaker(sequence, previousSpeaker);
@@ -261,8 +311,12 @@ export const TranscriptionDisplayContainer = ({
   );
 
   const activeSequenceItems = useMemo(
-    () => buildActiveSequenceItems(activeSection.sequences),
-    [activeSection.sequences],
+    () =>
+      buildActiveSequenceItems(
+        activeSection.sequences,
+        lastCommittedSpeaker(commitedSections),
+      ),
+    [activeSection.sequences, commitedSections],
   );
 
   return (

@@ -18,7 +18,10 @@ import {
   createTranscriptExportMiddleware,
   transcriptExportReducer,
 } from '@scribear/transcript-export-store';
-import { transcriptionContentReducer } from '@scribear/transcription-content-store';
+import {
+  createParagraphCommitMiddleware,
+  transcriptionContentReducer,
+} from '@scribear/transcription-content-store';
 import { transcriptionDisplayPreferencesReducer } from '@scribear/transcription-display-store';
 import {
   createUrlConfigMiddleware,
@@ -87,6 +90,12 @@ export const createAppStore = () => {
       getDefaultMiddleware()
         .concat(createUrlConfigMiddleware(urlConfigSchemas))
         .concat(createClientSessionServiceMiddleware())
+        // Commits caption paragraphs on speaker changes, pauses and length so
+        // the display's live region announces them (with the speaker label
+        // once per turn); without it nothing in this app ever reached a
+        // screen reader. Installed after the session middleware so it sees
+        // the transcript actions that middleware dispatches.
+        .concat(createParagraphCommitMiddleware())
         .concat(createLiveTranslationMiddleware(translationService))
         .concat(createTranscriptExportMiddleware(summarizationService)),
     enhancers: (getDefaultEnhancers) =>
