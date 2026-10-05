@@ -70,6 +70,12 @@ class JobHandle(Generic[D, R, Conf], EventEmitter):
     """
 
     JobResultEvent = Event[JobSuccess[R] | JobException]("JOB_RESULT")
+    # Emitted once when the worker this job was registered to died before
+    # the job was deregistered. The job will never run or report again; the
+    # handle is dead after this and its owner decides whether to register a
+    # new job once the pool has replaced the worker (`WorkerPool` respawns
+    # it). The payload is the dead worker's id.
+    JobLostEvent = Event[[int]]("JOB_LOST")
 
     @property
     def worker_id(self):
@@ -149,6 +155,17 @@ class JobHandle(Generic[D, R, Conf], EventEmitter):
         self._queue_data = None
         self._update_config = None
         self._deregister = None
+
+    def _mark_lost(self) -> None:
+        """
+        Turns the handle inert and tells its owner the worker is gone.
+        Called by the manager of a worker that died; nothing is queued to
+        the dead process
+        """
+        self._queue_data = None
+        self._update_config = None
+        self._deregister = None
+        self.emit(self.JobLostEvent, self._worker_id)
 
 
 class _RollingUtilization:
@@ -429,9 +446,47 @@ class WorkerProcessManager:
         result-queue poll loop simply times out forever, and any job already
         registered to that worker never completes and never errors. Nothing
         else in the pool notices, so this is the only signal that distinguishes
-        a wedged worker from an idle one.
+        a wedged worker from an idle one; the pool's supervisor polls it and
+        replaces a dead worker (`WorkerPool`).
         """
-        return self._process.is_alive()
+        return not self._abandoned and self._process.is_alive()
+
+    @property
+    def exitcode(self) -> int | None:
+        """
+        The worker process's exit code once it has exited (negative N for
+        signal N, as `multiprocessing` reports it), None while it runs
+        """
+        return self._process.exitcode
+
+    def abandon(self) -> int:
+        """
+        Gives up on a worker process that died: tells every registered job's
+        owner through `JobHandle.JobLostEvent`, reaps the process, stops the
+        result poller and closes the queues. Nothing is sent to the process.
+        The manager is inert afterwards and `alive` stays False
+
+        Returns:
+            How many registered jobs were lost
+        """
+        self._abandoned = True
+        lost = list(self._registered_job_handles.values())
+        self._registered_job_handles.clear()
+        self._job_correlation.clear()
+        for handle in lost:
+            handle._mark_lost()  # pylint: disable=protected-access
+        try:
+            self._process.join(timeout=1.0)
+        except (AssertionError, ValueError):
+            # Already joined, or joined from another thread
+            pass
+        self._stopping.set()
+        for queue in (self._task_queue, self._result_queue):
+            try:
+                queue.close()
+            except (OSError, ValueError):
+                pass
+        return len(lost)
 
     def snapshot(self) -> WorkerSnapshot:
         """
@@ -461,6 +516,7 @@ class WorkerProcessManager:
         context_defs: dict[int, JobContextInterface[Any]],
         rolling_utilization_window_ns: int = ROLLING_UTILIZATION_WINDOW_NS,
         job_observer: JobObserver | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
     ):
         """
         Constructor blocks until the worker process has finished creating all
@@ -476,6 +532,11 @@ class WorkerProcessManager:
                                               (production should use the default)
             job_observer    - Optional callback invoked on the event loop thread
                                 for every completed job execution
+            loop            - Event loop job results are marshalled onto.
+                                Defaults to the running loop; the pool passes
+                                it explicitly when it builds a replacement
+                                worker on an executor thread, where no loop
+                                is running
         """
         self._log = logger.child({"worker_id": worker_id})
         self._worker_id = worker_id
@@ -487,6 +548,12 @@ class WorkerProcessManager:
 
         self._next_job_id = 0
         self._context_defs = context_defs
+        # What each context reported about itself once created
+        # (JobContextInterface.runtime_info), by context id
+        self.context_info: dict[int, dict[str, Any]] = {}
+        # Set once the process was found dead and its jobs told so; the
+        # pool replaces such a manager and never routes to it again
+        self._abandoned = False
         self._registered_job_handles: dict[int, JobHandle[Any, Any, Any]] = {}
         # Caller-supplied session/room identifiers per job, reported on
         # /providers/health via ActiveJob. Kept only while the job lives, so
@@ -549,6 +616,7 @@ class WorkerProcessManager:
                 raise RuntimeError(
                     f"Worker {worker_id} failed to initialize: {result.error}"
                 )
+            self.context_info = dict(result.context_info)
             break
 
         # Poll for worker results on a dedicated daemon thread rather than via
@@ -559,7 +627,7 @@ class WorkerProcessManager:
         # never joined at loop close and never blocks interpreter exit, so a
         # wedged read can no longer hang teardown. Results are marshalled back
         # onto the event loop so job handlers keep running there.
-        self._loop = asyncio.get_running_loop()
+        self._loop = loop if loop is not None else asyncio.get_running_loop()
         self._poll_thread = threading.Thread(
             target=self._poll_loop,
             name=f"wpm-result-poller-{worker_id}",

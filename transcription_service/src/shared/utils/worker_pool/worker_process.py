@@ -180,6 +180,7 @@ class WorkerProcess:
 
         self._context_defs = context_defs
         self._contexts: dict[int, Any] = {}
+        self._context_info: dict[int, dict[str, Any]] = {}
         self._job_entries: dict[int, _JobEntry] = {}
 
         self._should_exit = False
@@ -200,6 +201,15 @@ class WorkerProcess:
             # pylint: disable=broad-exception-caught
             except Exception as error:
                 return f"context_id={context_id}: {error}"
+            try:
+                self._context_info[context_id] = dict(
+                    context_def.runtime_info(self._contexts[context_id])
+                )
+            # pylint: disable=broad-exception-caught
+            except Exception as error:
+                # Informational only: a context that cannot describe itself
+                # still works, and start-up must not fail over telemetry.
+                log.warning(f"Context runtime info unavailable: {error}")
         return None
 
     def _destroy_contexts(self):
@@ -519,7 +529,9 @@ class WorkerProcess:
             self._result_queue.put(InitializeWorkerResult(error=init_error))
             return
 
-        self._result_queue.put(InitializeWorkerResult())
+        self._result_queue.put(
+            InitializeWorkerResult(context_info=self._context_info)
+        )
 
         while True:
             if self._should_exit:

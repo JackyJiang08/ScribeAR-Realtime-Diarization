@@ -3,7 +3,7 @@ Defines interface for job context definitions
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from src.shared.logger import Logger
 
@@ -64,3 +64,18 @@ class JobContextInterface(ABC, Generic[JobContextInstance]):
         """
         Cleanup job context instance
         """
+
+    def runtime_info(self, context: JobContextInstance) -> dict[str, Any]:
+        """
+        What the created instance reports about itself, sent to the main
+        process with the worker's initialization result and exposed by the
+        pool (`WorkerPool.context_runtime_info`). Meant for the device a
+        model ended up on after resolving "auto" or falling back from CUDA,
+        how the model was loaded and how long it took. Must be picklable.
+        Defaults to nothing
+
+        Args:
+            context - The instance `create` returned
+        """
+        del context
+        return {}

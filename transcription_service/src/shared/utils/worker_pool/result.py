@@ -3,7 +3,7 @@ Defines result message objects for WorkerProcess
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Literal
 
@@ -31,6 +31,12 @@ class InitializeWorkerResult:
     """
 
     error: str | None = None
+    # What each created context reports about itself once loaded
+    # (JobContextInterface.runtime_info), keyed by context id: the device a
+    # model ended up on after an "auto" or a CUDA fallback, how it was
+    # loaded, how long it took. Informational; the main process reads it for
+    # /metrics/status and the logs
+    context_info: dict[int, dict[str, Any]] = field(default_factory=dict)
     type: Literal[ResultType.INITIALIZE_WORKER] = ResultType.INITIALIZE_WORKER
 
 
