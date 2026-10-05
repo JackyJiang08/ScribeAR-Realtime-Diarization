@@ -2,6 +2,12 @@
  * Utilities for rendering speaker labels: display names and colors that stay
  * readable against the user-configurable transcription background.
  */
+import { formatSpeakerName } from '@scribear/transcription-content-store';
+
+// The display name lives with the speaker runs in the content store, so the
+// caption display, the translated-caption panel and the transcript export
+// name a voice the same way; re-exported here for the existing callers.
+export { formatSpeakerName };
 
 /**
  * Colorblind-aware base palette (Okabe-Ito, minus black/white). Order matters:
@@ -106,11 +112,20 @@ export const speakerPaletteIndex = (speaker: string): number => {
   return Math.abs(hash) % SPEAKER_BASE_PALETTE.length;
 };
 
+const WHITE: Rgb = { r: 255, g: 255, b: 255 };
+const BLACK: Rgb = { r: 0, g: 0, b: 0 };
+
 /**
  * Returns a CSS color for the speaker that meets {@link MIN_CONTRAST_RATIO}
- * against `backgroundColor`. The base palette color is nudged toward white on
- * dark backgrounds (or black on light ones) until it is readable. If the
- * background cannot be parsed, the base palette color is returned unchanged.
+ * against `backgroundColor`. The base palette color is nudged toward white or
+ * black until it is readable. The target is whichever of the two has the
+ * higher contrast against the background, not the one a luminance cutoff
+ * picks: on a mid-luminance background such as `#5c5c5c` or `#808080` white
+ * tops out below 4.5:1 while black clears it, and the old cutoff sent every
+ * speaker toward the failing side. Should the steps run out, the target
+ * itself is returned, which always meets the ratio: for any background at
+ * least one of white and black does. If the background cannot be parsed, the
+ * base palette color is returned unchanged.
  */
 export const getSpeakerColor = (
   speaker: string,
@@ -122,9 +137,9 @@ export const getSpeakerColor = (
   if (background === null || baseRgb === null) return base;
 
   const target: Rgb =
-    relativeLuminance(background) < 0.5
-      ? { r: 255, g: 255, b: 255 }
-      : { r: 0, g: 0, b: 0 };
+    contrastRatio(WHITE, background) >= contrastRatio(BLACK, background)
+      ? WHITE
+      : BLACK;
 
   let color = baseRgb;
   for (
@@ -135,17 +150,8 @@ export const getSpeakerColor = (
   ) {
     color = mixToward(color, target, ADJUST_STEP);
   }
-  return toHex(color);
-};
-
-/**
- * Human-readable display name for a speaker label. Provider labels `spk_N`
- * become `Speaker N+1`; any other label is shown as-is.
- */
-export const formatSpeakerName = (speaker: string): string => {
-  const match = /^spk_(\d+)$/.exec(speaker);
-  if (match !== null) {
-    return `Speaker ${(Number(match[1]) + 1).toString()}`;
+  if (contrastRatio(color, background) < MIN_CONTRAST_RATIO) {
+    color = target;
   }
-  return speaker;
+  return toHex(color);
 };

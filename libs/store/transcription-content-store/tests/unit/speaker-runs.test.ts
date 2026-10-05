@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  dominantSpeaker,
+  formatSpeakerName,
+  lastAttributedSpeaker,
   sequencesToSpeakerRuns,
+  speakerRunsToText,
   wordsToSpeakerRuns,
 } from '#src/speaker-runs.js';
 
@@ -73,5 +77,60 @@ describe('sequencesToSpeakerRuns', () => {
         { text: [' text'], speakers: null },
       ]),
     ).toEqual([{ speaker: null, text: ' plain text' }]);
+  });
+});
+
+describe('formatSpeakerName', () => {
+  it('turns provider labels into one-based speaker names', () => {
+    expect(formatSpeakerName('spk_0')).toBe('Speaker 1');
+    expect(formatSpeakerName('spk_11')).toBe('Speaker 12');
+  });
+
+  it('passes other labels through', () => {
+    expect(formatSpeakerName('Alice')).toBe('Alice');
+  });
+});
+
+describe('dominantSpeaker', () => {
+  it('is the label most words carry, ties to the first seen', () => {
+    expect(dominantSpeaker(['spk_0', 'spk_1', 'spk_1'])).toBe('spk_1');
+    expect(dominantSpeaker(['spk_0', null, 'spk_1'])).toBe('spk_0');
+  });
+
+  it('is null without any label', () => {
+    expect(dominantSpeaker(null)).toBeNull();
+    expect(dominantSpeaker([null, null])).toBeNull();
+    expect(dominantSpeaker(undefined)).toBeNull();
+  });
+});
+
+describe('lastAttributedSpeaker', () => {
+  it('finds the last labelled word across sequences', () => {
+    expect(
+      lastAttributedSpeaker([
+        { text: [' a'], speakers: ['spk_0'] },
+        { text: [' b', ' c'], speakers: ['spk_1', null] },
+        { text: [' d'] },
+      ]),
+    ).toBe('spk_1');
+    expect(lastAttributedSpeaker([{ text: [' d'] }])).toBeNull();
+  });
+});
+
+describe('speakerRunsToText', () => {
+  it('writes one speaker turn per line with display names', () => {
+    expect(
+      speakerRunsToText([
+        { speaker: 'spk_0', text: ' Hello there.' },
+        { speaker: null, text: ' Yes.' },
+        { speaker: 'spk_1', text: ' Hi.' },
+      ]),
+    ).toBe('Speaker 1: Hello there. Yes.\nSpeaker 2: Hi.');
+  });
+
+  it('is plain text when nothing is attributed', () => {
+    expect(speakerRunsToText([{ speaker: null, text: ' Hello ' }])).toBe(
+      'Hello',
+    );
   });
 });
