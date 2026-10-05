@@ -1743,10 +1743,12 @@ dropped-period count is the one new single-run miss, recorded above.
 **Known flaky tests.** `worker_process_manager_test.py`'s two "job stats
 with a slow job" tests assert a scheduling delay under 1 ms and failed
 on this host while the container runs were active (1.9 ms measured);
-they are upstream's timing tests, were already the fork's two known
-flaky tests before this step (the sync notes record them failing on a
-loaded laptop at the staging baseline), and are unrelated to this step's
-changes.
+they are upstream's timing tests and fail identically on this host with
+upstream `staging`'s worker-pool code and tests checked out in place
+(1.5 and 1.8 ms measured), so they are the fork's two known host-timing
+failures and unrelated to this step's changes. The admin-server suite's
+`compose-file-version` test also fails on this branch independently of
+this step (`deployment/compose.yml` is untouched here).
 
 ### Hard cases
 

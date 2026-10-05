@@ -77,7 +77,7 @@
     "offline_set": "dev",
     "stream_sec": 0.0,
     "skip_offline": false,
-    "offline_from": "/app/benchmarks/diarization/results/phase2e/offline_standard_native.json",
+    "offline_from": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
     "reconciler_overrides": null,
     "classroom_data": "benchmarks/diarization/data/classroom",
     "caption_audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",

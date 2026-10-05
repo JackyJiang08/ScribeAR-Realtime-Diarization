@@ -517,7 +517,9 @@ def main():
             "offline_set": args.offline_set,
             "stream_sec": args.stream_sec,
             "skip_offline": args.skip_offline,
-            "offline_from": args.offline_from,
+            "offline_from": (
+                rel_path(Path(args.offline_from)) if args.offline_from else None
+            ),
             "reconciler_overrides": (
                 json.loads(args.reconciler_json)
                 if args.reconciler_json
