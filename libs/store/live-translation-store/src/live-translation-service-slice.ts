@@ -281,6 +281,25 @@ export const liveTranslationServiceSlice = createSlice({
       }
     },
     /**
+     * Attaches a late speaker label to the translated segments built from a
+     * source sequence that had no label when it was translated. Fills only
+     * `null` speakers, so a label already shown never flips (the transcript
+     * store's rule).
+     */
+    relabelTranslatedSegments: (
+      state,
+      action: PayloadAction<{ sequenceId: string; speaker: string }>,
+    ) => {
+      for (const segment of state.segments) {
+        if (
+          (segment.speaker ?? null) === null &&
+          segment.sequenceIds?.includes(action.payload.sequenceId)
+        ) {
+          segment.speaker = action.payload.speaker;
+        }
+      }
+    },
+    /**
      * Replaces the list of selectable target languages after a probe.
      */
     setAvailableTranslationLanguages: (
@@ -312,4 +331,5 @@ export const {
   setAvailableTranslationLanguages,
   clearTranslatedSegments,
   recordTranslationSample,
+  relabelTranslatedSegments,
 } = liveTranslationServiceSlice.actions;

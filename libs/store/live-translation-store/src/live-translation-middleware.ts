@@ -7,8 +7,10 @@ import {
 import {
   type TranscriptionContentSlice,
   appendFinalizedTranscription,
+  applySpeakersUpdate,
   clearTranscription,
   commitInProgressTranscription,
+  dominantSpeaker,
   handleTranscript,
 } from '@scribear/transcription-content-store';
 
@@ -23,6 +25,7 @@ import {
   appendTranslatedSegment,
   clearTranslatedSegments,
   recordTranslationSample,
+  relabelTranslatedSegments,
   setAvailableTranslationLanguages,
   setTranslationServiceState,
 } from './live-translation-service-slice.js';
@@ -89,12 +92,11 @@ export const createLiveTranslationMiddleware =
       // Read before reducing: `commitInProgressTranscription` carries no
       // payload, and by the time the reducer has run the text it promoted is
       // no longer in `inProgressTranscription`.
-      const pendingInterim = commitInProgressTranscription.match(action)
-        ? (store
-            .getState()
-            .transcriptionContent.inProgressTranscription?.text.join('') ??
-          null)
+      const interim = commitInProgressTranscription.match(action)
+        ? store.getState().transcriptionContent.inProgressTranscription
         : null;
+      const pendingInterim = interim?.text.join('') ?? null;
+      const pendingInterimSpeaker = dominantSpeaker(interim?.speakers);
 
       const result = next(action);
 
@@ -142,16 +144,39 @@ export const createLiveTranslationMiddleware =
       // Only finalized transcripts are translated. Interim text is rewritten
       // several times a second, so translating it would spend the model's
       // whole throughput on output that is about to be replaced.
+      // Each caption travels with the speaker label its words carry (the
+      // one most of them have) and its sequence id, so the translated panel
+      // shows the same speaker as the source text and a label that arrives
+      // later (`speakers_update`) still finds its translation.
       if (appendFinalizedTranscription.match(action)) {
-        service.submit(action.payload.text.join(''));
+        service.submit(action.payload.text.join(''), {
+          speaker: dominantSpeaker(action.payload.speakers),
+          sequenceId: action.payload.sequenceId,
+        });
       }
 
       if (handleTranscript.match(action) && action.payload.final) {
-        service.submit(action.payload.final.text.join(''));
+        service.submit(action.payload.final.text.join(''), {
+          speaker: dominantSpeaker(action.payload.final.speakers),
+          sequenceId: action.payload.final.sequenceId,
+        });
       }
 
       if (pendingInterim !== null) {
-        service.submit(pendingInterim);
+        service.submit(pendingInterim, { speaker: pendingInterimSpeaker });
+      }
+
+      if (applySpeakersUpdate.match(action)) {
+        const speaker = dominantSpeaker(action.payload.speakers);
+        if (speaker !== null) {
+          service.relabel(action.payload.sequenceId, speaker);
+          store.dispatch(
+            relabelTranslatedSegments({
+              sequenceId: action.payload.sequenceId,
+              speaker,
+            }),
+          );
+        }
       }
 
       if (clearTranscription.match(action)) {

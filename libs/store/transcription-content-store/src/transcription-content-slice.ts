@@ -5,7 +5,11 @@ import {
 } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 
-import { type SpeakerRun, sequencesToSpeakerRuns } from './speaker-runs.js';
+import {
+  type SpeakerRun,
+  sequencesToSpeakerRuns,
+  speakerRunsToText,
+} from './speaker-runs.js';
 
 /** Sliding-window size for the latency moving averages. */
 const LATENCY_WINDOW_SIZE = 60;
@@ -189,7 +193,7 @@ export interface TranscriptionContentSlice {
 /**
  * Minimal Redux state shape required by transcription content selectors.
  */
-interface WithTranscriptionContent {
+export interface WithTranscriptionContent {
   transcriptionContent: TranscriptionContentSlice;
 }
 
@@ -235,11 +239,22 @@ export const selectInProgressTranscriptionText = (
 export const selectTranscriptText = createSelector(
   [selectCommitedSections, selectActiveSection],
   (commitedSections, activeSection) => {
-    const paragraphs = commitedSections.map((section) => section.text.trim());
-    const active = activeSection.sequences
-      .map((sequence) => sequence.text.join(''))
-      .join('')
-      .trim();
+    // Speakers travel into the file: a paragraph with speaker runs is
+    // rendered one speaker turn per line ("Speaker 1: ..."), a paragraph
+    // without any (diarization off, or state persisted before speaker
+    // support) is its plain text, exactly as before.
+    const paragraphs = commitedSections.map((section) =>
+      section.runs?.some((run) => run.speaker !== null)
+        ? speakerRunsToText(section.runs)
+        : section.text.trim(),
+    );
+    const activeRuns = sequencesToSpeakerRuns(activeSection.sequences);
+    const active = activeRuns.some((run) => run.speaker !== null)
+      ? speakerRunsToText(activeRuns)
+      : activeRuns
+          .map((run) => run.text)
+          .join('')
+          .trim();
     if (active !== '') paragraphs.push(active);
     return paragraphs.filter((paragraph) => paragraph !== '').join('\n\n');
   },

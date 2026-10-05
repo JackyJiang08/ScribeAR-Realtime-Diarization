@@ -6,6 +6,7 @@ import {
   commitParagraphBreak,
   handleTranscript,
   isAwaitingSpeakers,
+  selectTranscriptText,
   transcriptionContentReducer,
 } from '#src/transcription-content-slice.js';
 
@@ -194,5 +195,59 @@ describe('applySpeakersUpdate', () => {
   it('does not treat a sequence without a sequenceId as pending', () => {
     expect(isAwaitingSpeakers({ text: [' a'], speakers: [null] })).toBe(false);
     expect(isAwaitingSpeakers({ text: [' a'] })).toBe(false);
+  });
+});
+
+describe('selectTranscriptText', () => {
+  const withContent = (state: TranscriptionContentSlice) => ({
+    transcriptionContent: state,
+  });
+
+  it('writes speaker turns into the exported transcript', () => {
+    let state = emptyState();
+    state = transcriptionContentReducer(
+      state,
+      handleTranscript({
+        final: { text: [' Hello', ' all.'], speakers: ['spk_0', 'spk_0'] },
+        inProgress: null,
+      }),
+    );
+    state = transcriptionContentReducer(
+      state,
+      handleTranscript({
+        final: { text: [' Hi.'], speakers: ['spk_1'] },
+        inProgress: null,
+      }),
+    );
+    state = transcriptionContentReducer(state, commitParagraphBreak());
+    state = transcriptionContentReducer(
+      state,
+      handleTranscript({
+        final: { text: [' Thanks.'], speakers: ['spk_1'] },
+        inProgress: { text: [' interim'] },
+      }),
+    );
+
+    expect(selectTranscriptText(withContent(state))).toBe(
+      'Speaker 1: Hello all.\nSpeaker 2: Hi.\n\nSpeaker 2: Thanks.',
+    );
+  });
+
+  it('stays plain text when nothing carries a speaker', () => {
+    let state = emptyState();
+    state = transcriptionContentReducer(
+      state,
+      handleTranscript({
+        final: { text: [' Hello', ' all.'] },
+        inProgress: null,
+      }),
+    );
+    state = transcriptionContentReducer(state, commitParagraphBreak());
+    state = transcriptionContentReducer(
+      state,
+      handleTranscript({ final: { text: [' Bye.'] }, inProgress: null }),
+    );
+
+    expect(selectTranscriptText(withContent(state))).toBe('Hello all.\n\nBye.');
   });
 });

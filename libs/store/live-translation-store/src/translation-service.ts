@@ -84,6 +84,13 @@ export interface TranslatedSegment {
   id: string;
   text: string;
   kind: 'text' | 'gap';
+  // The speaker label the source captions of this segment carried (the
+  // provider's stable session label, e.g. `spk_0`), `null` when they had none
+  // when they were translated. Absent on state persisted before speakers.
+  speaker?: string | null;
+  // The provider's ids of the finalized source sequences in this segment, so
+  // a label that arrives after the text was translated can still reach it.
+  sequenceIds?: string[];
 }
 
 /**
@@ -157,6 +164,8 @@ interface TranslationServiceEvents {
 interface QueuedCaption {
   text: string;
   enqueuedAt: number;
+  speaker: string | null;
+  sequenceId: string | null;
 }
 
 /** One batch pulled off the queue, with what it took to assemble it. */
@@ -165,6 +174,19 @@ interface CaptionBatch {
   /** When the oldest caption in the batch was queued. */
   oldestEnqueuedAt: number;
   captionCount: number;
+  /** The speaker every caption in the batch carried (batches never mix). */
+  speaker: string | null;
+  sequenceIds: string[];
+}
+
+/**
+ * What a caller can attach to a submitted caption: the speaker label its
+ * words carried and the provider's sequence id, so the translation can show
+ * the same speaker as the source text and pick up a label that arrives late.
+ */
+export interface CaptionAttribution {
+  speaker?: string | null | undefined;
+  sequenceId?: string | null | undefined;
 }
 
 /**
@@ -435,11 +457,16 @@ export class TranslationService extends EventEmitter<TranslationServiceEvents> {
    *
    * @param text - The finalized caption text, in the transcript's language.
    */
-  submit(text: string): void {
+  submit(text: string, attribution: CaptionAttribution = {}): void {
     if (!this.#translator) return;
     if (text.trim() === '') return;
 
-    this.#queue.push({ text, enqueuedAt: Date.now() });
+    this.#queue.push({
+      text,
+      enqueuedAt: Date.now(),
+      speaker: attribution.speaker ?? null,
+      sequenceId: attribution.sequenceId ?? null,
+    });
     if (this.#queue.length > MAX_QUEUE_SEGMENTS) {
       const overflow = this.#queue.splice(
         0,
@@ -493,7 +520,12 @@ export class TranslationService extends EventEmitter<TranslationServiceEvents> {
           continue;
         }
 
-        this.#emitSegment({ text: translated, kind: 'text' });
+        this.#emitSegment({
+          text: translated,
+          kind: 'text',
+          speaker: batch.speaker,
+          sequenceIds: batch.sequenceIds,
+        });
         this.emit('sample', {
           waitMs: Math.max(0, startedAt - batch.oldestEnqueuedAt),
           translateMs: Math.max(0, Date.now() - startedAt),
@@ -549,24 +581,54 @@ export class TranslationService extends EventEmitter<TranslationServiceEvents> {
    */
   #takeBatch(): CaptionBatch {
     const parts: string[] = [];
+    const sequenceIds: string[] = [];
     let length = 0;
     let oldestEnqueuedAt = Date.now();
+    let speaker: string | null = null;
     for (;;) {
       const next = this.#queue[0];
       if (next === undefined) break;
       if (parts.length > 0 && length + next.text.length > MAX_BATCH_CHARS) {
         break;
       }
+      // A batch never spans a change of speaker: the translated segment
+      // carries one label, and merging two people's words into one call
+      // would hand the second person's words to the first.
+      if (parts.length > 0 && next.speaker !== speaker) break;
       this.#queue.shift();
-      if (parts.length === 0) oldestEnqueuedAt = next.enqueuedAt;
+      if (parts.length === 0) {
+        oldestEnqueuedAt = next.enqueuedAt;
+        speaker = next.speaker;
+      }
       parts.push(next.text);
+      if (next.sequenceId !== null) sequenceIds.push(next.sequenceId);
       length += next.text.length;
     }
     return {
       text: parts.join(' ').replace(/\s+/g, ' ').trim(),
       oldestEnqueuedAt,
       captionCount: parts.length,
+      speaker,
+      sequenceIds,
     };
+  }
+
+  /**
+   * Attaches a speaker label that arrived after its caption was submitted
+   * (the provider's late `speakers_update`) to the captions still queued
+   * for that sequence. Fills only captions without a label, the same rule
+   * the transcript store applies; a caption already translated is relabelled
+   * by the store through the segment's `sequenceIds`.
+   *
+   * @param sequenceId - The provider's id of the finalized sequence.
+   * @param speaker - The label most of its words now carry.
+   */
+  relabel(sequenceId: string, speaker: string): void {
+    for (const queued of this.#queue) {
+      if (queued.sequenceId === sequenceId && queued.speaker === null) {
+        queued.speaker = speaker;
+      }
+    }
   }
 
   /**

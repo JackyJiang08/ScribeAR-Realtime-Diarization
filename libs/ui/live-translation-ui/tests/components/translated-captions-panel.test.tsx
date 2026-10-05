@@ -135,3 +135,38 @@ describe('TranslatedCaptionsPanel', () => {
     expect(await axeViolations()).toEqual([]);
   });
 });
+
+describe('TranslatedCaptionsPanel speaker labels', () => {
+  const speakered: TranslatedSegment[] = [
+    { id: 'a', text: 'Hola a todos.', kind: 'text', speaker: 'spk_0' },
+    { id: 'b', text: 'Hoy empezamos.', kind: 'text', speaker: 'spk_0' },
+    { id: 'c', text: GAP_MARKER, kind: 'gap' },
+    { id: 'd', text: 'Una pregunta.', kind: 'text', speaker: 'spk_1' },
+    { id: 'e', text: 'Claro.', kind: 'text', speaker: 'spk_0' },
+  ];
+
+  it('names each speaker once per turn, as the transcript does', () => {
+    renderPanel({ segments: speakered });
+
+    const text = screen.getByRole('log').textContent;
+    expect(text.match(/Speaker 1:/g)).toHaveLength(2);
+    expect(text.match(/Speaker 2:/g)).toHaveLength(1);
+    expect(text.indexOf('Speaker 1:')).toBeLessThan(text.indexOf('Hola'));
+    expect(text.indexOf('Speaker 2:')).toBeLessThan(text.indexOf('Una'));
+    // Within one turn the second segment is not re-labelled.
+    const firstTurn = text.slice(0, text.indexOf('Speaker 2:'));
+    expect(firstTurn).toContain('Hoy empezamos.');
+    expect(firstTurn.match(/Speaker 1:/g)).toHaveLength(1);
+  });
+
+  it('shows no labels when captions carry no speaker', () => {
+    renderPanel();
+
+    expect(screen.getByRole('log').textContent).not.toContain('Speaker');
+  });
+
+  it('has no axe violations with speaker labels', async () => {
+    const { container } = renderPanel({ segments: speakered });
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});

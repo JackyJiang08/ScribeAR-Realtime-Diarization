@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import type { SxProps, Theme } from '@mui/material/styles';
+import { type SxProps, type Theme, useTheme } from '@mui/material/styles';
 
 import {
   type TranslatedSegment,
@@ -11,6 +11,8 @@ import {
 } from '@scribear/live-translation-store';
 import {
   JumpToBottomButton,
+  formatSpeakerName,
+  getSpeakerColor,
   useAutoScroll,
 } from '@scribear/transcription-display-ui';
 
@@ -56,6 +58,31 @@ export interface TranslatedCaptionsPanelProps {
 }
 
 /**
+ * Pairs each segment with the speaker label to show before it: a segment whose
+ * speaker differs from the last labelled one starts a new turn, the rest
+ * continue the current speaker and get no label. Gap markers carry no
+ * speaker and never break a turn.
+ */
+const buildSegmentItems = (
+  segments: TranslatedSegment[],
+): { segment: TranslatedSegment; label: string | null; isFirst: boolean }[] => {
+  const items: {
+    segment: TranslatedSegment;
+    label: string | null;
+    isFirst: boolean;
+  }[] = [];
+  let currentSpeaker: string | null = null;
+  for (const segment of segments) {
+    const speaker = segment.speaker ?? null;
+    const label =
+      speaker !== null && speaker !== currentSpeaker ? speaker : null;
+    if (speaker !== null) currentSpeaker = speaker;
+    items.push({ segment, label, isFirst: items.length === 0 });
+  }
+  return items;
+};
+
+/**
  * Renders translated captions beneath the original transcript.
  *
  * The original transcript is never replaced. Translation is best-effort and
@@ -76,6 +103,9 @@ export const TranslatedCaptionsPanel = ({
   displayHeightPx = 160,
   idleReengageMs = null,
 }: TranslatedCaptionsPanelProps) => {
+  // Speaker labels are coloured for the transcript background, like the
+  // source transcript's.
+  const backgroundColor = useTheme().palette.background.default;
   const { isAutoScrollEnabled, textContainerRef, handleScroll, jumpToBottom } =
     useAutoScroll(
       // The text metrics belong here alongside the segments: changing the
@@ -202,7 +232,7 @@ export const TranslatedCaptionsPanel = ({
           }}
         >
           <Typography color="transcriptionColor" sx={textStyle}>
-            {segments.map((segment) => (
+            {buildSegmentItems(segments).map(({ segment, label, isFirst }) => (
               <span
                 key={segment.id}
                 // Gap markers stand in for captions dropped to catch up with the
@@ -210,6 +240,21 @@ export const TranslatedCaptionsPanel = ({
                 // ellipsis for something that was said.
                 style={segment.kind === 'gap' ? { opacity: 0.6 } : undefined}
               >
+                {label !== null && !isFirst && <br />}
+                {label !== null && (
+                  // The same label, name and colour as the source transcript
+                  // beside it: a change of speaker starts a new line and is
+                  // named once, in order, before the words.
+                  <Box
+                    component="span"
+                    sx={{
+                      color: getSpeakerColor(label, backgroundColor),
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {`${formatSpeakerName(label)}: `}
+                  </Box>
+                )}
                 {segment.text}{' '}
               </span>
             ))}

@@ -7,6 +7,7 @@ import {
 } from '@scribear/redux-remember-store';
 import {
   appendFinalizedTranscription,
+  applySpeakersUpdate,
   clearTranscription,
   commitInProgressTranscription,
   handleTranscript,
@@ -258,5 +259,67 @@ describe('createLiveTranslationMiddleware', () => {
       );
       expect(selectTranslatedSegments(store.getState())).toEqual([]);
     });
+  });
+});
+
+describe('createLiveTranslationMiddleware speaker labels', () => {
+  let fake: FakeTranslatorApi;
+  let service: TranslationService;
+  let store: ReturnType<typeof createTestStore>;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    fake = installFakeTranslatorApi({ availability: { es: 'available' } });
+    service = new TranslationService();
+    store = createTestStore(service);
+    store.dispatch(enableTranslation());
+    await vi.advanceTimersByTimeAsync(0);
+  });
+
+  afterEach(() => {
+    service.destroy();
+    fake.uninstall();
+    vi.useRealTimers();
+  });
+
+  it('submits each finalized caption with the speaker most of its words carry', async () => {
+    store.dispatch(
+      handleTranscript({
+        final: {
+          text: [' Hello', ' there'],
+          speakers: ['spk_0', 'spk_0'],
+          sequenceId: 's1',
+        },
+        inProgress: null,
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(selectTranslatedSegments(store.getState())).toMatchObject([
+      { speaker: 'spk_0', sequenceIds: ['s1'] },
+    ]);
+  });
+
+  it('relabels a translated segment when its labels arrive late', async () => {
+    store.dispatch(
+      handleTranscript({
+        final: { text: [' Hello'], speakers: [null], sequenceId: 's1' },
+        inProgress: null,
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(selectTranslatedSegments(store.getState())[0]?.speaker).toBeNull();
+
+    store.dispatch(
+      applySpeakersUpdate({
+        sequenceId: 's1',
+        speakers: ['spk_2'],
+        settled: true,
+      }),
+    );
+
+    expect(selectTranslatedSegments(store.getState())[0]?.speaker).toBe(
+      'spk_2',
+    );
   });
 });

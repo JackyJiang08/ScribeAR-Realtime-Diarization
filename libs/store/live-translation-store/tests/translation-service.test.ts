@@ -433,3 +433,66 @@ describe('TranslationService', () => {
     });
   });
 });
+
+describe('TranslationService speaker attribution', () => {
+  let fake: FakeTranslatorApi;
+  let service: TranslationService;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    fake = installFakeTranslatorApi();
+    service = new TranslationService();
+    await service.enable('es');
+  });
+
+  afterEach(() => {
+    service.destroy();
+    fake.uninstall();
+    vi.useRealTimers();
+  });
+
+  it('carries the caption speaker and sequence id on the translated segment', async () => {
+    const segments = collectSegments(service);
+
+    service.submit('Hello there', { speaker: 'spk_0', sequenceId: 's1' });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(segments[0]).toMatchObject({
+      kind: 'text',
+      speaker: 'spk_0',
+      sequenceIds: ['s1'],
+    });
+  });
+
+  it('never merges two speakers into one translate call', async () => {
+    const segments = collectSegments(service);
+    fake.configure({ translateDelayMs: 1000 });
+
+    service.submit('one', { speaker: 'spk_0', sequenceId: 's1' });
+    await vi.advanceTimersByTimeAsync(0);
+    service.submit('two', { speaker: 'spk_0', sequenceId: 's2' });
+    service.submit('three', { speaker: 'spk_1', sequenceId: 's3' });
+    service.submit('four', { speaker: 'spk_1', sequenceId: 's4' });
+    await vi.advanceTimersByTimeAsync(4000);
+
+    expect(fake.translateCalls).toEqual(['one', 'two', 'three four']);
+    expect(segments.map((s) => [s.speaker, s.sequenceIds])).toEqual([
+      ['spk_0', ['s1']],
+      ['spk_0', ['s2']],
+      ['spk_1', ['s3', 's4']],
+    ]);
+  });
+
+  it('attaches a late label to captions still waiting in the queue', async () => {
+    const segments = collectSegments(service);
+    fake.configure({ translateDelayMs: 1000 });
+
+    service.submit('one', { speaker: 'spk_0', sequenceId: 's1' });
+    await vi.advanceTimersByTimeAsync(0);
+    service.submit('two', { speaker: null, sequenceId: 's2' });
+    service.relabel('s2', 'spk_1');
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(segments.map((s) => s.speaker)).toEqual(['spk_0', 'spk_1']);
+  });
+});
