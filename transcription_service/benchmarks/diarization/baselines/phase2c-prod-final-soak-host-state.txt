@@ -1,0 +1,30 @@
+recorded: 2026-10-05T01:53:20Z
+--- load ---
+20:53  up 23 days,  7:24, 2 users, load averages: 2.54 3.14 3.16
+--- memory (pages, 16 KiB each) ---
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                5369.
+Pages active:                            222376.
+Pages inactive:                          210220.
+Pages speculative:                        13973.
+Pages throttled:                              0.
+Pages wired down:                        227403.
+Pages purgeable:                          11325.
+--- swap ---
+total = 7168.00M  used = 6805.00M  free = 363.00M  (encrypted)
+--- docker containers ---
+--- docker vm ---
+8 cpus, 8218251264 bytes
+--- benchmark / build / test processes ---
+none
+--- top cpu ---
+PID    COMMAND          %CPU
+98372  Google Chrome He 0.0 
+96491  distnoted        0.0 
+96210  com.apple.WebKit 0.0 
+95048  Google Chrome He 0.0 
+94537  tipsd            0.0 
+93399  assistantd       0.0 
+91954  BTLEServer       0.0 
+91953  BTLEServerAgent  0.0 
+host quiet enough: load 2.58 on 10 cores, no benchmark processes, no containers

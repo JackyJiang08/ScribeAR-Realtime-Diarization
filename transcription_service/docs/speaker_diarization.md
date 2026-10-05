@@ -1622,71 +1622,84 @@ baked directory in **2.7 s** (budget 10 s), provider `OK`,
 against 1.3 GB for the base; the baked model is 34 MB and downloads in 3 s
 at build time.
 
-**Two-hour soak with a worker kill** (`soak_service.py`: 120 min of
-ES2004a to ES2004d, the same four people throughout, streamed at real time
-through the service with diarization on; the diarization worker killed
-with SIGKILL at 60 min; report `results/phase2e/soak_120min_on_linux.json`,
-gitignored like every run report, hygiene clean before and after). The run
-shared the host with the native whole-file offline pass of the standard
-set (4 torch threads at the lowest priority), which is visible in the
-caption worker's numbers below and is why the caption-drop comparison and
-the drift score come from the quieter 30-minute pairs that follow.
+**Two-hour soak on a quiet host, with a worker kill** (`soak_service.py`,
+2026-10-05: 120 min of ES2004a to ES2004d, the same four people
+throughout, streamed at real time through the service in the reference
+container with diarization on, the diarization worker killed with SIGKILL
+at 60 min; then the first 60 min of the same audio with diarization off
+for the drop comparison. Nothing else ran on the host: the launcher
+recorded the host state (load 2.6 on 10 cores from macOS daemons alone, no
+containers, no benchmark or build process; the laptop's chronic 6.8 GB of
+macOS swap noted) and would have aborted otherwise, and the container-side
+hygiene check was clean before and after both runs. Reports
+`baselines/phase2c-prod-final-soak-{120min-on,60min-off}-linux-cpu-4c8g.json`.
+Words are placed on the reference timeline with the caption clock
+corrected for the audio the caption job dropped, the attacher's own
+rule.)
+
+This run replaces an earlier two-hour soak (2026-10-04) whose drift and
+drop numbers were invalid: the native whole-file offline pass of the
+standard set ran on the same host at the same time, the caption worker
+dropped 363 s of audio under that load, and the scorer of the day did not
+yet correct the caption clock for it, so it scored words against the wrong
+reference speakers (50 apparent swaps). That run's memory and recovery
+numbers agreed with the clean run's and are not repeated here.
 
 | metric | result | target |
 |---|---|---|
-| service tree RSS, mean of the first steady 10 min to the last 10 min | 1827 to 1851 MB, **+1.3%** (peak 2014 MB) | under 10% |
-| caption worker RSS | 879 to 891 MB, **+1.3%** (peak 1025 MB) | under 10% |
-| diarization worker RSS (to the kill) | 653 to 659 MB, **+0.9%** (peak 697 MB); the replacement 662 to 658 MB over its hour | under 10% |
-| diarization real-time factor over two hours | 0.178 | at most 0.25 |
-| diarization audio skipped / dropped periods / failed passes | 0 s / 1 / 0 | 0 / - / 0 |
-| labels changed after being sent | 0 | 0 |
-| final words labelled | 99.4% (12 866 of 12 968) | at least 97% |
-| session labels minted for 4 people in two hours | 8 | |
-| kill at 60 min: replacement worker process visible after | 3.5 s | |
-| kill: worker replaced (model loaded, warm) after | 7.5 s (load 6.2 s; 5.7 s at start-up under the same load) | load at most 10 s |
-| kill: diarization job re-registered after | 9 s (log timestamps, 1 s resolution) | at most 10 s |
-| kill: caption messages around the kill | one gap of 8.8 s against a typical 5 to 7 s between messages; no caption dropped because of it, the stream never stalled | continue uninterrupted |
-| kill: first speaker label shown after | 4.2 s (on a caption whose audio the lost job had covered) | |
-| caption worker under this host load | 1.38 cores, 808 of 1440 periods dropped, 363 s of audio dropped for a full buffer, caption p50 8.3 s | see the 30-minute pairs |
+| service tree RSS, mean of the first steady 10 min to the last 10 min | 1832 to 1859 MB, **+1.5%** (peak 2020 MB) | under 10% |
+| caption worker RSS | 885 to 895 MB, **+1.2%** (peak 1047 MB) | under 10% |
+| diarization worker RSS, to the kill / the replacement over its hour | 650 to 660 MB, **+1.4%** (peak 697 MB) / 666 to 662 MB, -0.5% (peak 707 MB) | under 10% |
+| label drift: majority label per reference speaker per 15 min bin | **0 swaps in 8 bins**: FEE013 `spk_0`, MEO015 `spk_2`, FEE016 `spk_3`, MEE014 `spk_4` in every bin of the two hours | none |
+| labels used per 15 min bin / minted in two hours for 4 people | 4 to 6 (the four people's labels plus `spk_5`, `spk_6` on a few words in five of the bins) / 8 | |
+| labels changed after settling (after being sent) | **0** (65 `speakers_update` messages; 32 of 13 803 final words, 0.2%, corrected before finalization) | 0 |
+| final words labelled | 99.76% (13 723 of 13 803) | at least 97% |
+| diarization audio skipped / dropped periods / failed passes / RTF | 0 s / 0 / 0 / 0.142 (1438 passes, 1023 s of compute on 7190 s of audio) | 0 / - / 0 / at most 0.25 |
+| caption audio dropped for a full buffer, diarization on, hour 1 / hour 2 | 83.4 s / 20.3 s (103.7 s in two hours, 1.4 percent) | not above the off run (next table) |
+| caption periods dropped (of 1440) | 608 | |
+| caption latency, chunk-id in-progress p50 / p95, per 30 min bin | 6.23 / 24.5 s, 5.70 / 23.6 s, 5.24 / 23.1 s, 6.25 / 24.8 s (two hours: 5.95 / 23.9 s) | |
+| kill at 60 min: replacement process visible / model loaded (warm) / worker replaced / job re-registered | **1.5 s / 3.7 s / 4.2 s / 5 s** | job back within 10 s |
+| kill: caption messages | first message 9.2 s after the kill, one gap of 12.2 s against the stream's own gaps before it (p50 5.8 s, p95 18.1 s, max 32.1 s); no caption dropped, the stream did not stall | no stall |
+| kill: first speaker label on screen after | **20.2 s** (on audio recorded after the kill) | within 10 s: **missed by 10.2 s** on this reading |
 
-Two numbers of this run are **not usable as written**, and the harness
-was corrected before the pairs below: the label-drift score (50 majority
-swaps) and the "labels on post-kill audio" delay (326 s) both placed
-caption words on the reference timeline by Whisper's word times, which
-count only the audio Whisper kept; with 363 s dropped over the run the
-words drifted up to six minutes from the reference and were scored
-against the wrong speakers (the attacher itself shifts word times by the
-dropped audio, which is why 99.4 percent of words still carried labels).
-`soak_service.py` now samples the service's dropped-audio counter every
-5 s and shifts every word by the audio dropped before it, the same
-correction the attacher applies.
+*What the 20 s is.* The service had its diarization job back 5 s after the
+kill (replacement process in 1.5 s, warm load 3.7 s, re-registration on
+the next chunk), and the new job's first pass ran one period later, about
+10 s after the kill. A label reaches the screen only on a caption message,
+and captions appear 5 to 9 s after their audio in this container (p50
+5.95 s here), so the first caption able to carry a new label arrived about
+20 s after the kill; the words spoken in the 5 s between the kill and the
+re-registration, which no pass covered, settled as unattributed. Measured
+by when the service is labelling again, the target is met with 5 s to
+spare; measured by when a viewer sees a label on new audio, it is missed
+by about one caption latency plus one diarization period, and the strict
+reading is the one reported. Captions themselves never stalled.
 
-**Thirty-minute pair on a quiet host** (the same clip's first 30 min,
-diarization off then on, back to back in the same container, nothing else
-running on the host, hygiene clean; reports
-`results/phase2e/soak_30min_{off,on}_linux.json`). The drift score here
-uses the corrected clock (the caption worker dropped 15 and 20 s of audio
-in the two runs, so the shift was small either way).
+**Diarization off, same audio, one hour** (the clip's first 60 min,
+right after the on run, same container, hygiene clean; the on run's first
+hour is the like-for-like column):
 
-| metric | diarization off | diarization on | reading |
+| metric | diarization off, hour 1 | diarization on, hour 1 (of the two-hour run) | reading |
 |---|---|---|---|
-| caption audio dropped, buffer full | 15.0 s | 20.0 s | 5 s more over 1800 s of audio (0.3 percent); the off configuration alone has moved between 0 and 30 s across this fork's earlier runs of the same clip, so the difference is inside its own spread. Reported as a miss of the strict "no more than off" target, by 5 s |
-| caption periods dropped (of 360) | 163 | 149 | fewer with diarization on |
-| caption latency, chunk-id in-progress p50 / p95 | 6.83 / 27.0 s | 6.96 / 28.9 s | +2% / +7%, within the 10 percent parity target |
-| caption worker cores / peak RSS | 1.27 / 1019 MB | 1.26 / 1019 MB | unchanged |
-| diarization worker cores / peak RSS / RTF | - | 0.14 / 695 MB / 0.141 | the Phase 2 wrap-up numbers |
-| diarization audio skipped / dropped periods / failed passes | - | 0 s / 0 / 0 | |
-| service tree RSS growth over 30 min | +11.7% (one worker; whisper's buffers still filling in the first window) | +0.6% | |
-| final words labelled | - | 99.7% (3005 of 3013) | |
-| labels minted for 4 people | - | 7 | 1.75 per person on this far-field meeting, in line with the set's 1.17 minted per speaker on 10-minute files |
-| label drift, majority label per reference speaker per 5 min bin | - | 2 swaps in 6 bins | FEE016's words sat under the instructor's `spk_0` in the first bin before her own `spk_3` was minted at minute 5 (the attach-to-nearest rule before a voice has 2.5 s of evidence), then stayed `spk_3`; the instructor FEE013 kept `spk_0` for five bins and flipped to `spk_3` in the last (minutes 25 to 30), a confusion of the kind the set's 0.10 confusion rate describes. MEO015 and MEE014 kept one label each throughout. Reported as a miss of the strict "no swaps" target |
+| caption audio dropped for a full buffer | 75.0 s | 83.4 s | 8.4 s more over 3600 s of audio (0.23 percent of the hour, 11 percent more than off). **Target "not above the off run" missed by 8.4 s.** The off configuration alone has moved by more than that between runs of this clip (15 s and 0 s in two earlier 30-minute and 3-minute runs; 75 s here), so a single pair cannot attribute it, and the on run's second hour dropped 20.3 s with the same diarization worker running |
+| caption periods dropped | 320 of 720 | 608 of 1440 over the two hours (304 per hour) | no more with diarization on |
+| caption latency p50 / p95, chunk-id in-progress, per 30 min bin | 6.19 / 28.5 s, 6.31 / 25.1 s | 6.23 / 24.5 s, 5.70 / 23.6 s | parity: p50 within 1 and 10 percent, p95 lower with diarization on |
+| caption worker cores / peak RSS | 1.29 / 1028 MB | 1.28 / 1047 MB | unchanged |
+| service tree RSS growth over the run | +0.4% (one worker, one hour) | +1.5% (two workers, two hours) | |
+| final words | 6775 | 13 803 over two hours | |
 
-The strict reading of "no label drift" is therefore missed by one real
-flip in six bins; the identities did not drift in the sense the soak was
-built to catch (a label slowly migrating to another person, or the
-reconciler restarting), and no label ever changed after being sent. The
-two-hour run's own labelled fraction (99.4 percent) and its 8 labels for
-4 people over two hours say the same: no restart, no runaway minting.
+Acceptance (`acceptance.py` with `phase2c_prod_acceptance.json`, the off
+report as the baseline): memory, drift, diarization skips and failures,
+labels after sending, the job's re-registration, both model loads and the
+real-time factor **pass**. Three rules fire and are reported as missed:
+the audio-drop rule (the tool compares the on run's two-hour total,
+103.7 s, with the off run's one hour, 75 s; like for like it is 83.4
+against 75.0 s, missed by 8.4 s), the viewer-visible label return (20.2 s
+against the 10 s plus one caption latency the rule allows, 16.0 s, missed
+by 4.2 s), and the rule's 10 s cap on the caption gap at the kill (12.2 s,
+over by 2.2 s, while the stream's own gaps before the kill reached 18.1 s
+at p95 and 32.1 s at most, so the stream slowed as it does every few
+minutes and did not stall). Nothing is relaxed in the targets file.
 
 
 **Final gate run** (`make benchmark_diarization_gate_docker SET=standard
@@ -1766,9 +1779,10 @@ on this host while the container runs were active (1.9 ms measured);
 they are upstream's timing tests and fail identically on this host with
 upstream `staging`'s worker-pool code and tests checked out in place
 (1.5 and 1.8 ms measured), so they are the fork's two known host-timing
-failures and unrelated to this step's changes. The admin-server suite's
-`compose-file-version` test also fails on this branch independently of
-this step (`deployment/compose.yml` is untouched here).
+failures and unrelated to this step's changes. (The admin-server suite's
+`compose-file-version` test, which also failed on the branch, was the
+Phase 2a commit's compose.yml change without a re-pinned hash; fixed with
+compose-file version 18.)
 
 ### Hard cases
 

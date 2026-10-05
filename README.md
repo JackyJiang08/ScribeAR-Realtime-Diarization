@@ -33,11 +33,15 @@
 > speaker confusion 0.102, 1.06 labels on settled captions per real speaker,
 > speaker count exact on 11 and within one on 19 of 24, 98 percent of final
 > words labelled, labels 0 s after the caption text; warm model load 2.7 s
-> from the baked image. A two-hour soak in the same container with the diarization worker
-> killed at 60 min grew the service's memory 1.3 percent, kept every
-> diarization counter clean (no audio skipped, no failed pass, no label
-> changed after sending), replaced the worker in 7.5 s and had the
-> session's labels back 9 s after the kill; the final gate run passed
+> from the baked image. A two-hour soak in the same container on a quiet host, with the
+> diarization worker killed at 60 min, grew the service's memory 1.5
+> percent, kept the same four people under the same four labels in every
+> 15-minute bin, kept every diarization counter clean (no audio skipped,
+> no failed pass, no label changed after sending), replaced the worker in
+> 4.2 s with the session's job back 5 s after the kill (the first label on
+> new audio reached the screen 20 s after it, one caption latency plus one
+> diarization period later), and dropped 83 s of caption audio in its
+> first hour against 75 s for the same hour with diarization off; the final gate run passed
 > every gated metric against the previous baseline with a clean caption
 > stream (on 4.57 s against off 4.74 s p50) and the whole-file offline
 > pass included (model ceiling DER 0.190, confusion 0.025 on the set), and
@@ -46,8 +50,9 @@
 > set's speaker count within one on 19 of 24 (the fragment fold costs a
 > five-person debate two labels), far-field under-counting and clean
 > many-speaker panels, a single-run dropped-period count of 10 against 5
-> with diarization on (inside the off configuration's own spread), and one
-> label flip in six five-minute bins of the paired 30-minute run.
+> with diarization on (inside the off configuration's own spread), the
+> soak's 8 s of extra dropped audio in an hour, and the 20 s a viewer waits
+> for the first label after a diarization worker dies.
 >
 > **Enable.** Deploy the `transcription-service-<device>-diarization` image
 > (`TRANSCRIPTION_DEVICE=cpu-diarization` in `deployment/.env`; the model is

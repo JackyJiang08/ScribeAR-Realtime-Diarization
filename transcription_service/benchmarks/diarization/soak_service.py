@@ -169,6 +169,10 @@ class SoakCollector(LatencyCollector):
         # long run under load scores drift against the wrong speakers.
         self.drop_samples: list[tuple[float, float]] = []
         self.message_arrivals: list[float] = []
+        # (kind, arrival, chunk-id latency) of every in-progress and final
+        # message, for caption latency per time bin
+        self.latency_events: list[tuple[str, float, float]] = []
+        self.stream_t0: float | None = None
         # (start, end, text, speaker_or_None, arrival) per finalized word
         self.final_words_timed: list[tuple] = []
         self.label_arrivals: list[float] = []
@@ -187,9 +191,27 @@ class SoakCollector(LatencyCollector):
             shift = dropped
         return shift
 
+    def on_sent(self, index: int, at: float):
+        if self.stream_t0 is None:
+            self.stream_t0 = at
+        super().on_sent(index, at)
+
     def on_message(self, payload: dict, arrival: float):
         if payload.get("type") == "transcript":
             self.message_arrivals.append(arrival)
+            for kind, key in (
+                ("in_progress", "in_progress_chunk_ids"),
+                ("final", "final_chunk_ids"),
+            ):
+                indices = [
+                    i
+                    for i in map(self._chunk_index, payload.get(key) or [])
+                    if i is not None
+                ]
+                if indices and max(indices) in self.send_time:
+                    self.latency_events.append(
+                        (kind, arrival, arrival - self.send_time[max(indices)])
+                    )
             shift = self.clock_shift(arrival)
             final = payload.get("final")
             if final and final.get("text"):
@@ -330,11 +352,21 @@ def drift_report(words, turns, bin_sec: float, streamed_sec: float) -> dict:
                     }
                 )
         previous.update(majority)
+        labels_in_bin = sorted(
+            {
+                label
+                for counter in counters.values()
+                for label in counter
+                if label != "<none>"
+            }
+        )
         rows.append(
             {
                 "bin": index,
                 "start_min": round(index * bin_sec / 60, 1),
                 "majority_label": majority,
+                "labels_used": labels_in_bin,
+                "labels_used_count": len(labels_in_bin),
                 "labelled_words": sum(
                     v
                     for c in counters.values()
@@ -464,6 +496,62 @@ def resume_from_log(log_path: Path) -> dict:
             exited.group(1)
         )
     return out
+
+
+def latency_bins(
+    collector: SoakCollector, bin_sec: float, streamed_sec: float
+) -> list[dict]:
+    """
+    Caption chunk-id latency per time bin of the stream (by message arrival
+    relative to the first chunk sent): count, p50 and p95 for in-progress
+    and final messages.
+    """
+    if collector.stream_t0 is None:
+        return []
+    bins = int(streamed_sec // bin_sec) + 1
+    rows = []
+    for index in range(bins):
+        start, end = index * bin_sec, (index + 1) * bin_sec
+        row = {"bin": index, "start_min": round(start / 60, 1)}
+        for kind in ("in_progress", "final"):
+            values = [
+                latency
+                for k, arrival, latency in collector.latency_events
+                if k == kind and start <= arrival - collector.stream_t0 < end
+            ]
+            row[kind] = summarize(values, 3)
+        if row["in_progress"].get("count") or row["final"].get("count"):
+            rows.append(row)
+    return rows
+
+
+def dropped_per_hour(
+    collector: SoakCollector, streamed_sec: float
+) -> list[dict]:
+    """
+    Audio the caption job dropped for a full buffer, per hour of the stream,
+    from the cumulative counter sampled every 5 s.
+    """
+    if not collector.drop_samples or collector.stream_t0 is None:
+        return []
+    rows = []
+    hours = int(streamed_sec // 3600) + (1 if streamed_sec % 3600 else 0)
+    previous = 0.0
+    for hour in range(hours):
+        end = collector.stream_t0 + min((hour + 1) * 3600, streamed_sec)
+        cumulative = previous
+        for at, dropped in collector.drop_samples:
+            if at <= end:
+                cumulative = dropped
+        rows.append(
+            {
+                "hour": hour + 1,
+                "dropped_sec": round(cumulative - previous, 1),
+                "cumulative_sec": round(cumulative, 1),
+            }
+        )
+        previous = cumulative
+    return rows
 
 
 def load_times_from_log(log_path: Path) -> list[float]:
@@ -608,6 +696,18 @@ def main():
     parser.add_argument("--service-log", default=None)
     parser.add_argument("--label", default="")
     parser.add_argument("--no-hygiene", action="store_true")
+    parser.add_argument(
+        "--require-quiet",
+        action="store_true",
+        help="abort before starting the service when the hygiene check finds "
+        "swap in use, a high load average or too little free memory",
+    )
+    parser.add_argument(
+        "--latency-bin-min",
+        type=float,
+        default=30.0,
+        help="caption latency p50/p95 are also reported per this many minutes",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -638,6 +738,11 @@ def main():
         Path(args.provider_config), args.diarization == "on", args.provider
     )
     hygiene = None if args.no_hygiene else hygiene_check()
+    if args.require_quiet and hygiene is not None and not hygiene["clean"]:
+        raise SystemExit(
+            "host is not quiet, aborting before the service starts: "
+            + "; ".join(hygiene["warnings"])
+        )
     scratch = Path(tempfile.mkdtemp(prefix="soak_service_"))
     config_path = scratch / "provider_config.json"
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
@@ -747,6 +852,10 @@ def main():
         "latency": latency,
         "memory": memory,
         "drift": drift,
+        "caption_latency_bins": latency_bins(
+            collector, args.latency_bin_min * 60.0, streamed_sec
+        ),
+        "audio_dropped_per_hour": dropped_per_hour(collector, streamed_sec),
         "caption_clock_shift_sec_at_end": (
             collector.drop_samples[-1][1] if collector.drop_samples else 0.0
         ),
