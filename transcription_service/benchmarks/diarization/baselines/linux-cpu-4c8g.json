@@ -1,7 +1,7 @@
 {
-  "label": "phase2 wrap-up final",
-  "generated_at": "2026-10-04T09:44:52+0000",
-  "code_revision": "de05327",
+  "label": "phase2c-prod: standard set, full 10 min, offline pass imported from the native run, clean host",
+  "generated_at": "2026-10-05T00:03:19+0000",
+  "code_revision": "fd47fc8",
   "code_dirty": null,
   "environment": {
     "machine": "aarch64",
@@ -41,23 +41,23 @@
   "hygiene": {
     "before": {
       "state": {
-        "taken_at": "2026-10-04T09:44:52+0000",
-        "free_memory_mb": 7090,
+        "taken_at": "2026-10-05T00:03:19+0000",
+        "free_memory_mb": 7207,
         "swap_used_mb": 0,
-        "load_1m": 2.01,
-        "load_5m": 0.54,
-        "load_15m": 0.19
+        "load_1m": 2.46,
+        "load_5m": 1.69,
+        "load_15m": 1.63
       },
       "warnings": [],
       "clean": true
     },
     "after": {
-      "taken_at": "2026-10-04T10:21:13+0000",
-      "free_memory_mb": 6808,
+      "taken_at": "2026-10-05T00:40:01+0000",
+      "free_memory_mb": 6757,
       "swap_used_mb": 0,
-      "load_1m": 1.19,
-      "load_5m": 1.92,
-      "load_15m": 2.36
+      "load_1m": 1.51,
+      "load_5m": 2.02,
+      "load_15m": 2.21
     },
     "clean": true,
     "warnings": []
@@ -76,7 +76,8 @@
     "set": "standard",
     "offline_set": "dev",
     "stream_sec": 0.0,
-    "skip_offline": true,
+    "skip_offline": false,
+    "offline_from": "/app/benchmarks/diarization/results/phase2e/offline_standard_native.json",
     "reconciler_overrides": null,
     "classroom_data": "benchmarks/diarization/data/classroom",
     "caption_audio": "benchmarks/diarization/data/ami/ES2004a_10min.wav",
@@ -90,18 +91,18 @@
       "warmup"
     ]
   },
-  "logs": "<outside>/diarization_suite_o65wtmd7",
+  "logs": "<outside>/diarization_suite_ritynk7o",
   "warmup": {
-    "whisper_load_sec": 0.55,
-    "whisper_pass_sec": 1.27,
-    "silero_load_sec": 0.35,
-    "pyannote_load_sec": 2.24,
-    "pyannote_pass_sec": 0.31
+    "whisper_load_sec": 1.77,
+    "whisper_pass_sec": 1.5,
+    "silero_load_sec": 0.21,
+    "pyannote_load_sec": 2.86,
+    "pyannote_pass_sec": 0.24
   },
   "replay": {
-    "label": "phase2 wrap-up final",
-    "generated_at": "2026-10-04T10:13:07+0000",
-    "code_revision": "de05327",
+    "label": "phase2c-prod: standard set, full 10 min, offline pass imported from the native run, clean host",
+    "generated_at": "2026-10-05T00:31:56+0000",
+    "code_revision": "fd47fc8",
     "code_dirty": null,
     "environment": {
       "machine": "aarch64",
@@ -140,6 +141,7 @@
       "suffix": "_10min",
       "set": "standard",
       "offline_set": "dev",
+      "offline_from": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
       "files": [
         "benchmarks/diarization/data/ami/IS1009a_10min.wav",
         "benchmarks/diarization/data/ami/IS1009b_10min.wav",
@@ -169,10 +171,33 @@
       "min_speaker_sec": 5.0,
       "reconciler_overrides": null
     },
-    "model_load_sec": 2.1,
-    "warmup_pass_sec": 0.2,
-    "peak_rss_mb": 728.0,
+    "model_load_sec": 2.0,
+    "warmup_pass_sec": 0.35,
+    "peak_rss_mb": 717.0,
     "aggregate": {
+      "offline": {
+        "der": {
+          "value": 0.1902,
+          "reference_speech_sec": 12648.29,
+          "missed_detection": 0.134,
+          "false_alarm": 0.031,
+          "confusion": 0.0252
+        },
+        "der_collar_0.25": {
+          "value": 0.1544,
+          "reference_speech_sec": 11594.34,
+          "missed_detection": 0.1138,
+          "false_alarm": 0.0207,
+          "confusion": 0.0198
+        },
+        "jer": {
+          "value": 0.3503
+        },
+        "speaker_count_abs_error_mean": 0.5,
+        "rtf_mean": 0.6939,
+        "files_scored": 24,
+        "files_from_prior_report": 24
+      },
       "streaming_first_seen": {
         "der": {
           "value": 0.2712,
@@ -288,14 +313,14 @@
         }
       },
       "streaming": {
-        "tick_cost_mean_sec": 0.582,
-        "tick_cost_p95_sec": 0.817,
-        "tick_cost_worst_sec": 2.11,
-        "lag_behind_realtime_p50_sec": 0.592,
-        "lag_behind_realtime_p95_sec": 0.817,
+        "tick_cost_mean_sec": 0.588,
+        "tick_cost_p95_sec": 0.902,
+        "tick_cost_worst_sec": 2.034,
+        "lag_behind_realtime_p50_sec": 0.594,
+        "lag_behind_realtime_p95_sec": 0.902,
         "ticks_skipped_fraction": 0.0,
-        "label_latency_p50_sec": 3.7,
-        "label_latency_p95_sec": 10.15,
+        "label_latency_p50_sec": 3.71,
+        "label_latency_p95_sec": 10.14,
         "onsets_never_labelled": 118,
         "label_flips_per_min": 0.38,
         "label_flip_rate_after_first_shown": 0.017,
@@ -324,7 +349,7 @@
             "predicted": 4,
             "minted": 4,
             "settled": 4,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "IS1009b_10min.wav",
@@ -333,7 +358,7 @@
             "predicted": 4,
             "minted": 4,
             "settled": 3,
-            "offline": null
+            "offline": 3
           },
           {
             "file": "IS1009c_10min.wav",
@@ -342,7 +367,7 @@
             "predicted": 2,
             "minted": 2,
             "settled": 2,
-            "offline": null
+            "offline": 3
           },
           {
             "file": "IS1009d_10min.wav",
@@ -351,7 +376,7 @@
             "predicted": 5,
             "minted": 5,
             "settled": 5,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "ES2004a_10min.wav",
@@ -360,7 +385,7 @@
             "predicted": 5,
             "minted": 5,
             "settled": 4,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "ES2004b_10min.wav",
@@ -369,7 +394,7 @@
             "predicted": 6,
             "minted": 6,
             "settled": 6,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "ES2004c_10min.wav",
@@ -378,7 +403,7 @@
             "predicted": 5,
             "minted": 5,
             "settled": 5,
-            "offline": null
+            "offline": 5
           },
           {
             "file": "ES2004d_10min.wav",
@@ -387,7 +412,7 @@
             "predicted": 4,
             "minted": 4,
             "settled": 4,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "TS3003a_10min.wav",
@@ -396,7 +421,7 @@
             "predicted": 1,
             "minted": 1,
             "settled": 1,
-            "offline": null
+            "offline": 1
           },
           {
             "file": "TS3003b_10min.wav",
@@ -405,7 +430,7 @@
             "predicted": 4,
             "minted": 4,
             "settled": 4,
-            "offline": null
+            "offline": 3
           },
           {
             "file": "TS3003c_10min.wav",
@@ -414,7 +439,7 @@
             "predicted": 3,
             "minted": 3,
             "settled": 3,
-            "offline": null
+            "offline": 3
           },
           {
             "file": "TS3003d_10min.wav",
@@ -423,7 +448,7 @@
             "predicted": 4,
             "minted": 4,
             "settled": 4,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "EN2002a_10min.wav",
@@ -432,7 +457,7 @@
             "predicted": 5,
             "minted": 5,
             "settled": 5,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "EN2002b_10min.wav",
@@ -441,7 +466,7 @@
             "predicted": 7,
             "minted": 7,
             "settled": 7,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "EN2002c_10min.wav",
@@ -450,7 +475,7 @@
             "predicted": 4,
             "minted": 4,
             "settled": 4,
-            "offline": null
+            "offline": 5
           },
           {
             "file": "EN2002d_10min.wav",
@@ -459,7 +484,7 @@
             "predicted": 3,
             "minted": 3,
             "settled": 3,
-            "offline": null
+            "offline": 3
           },
           {
             "file": "uicid_10min.wav",
@@ -468,7 +493,7 @@
             "predicted": 2,
             "minted": 2,
             "settled": 1,
-            "offline": null
+            "offline": 1
           },
           {
             "file": "bgvvt_10min.wav",
@@ -477,7 +502,7 @@
             "predicted": 2,
             "minted": 2,
             "settled": 2,
-            "offline": null
+            "offline": 2
           },
           {
             "file": "ylgug_10min.wav",
@@ -486,7 +511,7 @@
             "predicted": 3,
             "minted": 3,
             "settled": 2,
-            "offline": null
+            "offline": 2
           },
           {
             "file": "gtjow_10min.wav",
@@ -495,7 +520,7 @@
             "predicted": 2,
             "minted": 2,
             "settled": 2,
-            "offline": null
+            "offline": 2
           },
           {
             "file": "jwggf_10min.wav",
@@ -504,7 +529,7 @@
             "predicted": 6,
             "minted": 6,
             "settled": 6,
-            "offline": null
+            "offline": 4
           },
           {
             "file": "iacod_10min.wav",
@@ -513,7 +538,7 @@
             "predicted": 2,
             "minted": 2,
             "settled": 2,
-            "offline": null
+            "offline": 3
           },
           {
             "file": "hhepf_10min.wav",
@@ -522,7 +547,7 @@
             "predicted": 2,
             "minted": 2,
             "settled": 2,
-            "offline": null
+            "offline": 6
           },
           {
             "file": "epygx_10min.wav",
@@ -531,7 +556,7 @@
             "predicted": 5,
             "minted": 5,
             "settled": 3,
-            "offline": null
+            "offline": 5
           }
         ],
         "session_labels_merged": 8,
@@ -541,28 +566,28 @@
         "revised_fraction": 0.0062,
         "stage_cost_sec": {
           "segmentation": {
-            "mean": 0.139,
-            "max": 1.452,
+            "mean": 0.143,
+            "max": 1.062,
             "count": 2880
           },
           "embeddings": {
-            "mean": 0.441,
-            "max": 0.718,
+            "mean": 0.443,
+            "max": 1.878,
             "count": 2880
           },
           "clustering_and_other": {
             "mean": 0.002,
-            "max": 0.008,
+            "max": 0.01,
             "count": 2880
           },
           "total": {
-            "mean": 0.582,
-            "max": 2.11,
+            "mean": 0.588,
+            "max": 2.034,
             "count": 2880
           }
         },
-        "reconciler_cost_mean_sec": 5.2e-05,
-        "memory_growth_mb_total": -20.8
+        "reconciler_cost_mean_sec": 5.5e-05,
+        "memory_growth_mb_total": 39.0
       }
     },
     "files": [
@@ -570,72 +595,102 @@
         "file": "IS1009a_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 316.1,
+          "rtf": 0.5269,
+          "stage_cost_sec": {
+            "total": 316.122,
+            "segmentation": 18.492,
+            "embeddings": 297.377,
+            "clustering_and_other": 0.253
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.2668,
+            "reference_speech_sec": 481.67,
+            "missed_detection": 0.1586,
+            "false_alarm": 0.0461,
+            "confusion": 0.062
+          },
+          "der_collar_0.25": {
+            "value": 0.213,
+            "reference_speech_sec": 410.9,
+            "missed_detection": 0.1279,
+            "false_alarm": 0.0331,
+            "confusion": 0.052
+          },
+          "jer": {
+            "value": 0.3884
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.612,
-            "p50": 0.643,
-            "p95": 0.722,
-            "max": 0.902,
-            "worst": 0.902,
+            "mean": 0.565,
+            "p50": 0.589,
+            "p95": 0.69,
+            "max": 0.769,
+            "worst": 0.769,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.8e-05,
-            "p50": 5.8e-05,
-            "p95": 9.7e-05,
-            "max": 0.000283
+            "mean": 6.1e-05,
+            "p50": 5.9e-05,
+            "p95": 0.000108,
+            "max": 0.000215
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.173,
-              "p50": 0.165,
-              "p95": 0.245,
-              "max": 0.289
+              "mean": 0.144,
+              "p50": 0.143,
+              "p95": 0.211,
+              "max": 0.305
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.437,
-              "p50": 0.474,
-              "p95": 0.516,
-              "max": 0.678
+              "mean": 0.42,
+              "p50": 0.45,
+              "p95": 0.495,
+              "max": 0.588
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.007
             },
             "total": {
               "count": 120,
-              "mean": 0.612,
-              "p50": 0.643,
-              "p95": 0.722,
-              "max": 0.902
+              "mean": 0.565,
+              "p50": 0.589,
+              "p95": 0.69,
+              "max": 0.769
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.612,
-              "p50": 0.643,
-              "p95": 0.722,
-              "max": 0.902
+              "mean": 0.565,
+              "p50": 0.589,
+              "p95": 0.69,
+              "max": 0.769
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.54,
-            "p50": 3.42,
-            "p95": 5.66,
+            "mean": 3.49,
+            "p50": 3.36,
+            "p95": 5.61,
             "onsets_scored": 131,
             "onsets_never_labelled": 3
           },
@@ -668,11 +723,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 627.4,
-            "rss_end_mb": 684.5,
-            "rss_min_mb": 626.4,
-            "rss_max_mb": 689.5,
-            "growth_mb": 57.1
+            "rss_after_first_tick_mb": 665.9,
+            "rss_end_mb": 663.5,
+            "rss_min_mb": 652.0,
+            "rss_max_mb": 674.1,
+            "growth_mb": -2.4
           },
           "first_seen": {
             "der": {
@@ -794,72 +849,102 @@
         "file": "IS1009b_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 3,
+          "speaker_count_error": -1,
+          "wall_sec": 316.9,
+          "rtf": 0.5282,
+          "stage_cost_sec": {
+            "total": 316.924,
+            "segmentation": 18.762,
+            "embeddings": 298.003,
+            "clustering_and_other": 0.159
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1153,
+            "reference_speech_sec": 526.41,
+            "missed_detection": 0.0621,
+            "false_alarm": 0.0137,
+            "confusion": 0.0396
+          },
+          "der_collar_0.25": {
+            "value": 0.0795,
+            "reference_speech_sec": 486.7,
+            "missed_detection": 0.0415,
+            "false_alarm": 0.0066,
+            "confusion": 0.0314
+          },
+          "jer": {
+            "value": 0.4995
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.655,
-            "p50": 0.661,
+            "mean": 0.595,
+            "p50": 0.595,
             "p95": 0.78,
-            "max": 1.481,
-            "worst": 1.481,
+            "max": 1.142,
+            "worst": 1.142,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.3e-05,
+            "mean": 5.6e-05,
             "p50": 4.8e-05,
-            "p95": 0.000104,
-            "max": 0.000156
+            "p95": 8.5e-05,
+            "max": 0.000287
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.191,
-              "p50": 0.173,
-              "p95": 0.267,
-              "max": 0.983
+              "mean": 0.156,
+              "p50": 0.145,
+              "p95": 0.306,
+              "max": 0.533
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.463,
-              "p50": 0.49,
-              "p95": 0.538,
-              "max": 0.585
+              "mean": 0.438,
+              "p50": 0.455,
+              "p95": 0.496,
+              "max": 0.607
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.002
             },
             "total": {
               "count": 120,
-              "mean": 0.655,
-              "p50": 0.661,
-              "p95": 0.779,
-              "max": 1.481
+              "mean": 0.595,
+              "p50": 0.595,
+              "p95": 0.78,
+              "max": 1.142
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.655,
-              "p50": 0.661,
+              "mean": 0.595,
+              "p50": 0.595,
               "p95": 0.78,
-              "max": 1.481
+              "max": 1.142
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.64,
-            "p50": 3.82,
-            "p95": 5.59,
+            "mean": 3.51,
+            "p50": 3.64,
+            "p95": 5.5,
             "onsets_scored": 74,
             "onsets_never_labelled": 5
           },
@@ -892,11 +977,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 678.1,
-            "rss_end_mb": 662.7,
-            "rss_min_mb": 632.0,
-            "rss_max_mb": 692.6,
-            "growth_mb": -15.5
+            "rss_after_first_tick_mb": 657.4,
+            "rss_end_mb": 663.2,
+            "rss_min_mb": 645.9,
+            "rss_max_mb": 670.4,
+            "growth_mb": 5.8
           },
           "first_seen": {
             "der": {
@@ -1018,17 +1103,47 @@
         "file": "IS1009c_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 3,
+          "speaker_count_error": -1,
+          "wall_sec": 309.5,
+          "rtf": 0.5159,
+          "stage_cost_sec": {
+            "total": 309.519,
+            "segmentation": 18.064,
+            "embeddings": 291.301,
+            "clustering_and_other": 0.153
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1221,
+            "reference_speech_sec": 467.98,
+            "missed_detection": 0.0598,
+            "false_alarm": 0.0344,
+            "confusion": 0.0278
+          },
+          "der_collar_0.25": {
+            "value": 0.0837,
+            "reference_speech_sec": 436.19,
+            "missed_detection": 0.0458,
+            "false_alarm": 0.0196,
+            "confusion": 0.0183
+          },
+          "jer": {
+            "value": 0.5337
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.585,
-            "p50": 0.593,
-            "p95": 0.685,
-            "max": 0.779,
-            "worst": 0.779,
+            "mean": 0.568,
+            "p50": 0.589,
+            "p95": 0.633,
+            "max": 0.732,
+            "worst": 0.732,
             "budget": 5.0,
             "fits_budget": true
           },
@@ -1036,54 +1151,54 @@
             "count": 120,
             "mean": 5e-05,
             "p50": 4.5e-05,
-            "p95": 7.4e-05,
-            "max": 0.000242
+            "p95": 7.3e-05,
+            "max": 0.000179
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.146,
+              "mean": 0.136,
               "p50": 0.143,
-              "p95": 0.217,
-              "max": 0.267
+              "p95": 0.18,
+              "max": 0.259
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.437,
-              "p50": 0.455,
-              "p95": 0.51,
-              "max": 0.551
+              "mean": 0.431,
+              "p50": 0.447,
+              "p95": 0.492,
+              "max": 0.529
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.585,
-              "p50": 0.593,
-              "p95": 0.685,
-              "max": 0.779
+              "mean": 0.568,
+              "p50": 0.589,
+              "p95": 0.633,
+              "max": 0.732
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.585,
-              "p50": 0.593,
-              "p95": 0.685,
-              "max": 0.779
+              "mean": 0.568,
+              "p50": 0.589,
+              "p95": 0.633,
+              "max": 0.732
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.59,
-            "p50": 3.45,
-            "p95": 5.69,
+            "mean": 3.58,
+            "p50": 3.41,
+            "p95": 5.66,
             "onsets_scored": 82,
             "onsets_never_labelled": 6
           },
@@ -1116,11 +1231,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 634.9,
-            "rss_end_mb": 645.0,
-            "rss_min_mb": 632.7,
-            "rss_max_mb": 690.3,
-            "growth_mb": 10.1
+            "rss_after_first_tick_mb": 657.8,
+            "rss_end_mb": 671.5,
+            "rss_min_mb": 652.5,
+            "rss_max_mb": 673.3,
+            "growth_mb": 13.7
           },
           "first_seen": {
             "der": {
@@ -1242,72 +1357,102 @@
         "file": "IS1009d_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 310.8,
+          "rtf": 0.5179,
+          "stage_cost_sec": {
+            "total": 310.754,
+            "segmentation": 20.172,
+            "embeddings": 290.421,
+            "clustering_and_other": 0.161
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.124,
+            "reference_speech_sec": 490.29,
+            "missed_detection": 0.0701,
+            "false_alarm": 0.0362,
+            "confusion": 0.0178
+          },
+          "der_collar_0.25": {
+            "value": 0.0869,
+            "reference_speech_sec": 451.14,
+            "missed_detection": 0.0527,
+            "false_alarm": 0.0239,
+            "confusion": 0.0103
+          },
+          "jer": {
+            "value": 0.237
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.617,
-            "p50": 0.597,
-            "p95": 0.78,
-            "max": 1.066,
-            "worst": 1.066,
+            "mean": 0.613,
+            "p50": 0.591,
+            "p95": 0.798,
+            "max": 1.157,
+            "worst": 1.157,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.9e-05,
-            "p50": 4.9e-05,
-            "p95": 0.000112,
-            "max": 0.000199
+            "mean": 6.4e-05,
+            "p50": 5.5e-05,
+            "p95": 0.000126,
+            "max": 0.000208
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.152,
-              "p50": 0.144,
-              "p95": 0.215,
-              "max": 0.556
+              "mean": 0.149,
+              "p50": 0.143,
+              "p95": 0.242,
+              "max": 0.399
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.464,
-              "p50": 0.466,
-              "p95": 0.528,
-              "max": 0.689
+              "mean": 0.463,
+              "p50": 0.458,
+              "p95": 0.557,
+              "max": 0.907
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
-              "p95": 0.003,
-              "max": 0.003
+              "p95": 0.002,
+              "max": 0.006
             },
             "total": {
               "count": 120,
-              "mean": 0.617,
-              "p50": 0.597,
-              "p95": 0.78,
-              "max": 1.066
+              "mean": 0.613,
+              "p50": 0.591,
+              "p95": 0.798,
+              "max": 1.157
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.617,
-              "p50": 0.597,
-              "p95": 0.78,
-              "max": 1.066
+              "mean": 0.613,
+              "p50": 0.591,
+              "p95": 0.798,
+              "max": 1.157
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
             "mean": 3.41,
-            "p50": 3.3,
-            "p95": 5.51,
+            "p50": 3.31,
+            "p95": 5.39,
             "onsets_scored": 92,
             "onsets_never_labelled": 3
           },
@@ -1340,11 +1485,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 670.7,
-            "rss_end_mb": 666.8,
-            "rss_min_mb": 644.1,
-            "rss_max_mb": 692.6,
-            "growth_mb": -3.9
+            "rss_after_first_tick_mb": 671.4,
+            "rss_end_mb": 674.1,
+            "rss_min_mb": 651.7,
+            "rss_max_mb": 680.4,
+            "growth_mb": 2.6
           },
           "first_seen": {
             "der": {
@@ -1466,72 +1611,102 @@
         "file": "ES2004a_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 323.4,
+          "rtf": 0.539,
+          "stage_cost_sec": {
+            "total": 323.371,
+            "segmentation": 20.032,
+            "embeddings": 303.177,
+            "clustering_and_other": 0.163
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.3741,
+            "reference_speech_sec": 420.92,
+            "missed_detection": 0.2882,
+            "false_alarm": 0.0535,
+            "confusion": 0.0323
+          },
+          "der_collar_0.25": {
+            "value": 0.3346,
+            "reference_speech_sec": 362.4,
+            "missed_detection": 0.2572,
+            "false_alarm": 0.0497,
+            "confusion": 0.0277
+          },
+          "jer": {
+            "value": 0.3937
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.566,
-            "p50": 0.621,
-            "p95": 0.708,
-            "max": 0.819,
-            "worst": 0.819,
+            "mean": 0.549,
+            "p50": 0.589,
+            "p95": 0.682,
+            "max": 2.034,
+            "worst": 2.034,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.9e-05,
-            "p50": 4.6e-05,
-            "p95": 8.2e-05,
-            "max": 0.000147
+            "mean": 5.3e-05,
+            "p50": 4.7e-05,
+            "p95": 9.2e-05,
+            "max": 0.000565
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.157,
-              "p50": 0.151,
-              "p95": 0.217,
-              "max": 0.315
+              "mean": 0.149,
+              "p50": 0.145,
+              "p95": 0.216,
+              "max": 0.366
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.408,
-              "p50": 0.468,
-              "p95": 0.524,
-              "max": 0.676
+              "mean": 0.398,
+              "p50": 0.448,
+              "p95": 0.496,
+              "max": 1.878
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.001,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.007
             },
             "total": {
               "count": 120,
-              "mean": 0.566,
-              "p50": 0.621,
-              "p95": 0.708,
-              "max": 0.819
+              "mean": 0.549,
+              "p50": 0.589,
+              "p95": 0.682,
+              "max": 2.034
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.566,
-              "p50": 0.621,
-              "p95": 0.708,
-              "max": 0.819
+              "mean": 0.549,
+              "p50": 0.589,
+              "p95": 0.682,
+              "max": 2.034
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 4.29,
-            "p50": 4.25,
-            "p95": 10.15,
+            "mean": 4.3,
+            "p50": 4.31,
+            "p95": 10.14,
             "onsets_scored": 105,
             "onsets_never_labelled": 17
           },
@@ -1564,11 +1739,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 692.5,
-            "rss_end_mb": 664.2,
-            "rss_min_mb": 632.7,
-            "rss_max_mb": 692.6,
-            "growth_mb": -28.3
+            "rss_after_first_tick_mb": 674.3,
+            "rss_end_mb": 661.8,
+            "rss_min_mb": 652.7,
+            "rss_max_mb": 674.4,
+            "growth_mb": -12.5
           },
           "first_seen": {
             "der": {
@@ -1690,72 +1865,102 @@
         "file": "ES2004b_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 358.0,
+          "rtf": 0.5966,
+          "stage_cost_sec": {
+            "total": 357.959,
+            "segmentation": 19.466,
+            "embeddings": 338.318,
+            "clustering_and_other": 0.175
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1756,
+            "reference_speech_sec": 459.13,
+            "missed_detection": 0.1003,
+            "false_alarm": 0.0618,
+            "confusion": 0.0136
+          },
+          "der_collar_0.25": {
+            "value": 0.1504,
+            "reference_speech_sec": 431.29,
+            "missed_detection": 0.083,
+            "false_alarm": 0.0575,
+            "confusion": 0.0099
+          },
+          "jer": {
+            "value": 0.4328
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.571,
-            "p50": 0.611,
-            "p95": 0.688,
-            "max": 0.72,
-            "worst": 0.72,
+            "mean": 0.559,
+            "p50": 0.596,
+            "p95": 0.669,
+            "max": 0.862,
+            "worst": 0.862,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.6e-05,
-            "p50": 4.4e-05,
-            "p95": 7.7e-05,
-            "max": 0.000142
+            "mean": 4.8e-05,
+            "p50": 4.5e-05,
+            "p95": 8.3e-05,
+            "max": 0.000185
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.149,
-              "p50": 0.147,
-              "p95": 0.195,
-              "max": 0.238
+              "mean": 0.151,
+              "p50": 0.148,
+              "p95": 0.201,
+              "max": 0.34
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.42,
-              "p50": 0.465,
-              "p95": 0.519,
-              "max": 0.552
+              "mean": 0.407,
+              "p50": 0.448,
+              "p95": 0.499,
+              "max": 0.626
             },
             "clustering_and_other": {
               "count": 120,
-              "mean": 0.002,
+              "mean": 0.001,
               "p50": 0.002,
               "p95": 0.002,
               "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.571,
-              "p50": 0.611,
-              "p95": 0.688,
-              "max": 0.72
+              "mean": 0.559,
+              "p50": 0.596,
+              "p95": 0.669,
+              "max": 0.862
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.571,
-              "p50": 0.611,
-              "p95": 0.688,
-              "max": 0.72
+              "mean": 0.559,
+              "p50": 0.596,
+              "p95": 0.669,
+              "max": 0.862
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.95,
-            "p50": 4.18,
-            "p95": 5.72,
+            "mean": 3.94,
+            "p50": 4.17,
+            "p95": 5.7,
             "onsets_scored": 55,
             "onsets_never_labelled": 9
           },
@@ -1788,11 +1993,11 @@
           "speaker_count_settled_within_1": false,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 690.2,
-            "rss_end_mb": 665.1,
-            "rss_min_mb": 632.6,
-            "rss_max_mb": 690.7,
-            "growth_mb": -25.2
+            "rss_after_first_tick_mb": 661.9,
+            "rss_end_mb": 667.4,
+            "rss_min_mb": 651.9,
+            "rss_max_mb": 675.5,
+            "growth_mb": 5.5
           },
           "first_seen": {
             "der": {
@@ -1914,72 +2119,102 @@
         "file": "ES2004c_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 5,
+          "speaker_count_error": 1,
+          "wall_sec": 450.9,
+          "rtf": 0.7515,
+          "stage_cost_sec": {
+            "total": 450.877,
+            "segmentation": 20.006,
+            "embeddings": 430.665,
+            "clustering_and_other": 0.205
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1677,
+            "reference_speech_sec": 482.23,
+            "missed_detection": 0.1009,
+            "false_alarm": 0.0392,
+            "confusion": 0.0277
+          },
+          "der_collar_0.25": {
+            "value": 0.1214,
+            "reference_speech_sec": 434.42,
+            "missed_detection": 0.0719,
+            "false_alarm": 0.029,
+            "confusion": 0.0206
+          },
+          "jer": {
+            "value": 0.2399
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.581,
-            "p50": 0.606,
-            "p95": 0.697,
-            "max": 1.19,
-            "worst": 1.19,
+            "mean": 0.55,
+            "p50": 0.588,
+            "p95": 0.665,
+            "max": 0.897,
+            "worst": 0.897,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.7e-05,
-            "p50": 4.4e-05,
-            "p95": 7.9e-05,
-            "max": 0.000133
+            "mean": 4.8e-05,
+            "p50": 4.3e-05,
+            "p95": 8.5e-05,
+            "max": 0.000256
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.163,
-              "p50": 0.151,
-              "p95": 0.208,
-              "max": 0.697
+              "mean": 0.144,
+              "p50": 0.145,
+              "p95": 0.194,
+              "max": 0.422
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.417,
-              "p50": 0.459,
-              "p95": 0.509,
-              "max": 0.602
+              "mean": 0.404,
+              "p50": 0.446,
+              "p95": 0.495,
+              "max": 0.536
             },
             "clustering_and_other": {
               "count": 120,
-              "mean": 0.002,
+              "mean": 0.001,
               "p50": 0.002,
               "p95": 0.002,
               "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.581,
-              "p50": 0.606,
-              "p95": 0.697,
-              "max": 1.19
+              "mean": 0.55,
+              "p50": 0.588,
+              "p95": 0.665,
+              "max": 0.897
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.581,
-              "p50": 0.606,
-              "p95": 0.697,
-              "max": 1.19
+              "mean": 0.55,
+              "p50": 0.588,
+              "p95": 0.665,
+              "max": 0.897
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 4.03,
-            "p50": 4.37,
-            "p95": 5.85,
+            "mean": 4.0,
+            "p50": 4.36,
+            "p95": 5.76,
             "onsets_scored": 88,
             "onsets_never_labelled": 8
           },
@@ -2012,11 +2247,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 690.5,
-            "rss_end_mb": 664.4,
-            "rss_min_mb": 632.2,
-            "rss_max_mb": 690.5,
-            "growth_mb": -26.0
+            "rss_after_first_tick_mb": 667.0,
+            "rss_end_mb": 662.6,
+            "rss_min_mb": 646.4,
+            "rss_max_mb": 670.4,
+            "growth_mb": -4.4
           },
           "first_seen": {
             "der": {
@@ -2138,41 +2373,71 @@
         "file": "ES2004d_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 364.5,
+          "rtf": 0.6075,
+          "stage_cost_sec": {
+            "total": 364.526,
+            "segmentation": 22.286,
+            "embeddings": 342.074,
+            "clustering_and_other": 0.166
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.2185,
+            "reference_speech_sec": 562.08,
+            "missed_detection": 0.1781,
+            "false_alarm": 0.0199,
+            "confusion": 0.0204
+          },
+          "der_collar_0.25": {
+            "value": 0.1762,
+            "reference_speech_sec": 500.79,
+            "missed_detection": 0.1486,
+            "false_alarm": 0.0129,
+            "confusion": 0.0147
+          },
+          "jer": {
+            "value": 0.3486
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.591,
-            "p50": 0.601,
-            "p95": 0.666,
-            "max": 0.701,
-            "worst": 0.701,
+            "mean": 0.571,
+            "p50": 0.585,
+            "p95": 0.629,
+            "max": 0.877,
+            "worst": 0.877,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.1e-05,
+            "mean": 5.2e-05,
             "p50": 4.5e-05,
-            "p95": 8.5e-05,
-            "max": 0.000152
+            "p95": 8.4e-05,
+            "max": 0.000176
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.141,
-              "p50": 0.145,
-              "p95": 0.183,
-              "max": 0.212
+              "mean": 0.135,
+              "p50": 0.141,
+              "p95": 0.178,
+              "max": 0.395
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.448,
-              "p50": 0.462,
-              "p95": 0.504,
-              "max": 0.529
+              "mean": 0.434,
+              "p50": 0.444,
+              "p95": 0.488,
+              "max": 0.525
             },
             "clustering_and_other": {
               "count": 120,
@@ -2183,27 +2448,27 @@
             },
             "total": {
               "count": 120,
-              "mean": 0.591,
-              "p50": 0.6,
-              "p95": 0.665,
-              "max": 0.701
+              "mean": 0.571,
+              "p50": 0.585,
+              "p95": 0.629,
+              "max": 0.877
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.591,
-              "p50": 0.601,
-              "p95": 0.666,
-              "max": 0.701
+              "mean": 0.571,
+              "p50": 0.585,
+              "p95": 0.629,
+              "max": 0.877
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.92,
-            "p50": 3.85,
-            "p95": 8.3,
+            "mean": 3.89,
+            "p50": 3.82,
+            "p95": 8.31,
             "onsets_scored": 101,
             "onsets_never_labelled": 14
           },
@@ -2236,11 +2501,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 690.2,
-            "rss_end_mb": 690.4,
-            "rss_min_mb": 644.4,
-            "rss_max_mb": 690.5,
-            "growth_mb": 0.2
+            "rss_after_first_tick_mb": 662.8,
+            "rss_end_mb": 679.9,
+            "rss_min_mb": 652.9,
+            "rss_max_mb": 680.0,
+            "growth_mb": 17.1
           },
           "first_seen": {
             "der": {
@@ -2362,17 +2627,47 @@
         "file": "TS3003a_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 1,
+          "speaker_count_error": -3,
+          "wall_sec": 374.8,
+          "rtf": 0.6246,
+          "stage_cost_sec": {
+            "total": 374.762,
+            "segmentation": 20.382,
+            "embeddings": 354.245,
+            "clustering_and_other": 0.135
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1587,
+            "reference_speech_sec": 506.99,
+            "missed_detection": 0.132,
+            "false_alarm": 0.017,
+            "confusion": 0.0097
+          },
+          "der_collar_0.25": {
+            "value": 0.1373,
+            "reference_speech_sec": 478.66,
+            "missed_detection": 0.1184,
+            "false_alarm": 0.0113,
+            "confusion": 0.0077
+          },
+          "jer": {
+            "value": 0.7839
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.59,
-            "p50": 0.605,
-            "p95": 0.659,
-            "max": 0.714,
-            "worst": 0.714,
+            "mean": 0.572,
+            "p50": 0.59,
+            "p95": 0.655,
+            "max": 0.705,
+            "worst": 0.705,
             "budget": 5.0,
             "fits_budget": true
           },
@@ -2380,54 +2675,54 @@
             "count": 120,
             "mean": 4.7e-05,
             "p50": 4.2e-05,
-            "p95": 7.5e-05,
-            "max": 0.000147
+            "p95": 7.4e-05,
+            "max": 0.000191
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.144,
-              "p50": 0.147,
-              "p95": 0.18,
-              "max": 0.194
+              "mean": 0.136,
+              "p50": 0.144,
+              "p95": 0.177,
+              "max": 0.218
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.445,
-              "p50": 0.461,
-              "p95": 0.506,
-              "max": 0.525
+              "mean": 0.434,
+              "p50": 0.447,
+              "p95": 0.494,
+              "max": 0.551
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.59,
-              "p50": 0.605,
-              "p95": 0.659,
-              "max": 0.714
+              "mean": 0.572,
+              "p50": 0.59,
+              "p95": 0.655,
+              "max": 0.705
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.59,
-              "p50": 0.605,
-              "p95": 0.659,
-              "max": 0.714
+              "mean": 0.572,
+              "p50": 0.59,
+              "p95": 0.655,
+              "max": 0.705
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 4.12,
-            "p50": 4.16,
-            "p95": 8.0,
+            "mean": 4.11,
+            "p50": 4.15,
+            "p95": 7.99,
             "onsets_scored": 60,
             "onsets_never_labelled": 6
           },
@@ -2460,11 +2755,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 683.0,
-            "rss_end_mb": 664.8,
-            "rss_min_mb": 644.1,
-            "rss_max_mb": 690.7,
-            "growth_mb": -18.2
+            "rss_after_first_tick_mb": 662.0,
+            "rss_end_mb": 665.5,
+            "rss_min_mb": 652.9,
+            "rss_max_mb": 680.1,
+            "growth_mb": 3.5
           },
           "first_seen": {
             "der": {
@@ -2586,72 +2881,102 @@
         "file": "TS3003b_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 3,
+          "speaker_count_error": -1,
+          "wall_sec": 359.8,
+          "rtf": 0.5997,
+          "stage_cost_sec": {
+            "total": 359.826,
+            "segmentation": 24.173,
+            "embeddings": 335.496,
+            "clustering_and_other": 0.158
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1229,
+            "reference_speech_sec": 461.89,
+            "missed_detection": 0.0499,
+            "false_alarm": 0.0501,
+            "confusion": 0.0229
+          },
+          "der_collar_0.25": {
+            "value": 0.0948,
+            "reference_speech_sec": 438.0,
+            "missed_detection": 0.0402,
+            "false_alarm": 0.0362,
+            "confusion": 0.0185
+          },
+          "jer": {
+            "value": 0.3793
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.644,
-            "p50": 0.629,
-            "p95": 0.817,
-            "max": 2.11,
-            "worst": 2.11,
+            "mean": 0.576,
+            "p50": 0.595,
+            "p95": 0.641,
+            "max": 1.064,
+            "worst": 1.064,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.1e-05,
+            "mean": 4.8e-05,
             "p50": 4.4e-05,
-            "p95": 9.9e-05,
+            "p95": 7.3e-05,
             "max": 0.00023
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.188,
-              "p50": 0.155,
-              "p95": 0.303,
-              "max": 1.452
+              "mean": 0.146,
+              "p50": 0.147,
+              "p95": 0.185,
+              "max": 0.575
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.454,
-              "p50": 0.469,
-              "p95": 0.549,
-              "max": 0.711
+              "mean": 0.428,
+              "p50": 0.447,
+              "p95": 0.495,
+              "max": 0.518
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.006
             },
             "total": {
               "count": 120,
-              "mean": 0.644,
-              "p50": 0.629,
-              "p95": 0.817,
-              "max": 2.11
+              "mean": 0.576,
+              "p50": 0.594,
+              "p95": 0.641,
+              "max": 1.064
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.644,
-              "p50": 0.629,
-              "p95": 0.817,
-              "max": 2.11
+              "mean": 0.576,
+              "p50": 0.595,
+              "p95": 0.641,
+              "max": 1.064
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.64,
-            "p50": 3.62,
-            "p95": 5.76,
+            "mean": 3.55,
+            "p50": 3.59,
+            "p95": 5.7,
             "onsets_scored": 72,
             "onsets_never_labelled": 0
           },
@@ -2684,11 +3009,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 654.6,
-            "rss_end_mb": 662.3,
-            "rss_min_mb": 642.2,
-            "rss_max_mb": 690.5,
-            "growth_mb": 7.7
+            "rss_after_first_tick_mb": 662.7,
+            "rss_end_mb": 661.8,
+            "rss_min_mb": 653.0,
+            "rss_max_mb": 677.8,
+            "growth_mb": -0.9
           },
           "first_seen": {
             "der": {
@@ -2810,72 +3135,102 @@
         "file": "TS3003c_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 3,
+        "offline": {
+          "hypothesis_speakers": 3,
+          "speaker_count_error": 0,
+          "wall_sec": 401.9,
+          "rtf": 0.6698,
+          "stage_cost_sec": {
+            "total": 401.893,
+            "segmentation": 25.617,
+            "embeddings": 376.007,
+            "clustering_and_other": 0.27
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1525,
+            "reference_speech_sec": 492.97,
+            "missed_detection": 0.1053,
+            "false_alarm": 0.0292,
+            "confusion": 0.018
+          },
+          "der_collar_0.25": {
+            "value": 0.138,
+            "reference_speech_sec": 479.92,
+            "missed_detection": 0.1011,
+            "false_alarm": 0.0212,
+            "confusion": 0.0157
+          },
+          "jer": {
+            "value": 0.156
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.59,
-            "p50": 0.588,
-            "p95": 0.742,
-            "max": 1.001,
-            "worst": 1.001,
+            "mean": 0.588,
+            "p50": 0.591,
+            "p95": 0.678,
+            "max": 1.305,
+            "worst": 1.305,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.4e-05,
-            "p50": 4.3e-05,
-            "p95": 9.7e-05,
-            "max": 0.000322
+            "mean": 5.3e-05,
+            "p50": 4.4e-05,
+            "p95": 7.3e-05,
+            "max": 0.000455
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.138,
-              "p50": 0.135,
-              "p95": 0.191,
-              "max": 0.493
+              "mean": 0.141,
+              "p50": 0.144,
+              "p95": 0.184,
+              "max": 0.685
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.45,
-              "p50": 0.454,
-              "p95": 0.509,
-              "max": 0.718
+              "mean": 0.445,
+              "p50": 0.45,
+              "p95": 0.523,
+              "max": 0.68
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.004
+              "max": 0.005
             },
             "total": {
               "count": 120,
-              "mean": 0.59,
-              "p50": 0.588,
-              "p95": 0.742,
-              "max": 1.001
+              "mean": 0.588,
+              "p50": 0.591,
+              "p95": 0.678,
+              "max": 1.305
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.59,
-              "p50": 0.588,
-              "p95": 0.742,
-              "max": 1.001
+              "mean": 0.588,
+              "p50": 0.591,
+              "p95": 0.678,
+              "max": 1.305
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 4.07,
-            "p50": 4.22,
-            "p95": 6.81,
+            "mean": 4.08,
+            "p50": 4.19,
+            "p95": 6.6,
             "onsets_scored": 41,
             "onsets_never_labelled": 2
           },
@@ -2908,11 +3263,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 637.1,
-            "rss_end_mb": 670.6,
-            "rss_min_mb": 636.4,
-            "rss_max_mb": 692.9,
-            "growth_mb": 33.5
+            "rss_after_first_tick_mb": 656.9,
+            "rss_end_mb": 663.0,
+            "rss_min_mb": 649.7,
+            "rss_max_mb": 671.0,
+            "growth_mb": 6.1
           },
           "first_seen": {
             "der": {
@@ -3034,72 +3389,102 @@
         "file": "TS3003d_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 580.3,
+          "rtf": 0.9672,
+          "stage_cost_sec": {
+            "total": 580.299,
+            "segmentation": 31.734,
+            "embeddings": 548.365,
+            "clustering_and_other": 0.199
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.2062,
+            "reference_speech_sec": 540.12,
+            "missed_detection": 0.1669,
+            "false_alarm": 0.0195,
+            "confusion": 0.0198
+          },
+          "der_collar_0.25": {
+            "value": 0.1709,
+            "reference_speech_sec": 486.78,
+            "missed_detection": 0.144,
+            "false_alarm": 0.0119,
+            "confusion": 0.0149
+          },
+          "jer": {
+            "value": 0.2304
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.579,
-            "p50": 0.586,
-            "p95": 0.667,
-            "max": 0.924,
-            "worst": 0.924,
+            "mean": 0.573,
+            "p50": 0.589,
+            "p95": 0.624,
+            "max": 0.729,
+            "worst": 0.729,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 6e-05,
+            "mean": 5.6e-05,
             "p50": 5.3e-05,
-            "p95": 0.000107,
-            "max": 0.000439
+            "p95": 9e-05,
+            "max": 0.0002
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.137,
-              "p50": 0.137,
-              "p95": 0.189,
-              "max": 0.447
+              "mean": 0.134,
+              "p50": 0.142,
+              "p95": 0.174,
+              "max": 0.246
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.441,
-              "p50": 0.453,
-              "p95": 0.496,
-              "max": 0.514
+              "mean": 0.437,
+              "p50": 0.446,
+              "p95": 0.49,
+              "max": 0.55
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.008
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.579,
-              "p50": 0.586,
-              "p95": 0.667,
-              "max": 0.924
+              "mean": 0.573,
+              "p50": 0.589,
+              "p95": 0.624,
+              "max": 0.729
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.579,
-              "p50": 0.586,
-              "p95": 0.667,
-              "max": 0.924
+              "mean": 0.573,
+              "p50": 0.589,
+              "p95": 0.624,
+              "max": 0.729
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.81,
-            "p50": 3.61,
-            "p95": 8.21,
+            "mean": 3.8,
+            "p50": 3.64,
+            "p95": 8.17,
             "onsets_scored": 113,
             "onsets_never_labelled": 5
           },
@@ -3132,11 +3517,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 663.1,
-            "rss_end_mb": 690.6,
-            "rss_min_mb": 636.3,
-            "rss_max_mb": 690.6,
-            "growth_mb": 27.5
+            "rss_after_first_tick_mb": 657.8,
+            "rss_end_mb": 667.9,
+            "rss_min_mb": 642.8,
+            "rss_max_mb": 680.5,
+            "growth_mb": 10.1
           },
           "first_seen": {
             "der": {
@@ -3258,72 +3643,102 @@
         "file": "EN2002a_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 558.3,
+          "rtf": 0.9305,
+          "stage_cost_sec": {
+            "total": 558.316,
+            "segmentation": 24.162,
+            "embeddings": 533.969,
+            "clustering_and_other": 0.185
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.2864,
+            "reference_speech_sec": 697.08,
+            "missed_detection": 0.2442,
+            "false_alarm": 0.0131,
+            "confusion": 0.0291
+          },
+          "der_collar_0.25": {
+            "value": 0.243,
+            "reference_speech_sec": 589.58,
+            "missed_detection": 0.2136,
+            "false_alarm": 0.0076,
+            "confusion": 0.0218
+          },
+          "jer": {
+            "value": 0.364
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.562,
-            "p50": 0.567,
-            "p95": 0.593,
-            "max": 0.642,
-            "worst": 0.642,
+            "mean": 0.626,
+            "p50": 0.603,
+            "p95": 0.754,
+            "max": 1.148,
+            "worst": 1.148,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 6.1e-05,
-            "p50": 5.9e-05,
-            "p95": 8.6e-05,
-            "max": 0.000154
+            "mean": 6.8e-05,
+            "p50": 6.2e-05,
+            "p95": 9.8e-05,
+            "max": 0.00032
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.114,
-              "p50": 0.111,
-              "p95": 0.144,
-              "max": 0.178
+              "mean": 0.149,
+              "p50": 0.143,
+              "p95": 0.219,
+              "max": 0.65
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.447,
-              "p50": 0.441,
-              "p95": 0.482,
-              "max": 0.506
+              "mean": 0.475,
+              "p50": 0.467,
+              "p95": 0.533,
+              "max": 0.63
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.562,
-              "p50": 0.567,
-              "p95": 0.593,
-              "max": 0.642
+              "mean": 0.626,
+              "p50": 0.603,
+              "p95": 0.754,
+              "max": 1.148
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.562,
-              "p50": 0.567,
-              "p95": 0.593,
-              "max": 0.642
+              "mean": 0.626,
+              "p50": 0.603,
+              "p95": 0.754,
+              "max": 1.148
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.39,
-            "p50": 3.3,
-            "p95": 5.59,
+            "mean": 3.45,
+            "p50": 3.33,
+            "p95": 5.62,
             "onsets_scored": 168,
             "onsets_never_labelled": 5
           },
@@ -3356,11 +3771,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 665.0,
-            "rss_end_mb": 644.6,
-            "rss_min_mb": 643.1,
-            "rss_max_mb": 690.9,
-            "growth_mb": -20.4
+            "rss_after_first_tick_mb": 668.4,
+            "rss_end_mb": 660.4,
+            "rss_min_mb": 653.1,
+            "rss_max_mb": 670.5,
+            "growth_mb": -8.1
           },
           "first_seen": {
             "der": {
@@ -3482,72 +3897,102 @@
         "file": "EN2002b_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": 0,
+          "wall_sec": 464.0,
+          "rtf": 0.7733,
+          "stage_cost_sec": {
+            "total": 464.014,
+            "segmentation": 26.061,
+            "embeddings": 437.742,
+            "clustering_and_other": 0.212
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.4224,
+            "reference_speech_sec": 680.79,
+            "missed_detection": 0.3593,
+            "false_alarm": 0.0256,
+            "confusion": 0.0376
+          },
+          "der_collar_0.25": {
+            "value": 0.392,
+            "reference_speech_sec": 569.81,
+            "missed_detection": 0.3414,
+            "false_alarm": 0.0214,
+            "confusion": 0.0292
+          },
+          "jer": {
+            "value": 0.4414
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.533,
-            "p50": 0.562,
-            "p95": 0.589,
-            "max": 0.703,
-            "worst": 0.703,
+            "mean": 0.579,
+            "p50": 0.602,
+            "p95": 0.647,
+            "max": 0.814,
+            "worst": 0.814,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.8e-05,
-            "p50": 6.1e-05,
-            "p95": 8.7e-05,
-            "max": 0.000136
+            "mean": 6.3e-05,
+            "p50": 6.2e-05,
+            "p95": 9.9e-05,
+            "max": 0.000252
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.115,
-              "p50": 0.109,
-              "p95": 0.148,
-              "max": 0.24
+              "mean": 0.141,
+              "p50": 0.14,
+              "p95": 0.188,
+              "max": 0.351
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.416,
-              "p50": 0.438,
-              "p95": 0.481,
-              "max": 0.504
+              "mean": 0.437,
+              "p50": 0.462,
+              "p95": 0.493,
+              "max": 0.516
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.01
             },
             "total": {
               "count": 120,
-              "mean": 0.533,
-              "p50": 0.562,
-              "p95": 0.589,
-              "max": 0.702
+              "mean": 0.579,
+              "p50": 0.602,
+              "p95": 0.647,
+              "max": 0.814
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.533,
-              "p50": 0.562,
-              "p95": 0.589,
-              "max": 0.703
+              "mean": 0.579,
+              "p50": 0.602,
+              "p95": 0.647,
+              "max": 0.814
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.73,
-            "p50": 3.62,
-            "p95": 6.88,
+            "mean": 3.78,
+            "p50": 3.64,
+            "p95": 6.91,
             "onsets_scored": 158,
             "onsets_never_labelled": 13
           },
@@ -3580,11 +4025,11 @@
           "speaker_count_settled_within_1": false,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 690.7,
-            "rss_end_mb": 691.0,
-            "rss_min_mb": 644.4,
-            "rss_max_mb": 691.1,
-            "growth_mb": 0.2
+            "rss_after_first_tick_mb": 665.4,
+            "rss_end_mb": 666.0,
+            "rss_min_mb": 652.7,
+            "rss_max_mb": 671.2,
+            "growth_mb": 0.6
           },
           "first_seen": {
             "der": {
@@ -3706,72 +4151,102 @@
         "file": "EN2002c_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 3,
+        "offline": {
+          "hypothesis_speakers": 5,
+          "speaker_count_error": 2,
+          "wall_sec": 499.8,
+          "rtf": 0.833,
+          "stage_cost_sec": {
+            "total": 499.815,
+            "segmentation": 32.321,
+            "embeddings": 467.277,
+            "clustering_and_other": 0.217
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.2516,
+            "reference_speech_sec": 589.25,
+            "missed_detection": 0.2083,
+            "false_alarm": 0.0151,
+            "confusion": 0.0283
+          },
+          "der_collar_0.25": {
+            "value": 0.2167,
+            "reference_speech_sec": 522.4,
+            "missed_detection": 0.182,
+            "false_alarm": 0.0131,
+            "confusion": 0.0216
+          },
+          "jer": {
+            "value": 0.2943
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.554,
-            "p50": 0.573,
-            "p95": 0.604,
-            "max": 1.264,
-            "worst": 1.264,
+            "mean": 0.579,
+            "p50": 0.601,
+            "p95": 0.651,
+            "max": 0.675,
+            "worst": 0.675,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.2e-05,
-            "p50": 5.4e-05,
-            "p95": 8e-05,
-            "max": 0.00016
+            "mean": 5.5e-05,
+            "p50": 5.6e-05,
+            "p95": 8.3e-05,
+            "max": 0.000151
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.131,
-              "p50": 0.127,
-              "p95": 0.17,
-              "max": 0.738
+              "mean": 0.134,
+              "p50": 0.135,
+              "p95": 0.185,
+              "max": 0.215
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.422,
-              "p50": 0.444,
-              "p95": 0.484,
-              "max": 0.593
+              "mean": 0.444,
+              "p50": 0.473,
+              "p95": 0.506,
+              "max": 0.535
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.554,
-              "p50": 0.573,
-              "p95": 0.604,
-              "max": 1.264
+              "mean": 0.579,
+              "p50": 0.601,
+              "p95": 0.651,
+              "max": 0.675
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.554,
-              "p50": 0.573,
-              "p95": 0.604,
-              "max": 1.264
+              "mean": 0.579,
+              "p50": 0.601,
+              "p95": 0.651,
+              "max": 0.675
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.41,
-            "p50": 3.5,
-            "p95": 5.72,
+            "mean": 3.44,
+            "p50": 3.58,
+            "p95": 5.62,
             "onsets_scored": 108,
             "onsets_never_labelled": 6
           },
@@ -3804,11 +4279,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 686.0,
-            "rss_end_mb": 665.0,
-            "rss_min_mb": 633.4,
-            "rss_max_mb": 691.4,
-            "growth_mb": -20.9
+            "rss_after_first_tick_mb": 663.1,
+            "rss_end_mb": 671.3,
+            "rss_min_mb": 647.8,
+            "rss_max_mb": 681.7,
+            "growth_mb": 8.2
           },
           "first_seen": {
             "der": {
@@ -3930,72 +4405,102 @@
         "file": "EN2002d_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 4,
+        "offline": {
+          "hypothesis_speakers": 3,
+          "speaker_count_error": -1,
+          "wall_sec": 482.5,
+          "rtf": 0.8041,
+          "stage_cost_sec": {
+            "total": 482.488,
+            "segmentation": 27.925,
+            "embeddings": 454.37,
+            "clustering_and_other": 0.193
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.4012,
+            "reference_speech_sec": 716.9,
+            "missed_detection": 0.3109,
+            "false_alarm": 0.0191,
+            "confusion": 0.0712
+          },
+          "der_collar_0.25": {
+            "value": 0.374,
+            "reference_speech_sec": 609.16,
+            "missed_detection": 0.2909,
+            "false_alarm": 0.017,
+            "confusion": 0.0661
+          },
+          "jer": {
+            "value": 0.5416
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.553,
-            "p50": 0.577,
-            "p95": 0.596,
-            "max": 0.751,
-            "worst": 0.751,
+            "mean": 0.587,
+            "p50": 0.601,
+            "p95": 0.659,
+            "max": 0.808,
+            "worst": 0.808,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.4e-05,
-            "p50": 5.4e-05,
-            "p95": 8e-05,
-            "max": 0.000175
+            "mean": 5.9e-05,
+            "p50": 5.8e-05,
+            "p95": 8.9e-05,
+            "max": 0.000244
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.12,
-              "p50": 0.126,
-              "p95": 0.146,
-              "max": 0.276
+              "mean": 0.143,
+              "p50": 0.142,
+              "p95": 0.188,
+              "max": 0.298
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.432,
-              "p50": 0.446,
-              "p95": 0.488,
-              "max": 0.497
+              "mean": 0.443,
+              "p50": 0.458,
+              "p95": 0.505,
+              "max": 0.563
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.553,
-              "p50": 0.577,
-              "p95": 0.596,
-              "max": 0.751
+              "mean": 0.587,
+              "p50": 0.601,
+              "p95": 0.659,
+              "max": 0.808
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.553,
-              "p50": 0.577,
-              "p95": 0.596,
-              "max": 0.751
+              "mean": 0.587,
+              "p50": 0.601,
+              "p95": 0.659,
+              "max": 0.808
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 4.02,
-            "p50": 3.98,
-            "p95": 8.74,
+            "mean": 4.06,
+            "p50": 4.02,
+            "p95": 8.91,
             "onsets_scored": 160,
             "onsets_never_labelled": 3
           },
@@ -4028,11 +4533,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 690.8,
-            "rss_end_mb": 675.2,
-            "rss_min_mb": 633.6,
-            "rss_max_mb": 693.3,
-            "growth_mb": -15.6
+            "rss_after_first_tick_mb": 670.7,
+            "rss_end_mb": 652.2,
+            "rss_min_mb": 652.1,
+            "rss_max_mb": 675.1,
+            "growth_mb": -18.5
           },
           "first_seen": {
             "der": {
@@ -4154,72 +4659,102 @@
         "file": "uicid_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 1,
+        "offline": {
+          "hypothesis_speakers": 1,
+          "speaker_count_error": 0,
+          "wall_sec": 480.3,
+          "rtf": 0.8004,
+          "stage_cost_sec": {
+            "total": 480.255,
+            "segmentation": 31.322,
+            "embeddings": 448.797,
+            "clustering_and_other": 0.136
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1164,
+            "reference_speech_sec": 435.19,
+            "missed_detection": 0.0921,
+            "false_alarm": 0.0243,
+            "confusion": 0.0
+          },
+          "der_collar_0.25": {
+            "value": 0.0828,
+            "reference_speech_sec": 400.45,
+            "missed_detection": 0.0798,
+            "false_alarm": 0.003,
+            "confusion": 0.0
+          },
+          "jer": {
+            "value": 0.1137
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.577,
-            "p50": 0.578,
-            "p95": 0.6,
-            "max": 0.842,
-            "worst": 0.842,
+            "mean": 0.601,
+            "p50": 0.6,
+            "p95": 0.626,
+            "max": 0.685,
+            "worst": 0.685,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.9e-05,
-            "p50": 4.6e-05,
-            "p95": 6.5e-05,
-            "max": 0.000119
+            "mean": 6.1e-05,
+            "p50": 4.9e-05,
+            "p95": 7.2e-05,
+            "max": 0.001255
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.12,
-              "p50": 0.123,
-              "p95": 0.145,
-              "max": 0.353
+              "mean": 0.14,
+              "p50": 0.144,
+              "p95": 0.156,
+              "max": 0.203
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.455,
-              "p50": 0.446,
+              "mean": 0.459,
+              "p50": 0.452,
               "p95": 0.49,
-              "max": 0.519
+              "max": 0.531
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.009
             },
             "total": {
               "count": 120,
-              "mean": 0.577,
-              "p50": 0.578,
-              "p95": 0.6,
-              "max": 0.842
+              "mean": 0.601,
+              "p50": 0.6,
+              "p95": 0.626,
+              "max": 0.685
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.577,
-              "p50": 0.578,
-              "p95": 0.6,
-              "max": 0.842
+              "mean": 0.601,
+              "p50": 0.6,
+              "p95": 0.626,
+              "max": 0.685
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.32,
-            "p50": 3.54,
-            "p95": 5.59,
+            "mean": 3.34,
+            "p50": 3.53,
+            "p95": 5.66,
             "onsets_scored": 139,
             "onsets_never_labelled": 0
           },
@@ -4252,11 +4787,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 650.5,
-            "rss_end_mb": 645.5,
-            "rss_min_mb": 645.0,
-            "rss_max_mb": 690.1,
-            "growth_mb": -5.1
+            "rss_after_first_tick_mb": 652.1,
+            "rss_end_mb": 672.2,
+            "rss_min_mb": 652.1,
+            "rss_max_mb": 672.2,
+            "growth_mb": 20.0
           },
           "first_seen": {
             "der": {
@@ -4378,72 +4913,102 @@
         "file": "bgvvt_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 2,
+        "offline": {
+          "hypothesis_speakers": 2,
+          "speaker_count_error": 0,
+          "wall_sec": 490.5,
+          "rtf": 0.8174,
+          "stage_cost_sec": {
+            "total": 501.224,
+            "segmentation": 26.39,
+            "embeddings": 474.623,
+            "clustering_and_other": 0.21
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1224,
+            "reference_speech_sec": 493.42,
+            "missed_detection": 0.0808,
+            "false_alarm": 0.0393,
+            "confusion": 0.0022
+          },
+          "der_collar_0.25": {
+            "value": 0.0983,
+            "reference_speech_sec": 468.15,
+            "missed_detection": 0.0739,
+            "false_alarm": 0.0229,
+            "confusion": 0.0015
+          },
+          "jer": {
+            "value": 0.0928
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.566,
-            "p50": 0.568,
-            "p95": 0.589,
-            "max": 0.829,
-            "worst": 0.829,
+            "mean": 0.608,
+            "p50": 0.6,
+            "p95": 0.672,
+            "max": 0.76,
+            "worst": 0.76,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.9e-05,
-            "p50": 4.7e-05,
-            "p95": 6.6e-05,
-            "max": 0.000121
+            "mean": 5.6e-05,
+            "p50": 5.1e-05,
+            "p95": 7.7e-05,
+            "max": 0.000257
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.114,
-              "p50": 0.106,
-              "p95": 0.145,
-              "max": 0.335
+              "mean": 0.144,
+              "p50": 0.147,
+              "p95": 0.164,
+              "max": 0.242
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.45,
-              "p50": 0.443,
-              "p95": 0.487,
-              "max": 0.506
+              "mean": 0.462,
+              "p50": 0.451,
+              "p95": 0.499,
+              "max": 0.622
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.566,
-              "p50": 0.568,
-              "p95": 0.589,
-              "max": 0.829
+              "mean": 0.608,
+              "p50": 0.6,
+              "p95": 0.672,
+              "max": 0.76
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.566,
-              "p50": 0.568,
-              "p95": 0.589,
-              "max": 0.829
+              "mean": 0.608,
+              "p50": 0.6,
+              "p95": 0.672,
+              "max": 0.76
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.32,
-            "p50": 3.5,
-            "p95": 5.73,
+            "mean": 3.36,
+            "p50": 3.58,
+            "p95": 5.76,
             "onsets_scored": 93,
             "onsets_never_labelled": 2
           },
@@ -4476,11 +5041,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 670.5,
-            "rss_end_mb": 670.2,
-            "rss_min_mb": 644.7,
-            "rss_max_mb": 673.9,
-            "growth_mb": -0.3
+            "rss_after_first_tick_mb": 672.1,
+            "rss_end_mb": 668.8,
+            "rss_min_mb": 654.0,
+            "rss_max_mb": 675.7,
+            "growth_mb": -3.3
           },
           "first_seen": {
             "der": {
@@ -4602,71 +5167,101 @@
         "file": "ylgug_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 3,
+        "offline": {
+          "hypothesis_speakers": 2,
+          "speaker_count_error": -1,
+          "wall_sec": 437.5,
+          "rtf": 0.7291,
+          "stage_cost_sec": {
+            "total": 437.459,
+            "segmentation": 23.098,
+            "embeddings": 414.207,
+            "clustering_and_other": 0.154
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.0578,
+            "reference_speech_sec": 534.82,
+            "missed_detection": 0.0339,
+            "false_alarm": 0.0216,
+            "confusion": 0.0023
+          },
+          "der_collar_0.25": {
+            "value": 0.0422,
+            "reference_speech_sec": 521.62,
+            "missed_detection": 0.0331,
+            "false_alarm": 0.0074,
+            "confusion": 0.0017
+          },
+          "jer": {
+            "value": 0.3767
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.593,
-            "p50": 0.577,
-            "p95": 0.722,
-            "max": 0.793,
-            "worst": 0.793,
+            "mean": 0.613,
+            "p50": 0.6,
+            "p95": 0.685,
+            "max": 0.917,
+            "worst": 0.917,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.8e-05,
-            "p50": 4.3e-05,
-            "p95": 6.6e-05,
-            "max": 0.000165
+            "mean": 5.1e-05,
+            "p50": 4.5e-05,
+            "p95": 6.3e-05,
+            "max": 0.000282
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.13,
-              "p50": 0.135,
-              "p95": 0.216,
-              "max": 0.261
+              "mean": 0.15,
+              "p50": 0.148,
+              "p95": 0.179,
+              "max": 0.394
             },
             "embeddings": {
               "count": 120,
               "mean": 0.462,
-              "p50": 0.449,
-              "p95": 0.534,
-              "max": 0.637
+              "p50": 0.45,
+              "p95": 0.508,
+              "max": 0.68
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.004
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.593,
-              "p50": 0.577,
-              "p95": 0.722,
-              "max": 0.793
+              "mean": 0.613,
+              "p50": 0.6,
+              "p95": 0.685,
+              "max": 0.917
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.593,
-              "p50": 0.577,
-              "p95": 0.722,
-              "max": 0.793
+              "mean": 0.613,
+              "p50": 0.6,
+              "p95": 0.685,
+              "max": 0.917
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.45,
-            "p50": 3.35,
+            "mean": 3.49,
+            "p50": 3.4,
             "p95": 5.28,
             "onsets_scored": 52,
             "onsets_never_labelled": 0
@@ -4700,11 +5295,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 645.5,
-            "rss_end_mb": 645.6,
-            "rss_min_mb": 644.7,
-            "rss_max_mb": 673.7,
-            "growth_mb": 0.1
+            "rss_after_first_tick_mb": 668.9,
+            "rss_end_mb": 671.6,
+            "rss_min_mb": 650.6,
+            "rss_max_mb": 673.9,
+            "growth_mb": 2.7
           },
           "first_seen": {
             "der": {
@@ -4826,72 +5421,102 @@
         "file": "gtjow_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 2,
+        "offline": {
+          "hypothesis_speakers": 2,
+          "speaker_count_error": 0,
+          "wall_sec": 435.3,
+          "rtf": 0.7255,
+          "stage_cost_sec": {
+            "total": 435.287,
+            "segmentation": 25.85,
+            "embeddings": 409.277,
+            "clustering_and_other": 0.16
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.0917,
+            "reference_speech_sec": 557.68,
+            "missed_detection": 0.0749,
+            "false_alarm": 0.0033,
+            "confusion": 0.0134
+          },
+          "der_collar_0.25": {
+            "value": 0.0852,
+            "reference_speech_sec": 550.23,
+            "missed_detection": 0.072,
+            "false_alarm": 0.001,
+            "confusion": 0.0122
+          },
+          "jer": {
+            "value": 0.1035
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.56,
-            "p50": 0.572,
-            "p95": 0.596,
-            "max": 0.691,
-            "worst": 0.691,
+            "mean": 0.63,
+            "p50": 0.597,
+            "p95": 0.817,
+            "max": 1.819,
+            "worst": 1.819,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.5e-05,
-            "p50": 4.4e-05,
-            "p95": 6e-05,
-            "max": 6.8e-05
+            "mean": 5.8e-05,
+            "p50": 4.8e-05,
+            "p95": 8.7e-05,
+            "max": 0.000381
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.119,
-              "p50": 0.129,
-              "p95": 0.156,
-              "max": 0.218
+              "mean": 0.159,
+              "p50": 0.142,
+              "p95": 0.264,
+              "max": 1.062
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.439,
-              "p50": 0.439,
-              "p95": 0.477,
-              "max": 0.496
+              "mean": 0.47,
+              "p50": 0.455,
+              "p95": 0.566,
+              "max": 0.978
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.008
             },
             "total": {
               "count": 120,
-              "mean": 0.56,
-              "p50": 0.572,
-              "p95": 0.596,
-              "max": 0.691
+              "mean": 0.63,
+              "p50": 0.597,
+              "p95": 0.817,
+              "max": 1.819
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.56,
-              "p50": 0.572,
-              "p95": 0.596,
-              "max": 0.691
+              "mean": 0.63,
+              "p50": 0.597,
+              "p95": 0.817,
+              "max": 1.819
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.7,
-            "p50": 3.88,
-            "p95": 5.57,
+            "mean": 3.79,
+            "p50": 3.93,
+            "p95": 5.81,
             "onsets_scored": 25,
             "onsets_never_labelled": 0
           },
@@ -4924,11 +5549,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": true,
           "memory": {
-            "rss_after_first_tick_mb": 670.2,
-            "rss_end_mb": 645.5,
-            "rss_min_mb": 644.7,
-            "rss_max_mb": 690.1,
-            "growth_mb": -24.7
+            "rss_after_first_tick_mb": 671.1,
+            "rss_end_mb": 664.4,
+            "rss_min_mb": 651.3,
+            "rss_max_mb": 674.6,
+            "growth_mb": -6.7
           },
           "first_seen": {
             "der": {
@@ -5050,72 +5675,102 @@
         "file": "jwggf_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 5,
+        "offline": {
+          "hypothesis_speakers": 4,
+          "speaker_count_error": -1,
+          "wall_sec": 434.7,
+          "rtf": 0.7245,
+          "stage_cost_sec": {
+            "total": 434.694,
+            "segmentation": 23.443,
+            "embeddings": 411.068,
+            "clustering_and_other": 0.184
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1261,
+            "reference_speech_sec": 534.49,
+            "missed_detection": 0.084,
+            "false_alarm": 0.0204,
+            "confusion": 0.0216
+          },
+          "der_collar_0.25": {
+            "value": 0.1035,
+            "reference_speech_sec": 516.52,
+            "missed_detection": 0.0722,
+            "false_alarm": 0.0125,
+            "confusion": 0.0189
+          },
+          "jer": {
+            "value": 0.5302
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.567,
-            "p50": 0.569,
-            "p95": 0.592,
-            "max": 0.761,
-            "worst": 0.761,
+            "mean": 0.667,
+            "p50": 0.611,
+            "p95": 0.902,
+            "max": 1.32,
+            "worst": 1.32,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 5.1e-05,
-            "p50": 4.7e-05,
-            "p95": 7.5e-05,
-            "max": 0.000121
+            "mean": 7.1e-05,
+            "p50": 5.6e-05,
+            "p95": 0.000144,
+            "max": 0.000384
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.115,
-              "p50": 0.116,
-              "p95": 0.143,
-              "max": 0.244
+              "mean": 0.175,
+              "p50": 0.146,
+              "p95": 0.289,
+              "max": 0.768
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.45,
-              "p50": 0.442,
-              "p95": 0.484,
-              "max": 0.515
+              "mean": 0.49,
+              "p50": 0.468,
+              "p95": 0.589,
+              "max": 0.812
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
-              "p95": 0.002,
-              "max": 0.002
+              "p95": 0.003,
+              "max": 0.005
             },
             "total": {
               "count": 120,
-              "mean": 0.567,
-              "p50": 0.569,
-              "p95": 0.592,
-              "max": 0.761
+              "mean": 0.667,
+              "p50": 0.611,
+              "p95": 0.902,
+              "max": 1.32
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.567,
-              "p50": 0.569,
-              "p95": 0.592,
-              "max": 0.761
+              "mean": 0.667,
+              "p50": 0.611,
+              "p95": 0.902,
+              "max": 1.32
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.37,
-            "p50": 3.17,
-            "p95": 5.58,
+            "mean": 3.48,
+            "p50": 3.21,
+            "p95": 5.6,
             "onsets_scored": 57,
             "onsets_never_labelled": 6
           },
@@ -5148,11 +5803,11 @@
           "speaker_count_settled_within_1": false,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 670.3,
-            "rss_end_mb": 689.5,
-            "rss_min_mb": 641.1,
-            "rss_max_mb": 689.5,
-            "growth_mb": 19.1
+            "rss_after_first_tick_mb": 664.5,
+            "rss_end_mb": 671.0,
+            "rss_min_mb": 652.8,
+            "rss_max_mb": 673.0,
+            "growth_mb": 6.5
           },
           "first_seen": {
             "der": {
@@ -5274,72 +5929,102 @@
         "file": "iacod_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 3,
+        "offline": {
+          "hypothesis_speakers": 3,
+          "speaker_count_error": 0,
+          "wall_sec": 405.0,
+          "rtf": 0.6751,
+          "stage_cost_sec": {
+            "total": 405.021,
+            "segmentation": 24.726,
+            "embeddings": 380.143,
+            "clustering_and_other": 0.151
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.0713,
+            "reference_speech_sec": 463.24,
+            "missed_detection": 0.0222,
+            "false_alarm": 0.0454,
+            "confusion": 0.0037
+          },
+          "der_collar_0.25": {
+            "value": 0.0539,
+            "reference_speech_sec": 450.37,
+            "missed_detection": 0.0208,
+            "false_alarm": 0.0298,
+            "confusion": 0.0033
+          },
+          "jer": {
+            "value": 0.0557
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.546,
-            "p50": 0.567,
-            "p95": 0.593,
-            "max": 0.617,
-            "worst": 0.617,
+            "mean": 0.574,
+            "p50": 0.59,
+            "p95": 0.611,
+            "max": 0.78,
+            "worst": 0.78,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4e-05,
-            "p50": 3.9e-05,
-            "p95": 5.7e-05,
-            "max": 6.8e-05
+            "mean": 4.4e-05,
+            "p50": 4.2e-05,
+            "p95": 6e-05,
+            "max": 0.000154
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.115,
-              "p50": 0.121,
-              "p95": 0.148,
-              "max": 0.176
+              "mean": 0.132,
+              "p50": 0.14,
+              "p95": 0.174,
+              "max": 0.247
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.429,
-              "p50": 0.44,
-              "p95": 0.482,
-              "max": 0.5
+              "mean": 0.44,
+              "p50": 0.45,
+              "p95": 0.496,
+              "max": 0.592
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.002
+              "max": 0.003
             },
             "total": {
               "count": 120,
-              "mean": 0.546,
-              "p50": 0.567,
-              "p95": 0.593,
-              "max": 0.617
+              "mean": 0.574,
+              "p50": 0.59,
+              "p95": 0.611,
+              "max": 0.78
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.546,
-              "p50": 0.567,
-              "p95": 0.593,
-              "max": 0.617
+              "mean": 0.574,
+              "p50": 0.59,
+              "p95": 0.611,
+              "max": 0.78
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
-            "mean": 3.66,
-            "p50": 3.65,
-            "p95": 5.79,
+            "mean": 3.69,
+            "p50": 3.71,
+            "p95": 5.82,
             "onsets_scored": 51,
             "onsets_never_labelled": 0
           },
@@ -5372,11 +6057,11 @@
           "speaker_count_settled_within_1": true,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 663.0,
-            "rss_end_mb": 665.5,
-            "rss_min_mb": 636.1,
-            "rss_max_mb": 692.7,
-            "growth_mb": 2.5
+            "rss_after_first_tick_mb": 669.4,
+            "rss_end_mb": 664.9,
+            "rss_min_mb": 653.7,
+            "rss_max_mb": 671.0,
+            "growth_mb": -4.5
           },
           "first_seen": {
             "der": {
@@ -5498,72 +6183,102 @@
         "file": "hhepf_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 6,
+        "offline": {
+          "hypothesis_speakers": 6,
+          "speaker_count_error": 0,
+          "wall_sec": 410.2,
+          "rtf": 0.6837,
+          "stage_cost_sec": {
+            "total": 410.205,
+            "segmentation": 23.796,
+            "embeddings": 386.221,
+            "clustering_and_other": 0.189
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.0775,
+            "reference_speech_sec": 549.79,
+            "missed_detection": 0.0242,
+            "false_alarm": 0.0401,
+            "confusion": 0.0132
+          },
+          "der_collar_0.25": {
+            "value": 0.0484,
+            "reference_speech_sec": 524.88,
+            "missed_detection": 0.0181,
+            "false_alarm": 0.0211,
+            "confusion": 0.0091
+          },
+          "jer": {
+            "value": 0.0829
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.577,
-            "p50": 0.58,
-            "p95": 0.657,
-            "max": 1.542,
-            "worst": 1.542,
+            "mean": 0.575,
+            "p50": 0.585,
+            "p95": 0.621,
+            "max": 0.744,
+            "worst": 0.744,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 4.4e-05,
-            "p50": 4.1e-05,
-            "p95": 6.5e-05,
-            "max": 0.000114
+            "mean": 4.7e-05,
+            "p50": 4.3e-05,
+            "p95": 6.6e-05,
+            "max": 0.000136
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.129,
-              "p50": 0.128,
-              "p95": 0.15,
-              "max": 1.072
+              "mean": 0.125,
+              "p50": 0.136,
+              "p95": 0.16,
+              "max": 0.244
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.446,
-              "p50": 0.447,
-              "p95": 0.501,
-              "max": 0.573
+              "mean": 0.449,
+              "p50": 0.45,
+              "p95": 0.497,
+              "max": 0.529
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.003
+              "max": 0.002
             },
             "total": {
               "count": 120,
-              "mean": 0.577,
-              "p50": 0.58,
-              "p95": 0.657,
-              "max": 1.542
+              "mean": 0.575,
+              "p50": 0.585,
+              "p95": 0.621,
+              "max": 0.744
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.577,
-              "p50": 0.58,
-              "p95": 0.657,
-              "max": 1.542
+              "mean": 0.575,
+              "p50": 0.585,
+              "p95": 0.621,
+              "max": 0.744
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
           },
           "label_latency_sec": {
             "mean": 3.66,
-            "p50": 3.73,
-            "p95": 5.84,
+            "p50": 3.76,
+            "p95": 5.85,
             "onsets_scored": 76,
             "onsets_never_labelled": 1
           },
@@ -5596,11 +6311,11 @@
           "speaker_count_settled_within_1": false,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 638.2,
-            "rss_end_mb": 645.6,
-            "rss_min_mb": 634.4,
-            "rss_max_mb": 689.8,
-            "growth_mb": 7.3
+            "rss_after_first_tick_mb": 667.3,
+            "rss_end_mb": 664.5,
+            "rss_min_mb": 653.5,
+            "rss_max_mb": 667.3,
+            "growth_mb": -2.8
           },
           "first_seen": {
             "der": {
@@ -5722,64 +6437,94 @@
         "file": "epygx_10min.wav",
         "audio_sec": 600.0,
         "reference_speakers": 5,
+        "offline": {
+          "hypothesis_speakers": 5,
+          "speaker_count_error": 0,
+          "wall_sec": 427.5,
+          "rtf": 0.7126,
+          "stage_cost_sec": {
+            "total": 427.527,
+            "segmentation": 22.543,
+            "embeddings": 404.79,
+            "clustering_and_other": 0.194
+          },
+          "source": "benchmarks/diarization/results/phase2e/offline_standard_native.json",
+          "der": {
+            "value": 0.1466,
+            "reference_speech_sec": 502.96,
+            "missed_detection": 0.0121,
+            "false_alarm": 0.09,
+            "confusion": 0.0445
+          },
+          "der_collar_0.25": {
+            "value": 0.096,
+            "reference_speech_sec": 473.98,
+            "missed_detection": 0.0077,
+            "false_alarm": 0.0497,
+            "confusion": 0.0385
+          },
+          "jer": {
+            "value": 0.3232
+          }
+        },
         "streaming": {
           "settled_timeline": null,
           "streamed_sec": 600.0,
           "ticks": 120,
           "tick_cost_sec": {
             "count": 120,
-            "mean": 0.589,
-            "p50": 0.582,
-            "p95": 0.646,
-            "max": 0.924,
-            "worst": 0.924,
+            "mean": 0.587,
+            "p50": 0.586,
+            "p95": 0.624,
+            "max": 0.901,
+            "worst": 0.901,
             "budget": 5.0,
             "fits_budget": true
           },
           "reconciler_cost_sec": {
             "count": 120,
-            "mean": 6.1e-05,
-            "p50": 4.5e-05,
-            "p95": 8.6e-05,
-            "max": 0.00102
+            "mean": 5.2e-05,
+            "p50": 4.7e-05,
+            "p95": 7.1e-05,
+            "max": 0.000133
           },
           "stage_cost_sec": {
             "segmentation": {
               "count": 120,
-              "mean": 0.126,
-              "p50": 0.132,
-              "p95": 0.162,
-              "max": 0.429
+              "mean": 0.13,
+              "p50": 0.137,
+              "p95": 0.17,
+              "max": 0.369
             },
             "embeddings": {
               "count": 120,
-              "mean": 0.461,
-              "p50": 0.451,
-              "p95": 0.499,
-              "max": 0.576
+              "mean": 0.456,
+              "p50": 0.449,
+              "p95": 0.494,
+              "max": 0.53
             },
             "clustering_and_other": {
               "count": 120,
               "mean": 0.002,
               "p50": 0.002,
               "p95": 0.002,
-              "max": 0.006
+              "max": 0.002
             },
             "total": {
               "count": 120,
-              "mean": 0.589,
-              "p50": 0.582,
-              "p95": 0.646,
-              "max": 0.924
+              "mean": 0.587,
+              "p50": 0.586,
+              "p95": 0.624,
+              "max": 0.901
             }
           },
           "schedule": {
             "lag_behind_realtime_sec": {
               "count": 120,
-              "mean": 0.589,
-              "p50": 0.582,
-              "p95": 0.646,
-              "max": 0.924
+              "mean": 0.587,
+              "p50": 0.586,
+              "p95": 0.624,
+              "max": 0.901
             },
             "ticks_skipped": 0,
             "ticks_skipped_fraction": 0.0
@@ -5787,7 +6532,7 @@
           "label_latency_sec": {
             "mean": 3.45,
             "p50": 3.38,
-            "p95": 5.79,
+            "p95": 5.78,
             "onsets_scored": 104,
             "onsets_never_labelled": 4
           },
@@ -5820,11 +6565,11 @@
           "speaker_count_settled_within_1": false,
           "speaker_count_settled_exact": false,
           "memory": {
-            "rss_after_first_tick_mb": 670.1,
-            "rss_end_mb": 688.0,
-            "rss_min_mb": 642.9,
-            "rss_max_mb": 691.3,
-            "growth_mb": 18.0
+            "rss_after_first_tick_mb": 664.4,
+            "rss_end_mb": 665.1,
+            "rss_min_mb": 653.2,
+            "rss_max_mb": 675.6,
+            "growth_mb": 0.7
           },
           "first_seen": {
             "der": {
@@ -5945,7 +6690,7 @@
     ]
   },
   "classroom": {
-    "generated_at": "2026-10-04T10:14:18+0000",
+    "generated_at": "2026-10-05T00:33:08+0000",
     "report": "<outside>/classroom_replay.json",
     "instructor": "FEE013",
     "instructor_label": "spk_2",
@@ -6143,9 +6888,9 @@
   "caption_latency": {
     "reference": {
       "on": {
-        "label": "phase2 wrap-up final [caption_reference_on]",
-        "generated_at": "2026-10-04T10:17:45+0000",
-        "code_revision": "de05327",
+        "label": "phase2c-prod: standard set, full 10 min, offline pass imported from the native run, clean host [caption_reference_on]",
+        "generated_at": "2026-10-05T00:36:34+0000",
+        "code_revision": "fd47fc8",
         "code_dirty": null,
         "environment": {
           "machine": "aarch64",
@@ -6232,45 +6977,45 @@
           "linger_sec": 20.0
         },
         "service": {
-          "ready_after_sec": 7.6,
+          "ready_after_sec": 6.1,
           "exited_during_run": null,
           "log": "<outside>/caption_reference_on.service.log",
-          "rss_mb_after_ready": 1541.3,
-          "rss_mb_end": 1813.6,
-          "rss_mb_peak": 1978.4,
-          "rss_mb_growth_during_stream": 272.3,
-          "rss_samples": 207,
+          "rss_mb_after_ready": 1536.3,
+          "rss_mb_end": 1800.5,
+          "rss_mb_peak": 1982.3,
+          "rss_mb_growth_during_stream": 264.2,
+          "rss_samples": 205,
           "workers": [
             {
-              "pid": 511,
-              "rss_max_mb": 1032.4,
-              "cpu_sec": 240.2,
+              "pid": 514,
+              "rss_max_mb": 1013.8,
+              "cpu_sec": 210.55,
               "wall_sec": 199.5,
-              "cores": 1.204,
+              "cores": 1.055,
               "worker": 0
             },
             {
-              "pid": 520,
-              "rss_max_mb": 707.2,
-              "cpu_sec": 24.7,
+              "pid": 522,
+              "rss_max_mb": 700.2,
+              "cpu_sec": 24.38,
               "wall_sec": 199.5,
-              "cores": 0.124,
+              "cores": 0.122,
               "worker": 1
             }
           ]
         },
         "diarization_cost": {
-          "rtf_from_counters": 0.135,
-          "pass_cost_mean_sec": 0.673,
+          "rtf_from_counters": 0.132,
+          "pass_cost_mean_sec": 0.662,
           "runs": 36.0,
           "audio_seconds": 180.0,
           "uncovered_seconds": 0,
           "dropped_periods": 0,
           "failed_passes": 0,
           "labels_minted": 2.0,
-          "worker_cores_mean": 0.124,
-          "worker_cpu_sec": 24.7,
-          "worker_rss_max_mb": 707.2,
+          "worker_cores_mean": 0.122,
+          "worker_cpu_sec": 24.38,
+          "worker_rss_max_mb": 700.2,
           "wall_sec": 199.5
         },
         "stream": {
@@ -6288,85 +7033,85 @@
         "latency": {
           "chunk_id_method": {
             "in_progress": {
-              "count": 16,
-              "mean": 14.569,
-              "p50": 10.446,
-              "p95": 41.443,
-              "max": 41.443
+              "count": 24,
+              "mean": 7.758,
+              "p50": 4.567,
+              "p95": 23.222,
+              "max": 28.398
             },
             "final": {
-              "count": 10,
-              "mean": 36.177,
-              "p50": 33.035,
-              "p95": 51.68,
-              "max": 51.68
+              "count": 13,
+              "mean": 26.284,
+              "p50": 28.398,
+              "p95": 43.969,
+              "max": 43.969
             }
           },
           "word_method": {
             "first_shown": {
-              "count": 423,
-              "mean": 22.073,
-              "p50": 21.678,
-              "p95": 41.765,
-              "max": 50.678
+              "count": 523,
+              "mean": 12.644,
+              "p50": 10.821,
+              "p95": 26.452,
+              "max": 35.226
             },
             "finalized": {
-              "count": 262,
-              "mean": 39.943,
-              "p50": 40.034,
-              "p95": 57.451,
-              "max": 64.448
+              "count": 243,
+              "mean": 26.985,
+              "p50": 25.221,
+              "p95": 42.068,
+              "max": 44.223
             }
           },
           "label_latency": {
             "after_text_shown": {
-              "count": 257,
-              "mean": 0.0,
+              "count": 241,
+              "mean": 0.128,
               "p50": 0.0,
               "p95": 0.0,
-              "max": 0.0
+              "max": 8.33
             },
             "after_finalized": {
-              "count": 257,
+              "count": 241,
               "mean": 0.0,
               "p50": 0.0,
               "p95": 0.0,
               "max": 0.0
             }
           },
-          "transcript_messages": 19,
-          "transcript_messages_with_text": 17,
-          "speakers_update_messages": 3,
+          "transcript_messages": 29,
+          "transcript_messages_with_text": 25,
+          "speakers_update_messages": 2,
           "speakers_updates_for_unknown_sequence": 0,
-          "final_sequences_with_id": 10,
-          "final_sequences_settled": 3,
-          "final_words": 262,
-          "final_words_labelled": 257,
-          "final_words_labelled_fraction": 0.981,
+          "final_sequences_with_id": 13,
+          "final_sequences_settled": 2,
+          "final_words": 243,
+          "final_words_labelled": 241,
+          "final_words_labelled_fraction": 0.992,
           "speaker_labels_seen": [
             "spk_0",
             "spk_1"
           ],
-          "label_changes_before_final": 2,
-          "label_changes_before_final_fraction": 0.0076,
+          "label_changes_before_final": 1,
+          "label_changes_before_final_fraction": 0.0041,
           "label_changes_after_sent": 0
         },
         "per_session_latency": null,
         "service_counters_delta": {
-          "jobsCompletedTotal": 19.0,
+          "jobsCompletedTotal": 29.0,
           "jobsFailedTotal": 0,
           "asrAudioSecondsTotal": 180.0,
-          "asrDroppedPeriodsTotal": 19.0,
+          "asrDroppedPeriodsTotal": 10.0,
           "audioDroppedBufferFullTotal": 0,
           "audioDroppedBufferFullSecondsTotal": 0,
           "bufferOverflowTotal": 12.0,
-          "bufferOverflowSecondsTotal": 133.24,
+          "bufferOverflowSecondsTotal": 103.16,
           "vadNoSpeechTotal": 0,
-          "noWordsTotal": 3.0,
-          "temperatureFallbackTotal": 4.0,
+          "noWordsTotal": 6.0,
+          "temperatureFallbackTotal": 1.0,
           "repeatedSegmentDetectedTotal": 0,
           "diarizationRunsTotal": 36.0,
-          "diarizationSecondsTotal": 24.216,
+          "diarizationSecondsTotal": 23.826,
           "diarizationFailedTotal": 0,
           "reconcilerSecondsTotal": 0.003,
           "diarizationLabelsMintedTotal": 2.0,
@@ -6376,65 +7121,65 @@
         },
         "service_histograms_end": {
           "asrExecutionMs": {
-            "count": 19,
-            "sampleCount": 9,
-            "mean": 11509.957074888887,
-            "p50": 5331.567377,
-            "p95": 26674.869137,
-            "p99": 26674.869137,
-            "max": 26674.869137
+            "count": 29,
+            "sampleCount": 19,
+            "mean": 4588.31395831579,
+            "p50": 3687.891001,
+            "p95": 19451.473967,
+            "p99": 19451.473967,
+            "max": 19451.473967
           },
           "asrSchedulingDelayMs": {
-            "count": 19,
-            "sampleCount": 9,
-            "mean": 4.770074777777777,
-            "p50": 5.682613,
-            "p95": 7.19737,
-            "p99": 7.19737,
-            "max": 7.19737
+            "count": 29,
+            "sampleCount": 19,
+            "mean": 4.500144736842105,
+            "p50": 5.399153,
+            "p95": 6.670924,
+            "p99": 6.670924,
+            "max": 6.670924
           },
           "asrRtf": {
-            "count": 18,
-            "sampleCount": 8,
-            "mean": 2.068905458071389,
-            "p50": 0.4142321052,
-            "p95": 5.334973827400001,
-            "p99": 5.334973827400001,
-            "max": 5.334973827400001
+            "count": 26,
+            "sampleCount": 16,
+            "mean": 0.7406972105868055,
+            "p50": 0.7238425836,
+            "p95": 1.5743704758,
+            "p99": 1.5743704758,
+            "max": 1.5743704758
           },
           "diarizationExecutionMs": {
             "count": 39,
             "sampleCount": 24,
-            "mean": 627.639267625,
-            "p50": 741.896625,
-            "p95": 823.200126,
-            "p99": 898.045417,
-            "max": 898.045417
+            "mean": 612.8313613333333,
+            "p50": 731.735625,
+            "p95": 794.071917,
+            "p99": 858.326042,
+            "max": 858.326042
           },
           "diarizationLagMs": {
             "count": 36,
             "sampleCount": 21,
-            "mean": 853.7905783880325,
-            "p50": 873.3212947845459,
-            "p95": 1006.7594051361084,
-            "p99": 1350.724220275879,
-            "max": 1350.724220275879
+            "mean": 807.5253509339832,
+            "p50": 826.709508895874,
+            "p95": 941.3478374481201,
+            "p99": 1317.1775341033936,
+            "max": 1317.1775341033936
           },
           "diarizationRtf": {
             "count": 36,
             "sampleCount": 21,
-            "mean": 0.1442348867037037,
-            "p50": 0.1515968668,
-            "p95": 0.1646400252,
-            "p99": 0.17960908339999998,
-            "max": 0.17960908339999998
+            "mean": 0.14084972107936508,
+            "p50": 0.1479437418,
+            "p95": 0.16260791666666666,
+            "p99": 0.1716652084,
+            "max": 0.1716652084
           }
         }
       },
       "off": {
-        "label": "phase2 wrap-up final [caption_reference_off]",
-        "generated_at": "2026-10-04T10:21:10+0000",
-        "code_revision": "de05327",
+        "label": "phase2c-prod: standard set, full 10 min, offline pass imported from the native run, clean host [caption_reference_off]",
+        "generated_at": "2026-10-05T00:39:59+0000",
+        "code_revision": "fd47fc8",
         "code_dirty": null,
         "environment": {
           "machine": "aarch64",
@@ -6505,18 +7250,18 @@
           "ready_after_sec": 2.6,
           "exited_during_run": null,
           "log": "<outside>/caption_reference_off.service.log",
-          "rss_mb_after_ready": 896.0,
-          "rss_mb_end": 1168.9,
-          "rss_mb_peak": 1262.0,
-          "rss_mb_growth_during_stream": 272.9,
+          "rss_mb_after_ready": 895.1,
+          "rss_mb_end": 1105.1,
+          "rss_mb_peak": 1261.6,
+          "rss_mb_growth_during_stream": 210.0,
           "rss_samples": 202,
           "workers": [
             {
-              "pid": 589,
-              "rss_max_mb": 964.8,
-              "cpu_sec": 239.35,
-              "wall_sec": 199.5,
-              "cores": 1.2,
+              "pid": 590,
+              "rss_max_mb": 966.3,
+              "cpu_sec": 171.77,
+              "wall_sec": 199.6,
+              "cores": 0.861,
               "worker": 0
             }
           ]
@@ -6524,7 +7269,7 @@
         "diarization_cost": null,
         "stream": {
           "sessions": 1,
-          "wall_sec": 199.5,
+          "wall_sec": 199.6,
           "per_session": [
             {
               "late_sends": 0,
@@ -6537,34 +7282,34 @@
         "latency": {
           "chunk_id_method": {
             "in_progress": {
-              "count": 23,
-              "mean": 8.007,
-              "p50": 5.521,
-              "p95": 21.731,
-              "max": 35.838
+              "count": 28,
+              "mean": 8.251,
+              "p50": 4.743,
+              "p95": 23.182,
+              "max": 32.549
             },
             "final": {
-              "count": 14,
-              "mean": 30.196,
-              "p50": 33.556,
-              "p95": 41.843,
-              "max": 41.843
+              "count": 15,
+              "mean": 27.492,
+              "p50": 32.239,
+              "p95": 40.251,
+              "max": 40.251
             }
           },
           "word_method": {
             "first_shown": {
-              "count": 551,
-              "mean": 17.989,
-              "p50": 16.525,
-              "p95": 33.026,
-              "max": 42.842
+              "count": 520,
+              "mean": 12.874,
+              "p50": 10.743,
+              "p95": 29.187,
+              "max": 34.63
             },
             "finalized": {
-              "count": 235,
-              "mean": 33.176,
-              "p50": 32.688,
-              "p95": 46.663,
-              "max": 48.343
+              "count": 259,
+              "mean": 31.903,
+              "p50": 34.74,
+              "p95": 44.398,
+              "max": 47.398
             }
           },
           "label_latency": {
@@ -6583,13 +7328,13 @@
               "max": null
             }
           },
-          "transcript_messages": 29,
-          "transcript_messages_with_text": 24,
+          "transcript_messages": 34,
+          "transcript_messages_with_text": 28,
           "speakers_update_messages": 0,
           "speakers_updates_for_unknown_sequence": 0,
           "final_sequences_with_id": 0,
           "final_sequences_settled": 0,
-          "final_words": 235,
+          "final_words": 259,
           "final_words_labelled": 0,
           "final_words_labelled_fraction": 0.0,
           "speaker_labels_seen": [],
@@ -6599,16 +7344,16 @@
         },
         "per_session_latency": null,
         "service_counters_delta": {
-          "jobsCompletedTotal": 29.0,
+          "jobsCompletedTotal": 34.0,
           "jobsFailedTotal": 0,
-          "asrAudioSecondsTotal": 175.0,
-          "asrDroppedPeriodsTotal": 10.0,
-          "audioDroppedBufferFullTotal": 10.0,
-          "audioDroppedBufferFullSecondsTotal": 5.0,
-          "bufferOverflowTotal": 15.0,
-          "bufferOverflowSecondsTotal": 115.18,
+          "asrAudioSecondsTotal": 180.0,
+          "asrDroppedPeriodsTotal": 5.0,
+          "audioDroppedBufferFullTotal": 0,
+          "audioDroppedBufferFullSecondsTotal": 0,
+          "bufferOverflowTotal": 18.0,
+          "bufferOverflowSecondsTotal": 107.48,
           "vadNoSpeechTotal": 0,
-          "noWordsTotal": 6.0,
+          "noWordsTotal": 7.0,
           "temperatureFallbackTotal": 1.0,
           "repeatedSegmentDetectedTotal": 0,
           "diarizationRunsTotal": 0,
@@ -6622,45 +7367,52 @@
         },
         "service_histograms_end": {
           "asrExecutionMs": {
-            "count": 29,
-            "sampleCount": 18,
-            "mean": 5228.102175833334,
-            "p50": 3861.869335,
-            "p95": 31550.367057,
-            "p99": 31550.367057,
-            "max": 31550.367057
+            "count": 34,
+            "sampleCount": 19,
+            "mean": 3661.1285784736842,
+            "p50": 3319.172419,
+            "p95": 10713.200296,
+            "p99": 10713.200296,
+            "max": 10713.200296
           },
           "asrSchedulingDelayMs": {
-            "count": 29,
-            "sampleCount": 18,
-            "mean": 4.565323944444445,
-            "p50": 3.966767,
-            "p95": 9.957713,
-            "p99": 9.957713,
-            "max": 9.957713
+            "count": 34,
+            "sampleCount": 19,
+            "mean": 4.7589458421052635,
+            "p50": 4.150306,
+            "p95": 10.984148,
+            "p99": 10.984148,
+            "max": 10.984148
           },
           "asrRtf": {
-            "count": 26,
-            "sampleCount": 15,
-            "mean": 1.0989394998377777,
-            "p50": 0.7765728002000001,
-            "p95": 6.310073411399999,
-            "p99": 6.310073411399999,
-            "max": 6.310073411399999
+            "count": 31,
+            "sampleCount": 16,
+            "mean": 0.6576663877406799,
+            "p50": 0.4973599586,
+            "p95": 2.1426400592,
+            "p99": 2.1426400592,
+            "max": 2.1426400592
           }
         }
       }
     }
   },
   "durations_sec": {
-    "warmup": 6.0,
-    "replay": 1686.9,
-    "classroom": 69.6,
-    "caption_reference_on": 210.1,
-    "caption_reference_off": 204.7
+    "warmup": 8.3,
+    "replay": 1706.8,
+    "classroom": 70.7,
+    "caption_reference_on": 208.5,
+    "caption_reference_off": 204.9
   },
-  "suite_wall_sec": 2180.1,
+  "suite_wall_sec": 2201.9,
   "key_metrics": {
+    "replay.offline.der": 0.1902,
+    "replay.offline.der_missed": 0.134,
+    "replay.offline.der_false_alarm": 0.031,
+    "replay.offline.der_confusion": 0.0252,
+    "replay.offline.jer": 0.3503,
+    "replay.offline.speaker_count_abs_error_mean": 0.5,
+    "replay.offline.rtf_mean": 0.6939,
     "replay.first_seen.der": 0.2712,
     "replay.first_seen.der_missed": 0.1407,
     "replay.first_seen.der_false_alarm": 0.0307,
@@ -6691,14 +7443,14 @@
     "replay.overlap_end_of_stream.der_false_alarm": 0.0422,
     "replay.overlap_end_of_stream.der_confusion": 0.1023,
     "replay.overlap_end_of_stream.jer": 0.4987,
-    "replay.tick_cost_mean_sec": 0.582,
-    "replay.tick_cost_p95_sec": 0.817,
-    "replay.tick_cost_worst_sec": 2.11,
-    "replay.lag_behind_realtime_p50_sec": 0.592,
-    "replay.lag_behind_realtime_p95_sec": 0.817,
+    "replay.tick_cost_mean_sec": 0.588,
+    "replay.tick_cost_p95_sec": 0.902,
+    "replay.tick_cost_worst_sec": 2.034,
+    "replay.lag_behind_realtime_p50_sec": 0.594,
+    "replay.lag_behind_realtime_p95_sec": 0.902,
     "replay.ticks_skipped_fraction": 0.0,
-    "replay.label_latency_p50_sec": 3.7,
-    "replay.label_latency_p95_sec": 10.15,
+    "replay.label_latency_p50_sec": 3.71,
+    "replay.label_latency_p95_sec": 10.14,
     "replay.onsets_never_labelled": 118,
     "replay.label_flips_per_min": 0.38,
     "replay.label_flip_rate_after_first_shown": 0.017,
@@ -6724,15 +7476,15 @@
     "replay.reclusterings": 0,
     "replay.revisions": 192,
     "replay.revised_fraction": 0.0062,
-    "replay.reconciler_cost_mean_sec": 5.2e-05,
-    "replay.memory_growth_mb_total": -20.8,
-    "replay.stage.segmentation_mean_sec": 0.139,
-    "replay.stage.embeddings_mean_sec": 0.441,
+    "replay.reconciler_cost_mean_sec": 5.5e-05,
+    "replay.memory_growth_mb_total": 39.0,
+    "replay.stage.segmentation_mean_sec": 0.143,
+    "replay.stage.embeddings_mean_sec": 0.443,
     "replay.stage.clustering_and_other_mean_sec": 0.002,
-    "replay.stage.total_mean_sec": 0.582,
+    "replay.stage.total_mean_sec": 0.588,
     "replay.files": 24,
-    "replay.peak_rss_mb": 728.0,
-    "replay.model_load_sec": 2.1,
+    "replay.peak_rss_mb": 717.0,
+    "replay.model_load_sec": 2.0,
     "replay.window_sec": 10.0,
     "replay.segmentation_step": null,
     "classroom.questions_total": 9,
@@ -6753,89 +7505,89 @@
     "classroom.labels_per_person_settled": 1.5,
     "classroom.settled_der": 0.0951,
     "classroom.settled_confusion": 0.0503,
-    "caption.on.chunk_id.in_progress.p50": 10.446,
-    "caption.on.chunk_id.in_progress.p95": 41.443,
-    "caption.on.chunk_id.in_progress.mean": 14.569,
-    "caption.on.chunk_id.final.p50": 33.035,
-    "caption.on.chunk_id.final.p95": 51.68,
-    "caption.on.chunk_id.final.mean": 36.177,
-    "caption.on.word.first_shown.p50": 21.678,
-    "caption.on.word.first_shown.p95": 41.765,
-    "caption.on.word.first_shown.mean": 22.073,
-    "caption.on.word.finalized.p50": 40.034,
-    "caption.on.word.finalized.p95": 57.451,
-    "caption.on.word.finalized.mean": 39.943,
+    "caption.on.chunk_id.in_progress.p50": 4.567,
+    "caption.on.chunk_id.in_progress.p95": 23.222,
+    "caption.on.chunk_id.in_progress.mean": 7.758,
+    "caption.on.chunk_id.final.p50": 28.398,
+    "caption.on.chunk_id.final.p95": 43.969,
+    "caption.on.chunk_id.final.mean": 26.284,
+    "caption.on.word.first_shown.p50": 10.821,
+    "caption.on.word.first_shown.p95": 26.452,
+    "caption.on.word.first_shown.mean": 12.644,
+    "caption.on.word.finalized.p50": 25.221,
+    "caption.on.word.finalized.p95": 42.068,
+    "caption.on.word.finalized.mean": 26.985,
     "caption.on.label.after_text_shown.p50": 0.0,
     "caption.on.label.after_text_shown.p95": 0.0,
-    "caption.on.label.after_text_shown.mean": 0.0,
+    "caption.on.label.after_text_shown.mean": 0.128,
     "caption.on.label.after_finalized.p50": 0.0,
     "caption.on.label.after_finalized.p95": 0.0,
     "caption.on.label.after_finalized.mean": 0.0,
-    "caption.on.transcript_messages": 19,
-    "caption.on.speakers_update_messages": 3,
-    "caption.on.final_words": 262,
-    "caption.on.final_words_labelled_fraction": 0.981,
+    "caption.on.transcript_messages": 29,
+    "caption.on.speakers_update_messages": 2,
+    "caption.on.final_words": 243,
+    "caption.on.final_words_labelled_fraction": 0.992,
     "caption.on.speaker_labels_seen": 2,
-    "caption.on.label_changes_before_final": 2,
-    "caption.on.label_changes_before_final_fraction": 0.0076,
+    "caption.on.label_changes_before_final": 1,
+    "caption.on.label_changes_before_final_fraction": 0.0041,
     "caption.on.label_changes_after_sent": 0,
-    "caption.on.dropped_periods": 19.0,
+    "caption.on.dropped_periods": 10.0,
     "caption.on.audio_dropped_buffer_full_sec": 0,
-    "caption.on.buffer_overflow_sec": 133.24,
-    "caption.on.jobs_completed": 19.0,
-    "caption.on.rss_peak_mb": 1978.4,
-    "caption.on.rss_growth_mb": 272.3,
-    "caption.on.exec_ms_p95": 26674.869137,
-    "caption.on.exec_ms_max": 26674.869137,
-    "caption.on.worker0.cores": 1.204,
-    "caption.on.worker0.rss_max_mb": 1032.4,
-    "caption.on.worker1.cores": 0.124,
-    "caption.on.worker1.rss_max_mb": 707.2,
-    "caption.on.diarization.rtf": 0.135,
-    "caption.on.diarization.pass_cost_mean_sec": 0.673,
+    "caption.on.buffer_overflow_sec": 103.16,
+    "caption.on.jobs_completed": 29.0,
+    "caption.on.rss_peak_mb": 1982.3,
+    "caption.on.rss_growth_mb": 264.2,
+    "caption.on.exec_ms_p95": 19451.473967,
+    "caption.on.exec_ms_max": 19451.473967,
+    "caption.on.worker0.cores": 1.055,
+    "caption.on.worker0.rss_max_mb": 1013.8,
+    "caption.on.worker1.cores": 0.122,
+    "caption.on.worker1.rss_max_mb": 700.2,
+    "caption.on.diarization.rtf": 0.132,
+    "caption.on.diarization.pass_cost_mean_sec": 0.662,
     "caption.on.diarization.runs": 36.0,
     "caption.on.diarization.uncovered_sec": 0,
     "caption.on.diarization.dropped_periods": 0,
     "caption.on.diarization.failed_passes": 0,
-    "caption.on.diarization.worker_cores": 0.124,
-    "caption.on.diarization.worker_rss_max_mb": 707.2,
-    "caption.on.diarization.lag_ms_p95": 1006.7594051361084,
-    "caption.on.diarization.exec_ms_p95": 823.200126,
-    "caption.off.chunk_id.in_progress.p50": 5.521,
-    "caption.off.chunk_id.in_progress.p95": 21.731,
-    "caption.off.chunk_id.in_progress.mean": 8.007,
-    "caption.off.chunk_id.final.p50": 33.556,
-    "caption.off.chunk_id.final.p95": 41.843,
-    "caption.off.chunk_id.final.mean": 30.196,
-    "caption.off.word.first_shown.p50": 16.525,
-    "caption.off.word.first_shown.p95": 33.026,
-    "caption.off.word.first_shown.mean": 17.989,
-    "caption.off.word.finalized.p50": 32.688,
-    "caption.off.word.finalized.p95": 46.663,
-    "caption.off.word.finalized.mean": 33.176,
+    "caption.on.diarization.worker_cores": 0.122,
+    "caption.on.diarization.worker_rss_max_mb": 700.2,
+    "caption.on.diarization.lag_ms_p95": 941.3478374481201,
+    "caption.on.diarization.exec_ms_p95": 794.071917,
+    "caption.off.chunk_id.in_progress.p50": 4.743,
+    "caption.off.chunk_id.in_progress.p95": 23.182,
+    "caption.off.chunk_id.in_progress.mean": 8.251,
+    "caption.off.chunk_id.final.p50": 32.239,
+    "caption.off.chunk_id.final.p95": 40.251,
+    "caption.off.chunk_id.final.mean": 27.492,
+    "caption.off.word.first_shown.p50": 10.743,
+    "caption.off.word.first_shown.p95": 29.187,
+    "caption.off.word.first_shown.mean": 12.874,
+    "caption.off.word.finalized.p50": 34.74,
+    "caption.off.word.finalized.p95": 44.398,
+    "caption.off.word.finalized.mean": 31.903,
     "caption.off.label.after_text_shown.p50": null,
     "caption.off.label.after_text_shown.p95": null,
     "caption.off.label.after_text_shown.mean": null,
     "caption.off.label.after_finalized.p50": null,
     "caption.off.label.after_finalized.p95": null,
     "caption.off.label.after_finalized.mean": null,
-    "caption.off.transcript_messages": 29,
+    "caption.off.transcript_messages": 34,
     "caption.off.speakers_update_messages": 0,
-    "caption.off.final_words": 235,
+    "caption.off.final_words": 259,
     "caption.off.final_words_labelled_fraction": 0.0,
     "caption.off.speaker_labels_seen": 0,
     "caption.off.label_changes_before_final": 0,
     "caption.off.label_changes_before_final_fraction": 0.0,
     "caption.off.label_changes_after_sent": 0,
-    "caption.off.dropped_periods": 10.0,
-    "caption.off.audio_dropped_buffer_full_sec": 5.0,
-    "caption.off.buffer_overflow_sec": 115.18,
-    "caption.off.jobs_completed": 29.0,
-    "caption.off.rss_peak_mb": 1262.0,
-    "caption.off.rss_growth_mb": 272.9,
-    "caption.off.exec_ms_p95": 31550.367057,
-    "caption.off.exec_ms_max": 31550.367057,
-    "caption.off.worker0.cores": 1.2,
-    "caption.off.worker0.rss_max_mb": 964.8
+    "caption.off.dropped_periods": 5.0,
+    "caption.off.audio_dropped_buffer_full_sec": 0,
+    "caption.off.buffer_overflow_sec": 107.48,
+    "caption.off.jobs_completed": 34.0,
+    "caption.off.rss_peak_mb": 1261.6,
+    "caption.off.rss_growth_mb": 210.0,
+    "caption.off.exec_ms_p95": 10713.200296,
+    "caption.off.exec_ms_max": 10713.200296,
+    "caption.off.worker0.cores": 0.861,
+    "caption.off.worker0.rss_max_mb": 966.3
   }
 }
