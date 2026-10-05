@@ -751,6 +751,16 @@ def main():
     parser.add_argument("--skip-streaming", action="store_true")
     parser.add_argument("--skip-offline", action="store_true")
     parser.add_argument(
+        "--offline-from",
+        default=None,
+        help="a report written with --keep-hypotheses whose per-file offline "
+        "hypotheses are re-scored here instead of running the whole-file "
+        "offline pass again (the pass is deterministic: same model, same "
+        "audio, same turns); files the report lacks run the pass when "
+        "--skip-offline is not set. Recorded in the report as "
+        "config.offline_from and per file as offline.source",
+    )
+    parser.add_argument(
         "--no-shared-embeddings",
         action="store_true",
         help="run pyannote's one embedding pass per speaker slot instead of "
@@ -803,6 +813,18 @@ def main():
         if args.offline_set
         else None
     )
+    offline_from: dict[str, dict] = {}
+    if args.offline_from:
+        prior = json.loads(Path(args.offline_from).read_text(encoding="utf-8"))
+        for prior_entry in prior.get("files", []):
+            prior_offline = prior_entry.get("offline") or {}
+            if prior_offline.get("hypothesis_timeline") is not None:
+                offline_from[prior_entry["file"]] = prior_offline
+        if not offline_from:
+            raise SystemExit(
+                f"{args.offline_from} holds no offline hypotheses; write it "
+                "with --keep-hypotheses"
+            )
     reconciler_config = (
         SpeakerReconcilerConfig(**json.loads(args.reconciler_json))
         if args.reconciler_json
@@ -870,9 +892,40 @@ def main():
             "reference_speakers": len(reference.labels()),
         }
 
-        run_offline_here = not args.skip_offline and (
-            offline_wavs is None or wav.resolve() in offline_wavs
+        prior_offline = offline_from.get(wav.name)
+        run_offline_here = (
+            prior_offline is None
+            and not args.skip_offline
+            and (offline_wavs is None or wav.resolve() in offline_wavs)
         )
+        if prior_offline is not None:
+            # Re-score a deterministic pass recorded earlier (--offline-from)
+            # with this run's metric objects, so the aggregate pools the
+            # same way as a pass run here would.
+            segments = [
+                SpeakerSegment(start=s[0], end=s[1], speaker=s[2])
+                for s in prior_offline["hypothesis_timeline"]
+            ]
+            hyp = to_annotation(segments, stem)
+            entry["offline"] = {
+                "hypothesis_speakers": len(hyp.labels()),
+                "speaker_count_error": len(hyp.labels())
+                - len(reference.labels()),
+                "wall_sec": prior_offline.get("wall_sec"),
+                "rtf": prior_offline.get("rtf"),
+                "stage_cost_sec": prior_offline.get("stage_cost_sec"),
+                "source": rel_path(Path(args.offline_from)),
+            } | {
+                k: score(m, reference, hyp, uem)
+                for k, m in offline_metrics.items()
+            }
+            print(
+                f"offline (from {entry['offline']['source']}): DER "
+                f"{entry['offline']['der']['value']:.3f}  speakers "
+                f"{entry['offline']['hypothesis_speakers']}/"
+                f"{entry['reference_speakers']}",
+                flush=True,
+            )
         if run_offline_here:
             timed.reset()
             segments, wall = run_offline(service, samples)
@@ -890,6 +943,11 @@ def main():
                 k: score(m, reference, hyp, uem)
                 for k, m in offline_metrics.items()
             }
+            if args.keep_hypotheses:
+                entry["offline"]["hypothesis_timeline"] = [
+                    [round(s.start, 3), round(s.end, 3), s.speaker]
+                    for s in segments
+                ]
             print(
                 f"offline: DER {entry['offline']['der']['value']:.3f}  "
                 f"RTF {entry['offline']['rtf']:.3f}  speakers "
@@ -966,7 +1024,7 @@ def main():
         }
 
     aggregate_report: dict = {}
-    if not args.skip_offline and any("offline" in f for f in files):
+    if any("offline" in f for f in files):
         aggregate_report["offline"] = aggregate(offline_metrics) | {
             "speaker_count_abs_error_mean": _mean_of(
                 [
@@ -978,6 +1036,9 @@ def main():
             ),
             "rtf_mean": _mean_of(files, ["offline", "rtf"], 4),
             "files_scored": sum(1 for f in files if "offline" in f),
+            "files_from_prior_report": sum(
+                1 for f in files if "source" in f.get("offline", {})
+            ),
         }
     if not args.skip_streaming:
         aggregate_report["streaming_first_seen"] = aggregate(first_seen_metrics)
@@ -1208,6 +1269,9 @@ def main():
             "suffix": args.suffix,
             "set": args.set,
             "offline_set": args.offline_set,
+            "offline_from": (
+                rel_path(Path(args.offline_from)) if args.offline_from else None
+            ),
             "files": [rel_path(w) for w in wavs],
             "min_speaker_sec": args.min_speaker_sec,
             "reconciler_overrides": (

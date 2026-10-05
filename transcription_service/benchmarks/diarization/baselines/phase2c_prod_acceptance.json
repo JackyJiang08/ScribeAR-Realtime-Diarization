@@ -1,0 +1,75 @@
+{
+  "_comment": [
+    "Phase 2c production-readiness acceptance targets for the two-hour",
+    "real-service soak (soak_service.py in the Linux CPU reference",
+    "container, diarization on, the diarization worker killed once at 60",
+    "min). Checked by acceptance.py against the soak report; pass the",
+    "diarization-off soak report of the same clip as --baseline so the",
+    "audio-drop target compares against it. A missed target is reported by",
+    "how much, never relaxed here."
+  ],
+  "targets": {
+    "memory: service tree RSS grows under 10% from the first to the last 10 min": {
+      "metric": "memory.service_tree_growth_fraction",
+      "max": 0.1
+    },
+    "memory: diarization worker RSS grows under 10%": {
+      "metric": "memory.diarization_worker_growth_fraction",
+      "max": 0.1,
+      "note": "measured up to the kill; the replacement is reported separately"
+    },
+    "memory: caption worker RSS grows under 10%": {
+      "metric": "memory.caption_worker_growth_fraction",
+      "max": 0.1
+    },
+    "no label drift: no reference speaker changes majority label between 5 min bins": {
+      "metric": "drift.label_swaps",
+      "max": 0
+    },
+    "no audio dropped because of diarization: caption audio dropped (buffer full) no more than the diarization-off run": {
+      "metric": "caption.audio_dropped_buffer_full_seconds",
+      "max_vs_baseline": "caption.audio_dropped_buffer_full_seconds",
+      "abs": 0.0,
+      "note": "both runs stream the same clip in the same container; upstream's own drops are the baseline"
+    },
+    "diarization never skips audio": {
+      "metric": "diarization.uncovered_seconds",
+      "max": 0
+    },
+    "diarization never fails a pass": {
+      "metric": "diarization.failed_passes",
+      "max": 0
+    },
+    "labels never change after being sent": {
+      "metric": "diarization.label_changes_after_sent",
+      "max": 0
+    },
+    "kill: captions continue, gap around the kill no longer than 10 s": {
+      "metric": "recovery.captions_gap_around_kill_sec",
+      "max": 10
+    },
+    "kill: diarization job re-registered within 10 s": {
+      "metric": "recovery.job_reregistered_after_sec",
+      "max": 10
+    },
+    "kill: labels on audio recorded after the kill within 10 s plus the caption latency (p50)": {
+      "metric": "recovery.labels_for_post_kill_audio_after_sec",
+      "max_relative_to": "caption.chunk_id_in_progress_p50",
+      "ratio": 1.0,
+      "plus": 10,
+      "note": "a label can only show once its caption text has (labels ride on the text)"
+    },
+    "warm model load at most 10 s (start-up)": {
+      "metric": "model_load_startup_sec",
+      "max": 10
+    },
+    "warm model load at most 10 s (replacement after the kill)": {
+      "metric": "recovery.model_load_after_kill_sec",
+      "max": 10
+    },
+    "diarization real-time factor at most 0.25 over two hours": {
+      "metric": "diarization.rtf",
+      "max": 0.25
+    }
+  }
+}

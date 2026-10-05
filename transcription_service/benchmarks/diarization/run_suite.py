@@ -399,6 +399,13 @@ def main():
     )
     parser.add_argument("--skip-offline", action="store_true")
     parser.add_argument(
+        "--offline-from",
+        default=None,
+        help="re-score the offline hypotheses of this earlier replay report "
+        "(written with --keep-hypotheses) instead of running the whole-file "
+        "pass; see benchmark_baseline.py --offline-from",
+    )
+    parser.add_argument(
         "--reconciler-json",
         default=None,
         help="SpeakerReconcilerConfig overrides (JSON) for the replay and "
@@ -510,6 +517,7 @@ def main():
             "offline_set": args.offline_set,
             "stream_sec": args.stream_sec,
             "skip_offline": args.skip_offline,
+            "offline_from": args.offline_from,
             "reconciler_overrides": (
                 json.loads(args.reconciler_json)
                 if args.reconciler_json
@@ -575,6 +583,8 @@ def main():
             argv += ["--offline-set", args.offline_set]
         if args.skip_offline:
             argv.append("--skip-offline")
+        if args.offline_from:
+            argv += ["--offline-from", args.offline_from]
         if args.threads:
             argv += ["--threads", str(args.threads)]
         if args.reconciler_json:

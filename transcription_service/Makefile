@@ -163,6 +163,34 @@ benchmark_diarization_soak:
 	uv run python $(BENCH_DIR)/soak.py --minutes $(SOAK_MINUTES) --label "$(LABEL)" \
 		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_soak_$(SOAK_MINUTES)min.json,$(RESULT))
 
+# Real-service soak (soak_service.py): streams the soak recording through the
+# running service at real time, with diarization on or off, tracking memory per
+# worker, label drift per 5 min bin, audio drops and, with SOAK_KILL_AT_SEC,
+# the recovery after the diarization worker is killed. The container variant is
+# the one that decides (same limits as the suite).
+#   SOAK_MINUTES=120 SOAK_KILL_AT_SEC=3600 make benchmark_diarization_soak_service_docker
+SOAK_KILL_AT_SEC ?= 0
+SOAK_DIARIZATION ?= on
+benchmark_diarization_soak_service:
+	uv run python $(BENCH_DIR)/prepare_soak.py --minutes $(SOAK_MINUTES)
+	uv run python $(BENCH_DIR)/soak_service.py --minutes $(SOAK_MINUTES) \
+		--diarization $(SOAK_DIARIZATION) --kill-worker-at-sec $(SOAK_KILL_AT_SEC) \
+		--label "$(LABEL)" \
+		--out $(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_soak_service_$(SOAK_MINUTES)min_$(SOAK_DIARIZATION).json,$(RESULT))
+
+benchmark_diarization_soak_service_docker:
+	uv run python $(BENCH_DIR)/prepare_soak.py --minutes $(SOAK_MINUTES)
+	BENCH_SCRIPT=soak_service.py $(BENCH_DIR)/docker/run_in_docker.sh --minutes $(SOAK_MINUTES) \
+		--diarization $(SOAK_DIARIZATION) --kill-worker-at-sec $(SOAK_KILL_AT_SEC) \
+		--label "$(LABEL)" \
+		--out $(subst $(BENCH_DIR)/,/app/$(BENCH_DIR)/,$(if $(filter $(BENCH_DIR)/results/$(DATE)_suite.json,$(RESULT)),$(BENCH_DIR)/results/$(DATE)_soak_service_$(SOAK_MINUTES)min_$(SOAK_DIARIZATION).json,$(RESULT)))
+
+# Start-up test of a diarization image with networking disabled (see
+# scripts/check_diarization_image.sh and deployment/DIARIZATION.md).
+DIARIZATION_IMAGE ?= scribear/transcription-service-cpu-diarization:dev
+check_diarization_image:
+	scripts/check_diarization_image.sh $(DIARIZATION_IMAGE)
+
 # Acceptance: absolute targets checked against a suite report; the Linux
 # container run is the one that decides. RESULT=path picks the report
 # (default: today's suite report); TARGETS=path picks the target file
