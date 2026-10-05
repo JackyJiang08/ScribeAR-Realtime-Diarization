@@ -1739,6 +1739,17 @@ compares them from now on. The two known misses (confusion, count within
 one) are unchanged from the baseline that was replaced, and the
 dropped-period count is the one new single-run miss, recorded above.
 
+*Why the move was accepted with that miss* (decision of 2026-10-05): zero
+seconds of audio were dropped in both the on and the off run, so no
+caption text was lost to the extra periods, and the alternating pairs of
+the wrap-up's parity step had already shown dropped periods moving by
+that much on their own between runs of the same configuration (off runs
+of 11, 9 and 16 periods in the three pairs; on runs of 11, 6 and 12),
+larger than the 10 against 5 of this single run. A single run therefore
+cannot attribute the five periods to diarization, which is also why the
+gate now reads caption latency and dropped periods from the median of
+paired runs (next paragraph) rather than from one.
+
 
 **Known flaky tests.** `worker_process_manager_test.py`'s two "job stats
 with a slow job" tests assert a scheduling delay under 1 ms and failed
