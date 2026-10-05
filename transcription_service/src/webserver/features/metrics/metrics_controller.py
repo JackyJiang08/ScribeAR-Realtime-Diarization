@@ -144,6 +144,17 @@ class MetricsController:
             # old to send it. A provider with no local device (debug,
             # lumen_granite) is omitted.
             "providerDevice": self._providers.provider_device,
+            # Contexts that asked for one device and run on another (a CUDA
+            # request or an "auto" that fell back to the CPU), keyed by
+            # context tag with the reason. Empty in a healthy deployment; a
+            # non-empty map is the telemetry side of the start-up warning, so
+            # a dashboard can show that labels are coming from the CPU on a
+            # box that was meant to use its GPU.
+            "deviceFallbacks": self._providers.device_fallbacks,
+            # Worker processes the pool replaced after they died, by worker
+            # id. Zero everywhere in a healthy deployment; a rising count
+            # names a worker whose model or job keeps crashing it.
+            "workerRestarts": self._providers.worker_restarts,
             "workers": [
                 {
                     **serialize_worker(snapshot),

@@ -11,51 +11,43 @@ import math
 import os
 import time
 import warnings
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, TypeAdapter
 
 from src.shared.logger import Logger
+from src.shared.utils.diarization_backend import (
+    DevicePreference,
+    DeviceSelection,
+    DiarizationContextInterface,
+    DiarizationPass,
+    select_device,
+    usable_embedding,
+)
+from src.shared.utils.diarization_backend.diarization_backend import (
+    resolve_device_preference,
+)
 from src.shared.utils.speaker_reconciler import SpeakerSegment
-from src.shared.utils.worker_pool import JobContextInterface
 
+#: The model this context ships configured for, and the page whose terms a
+#: deployer accepts before the token can download it
+DEFAULT_MODEL = "pyannote/speaker-diarization-community-1"
+MODEL_TERMS_URL = (
+    "https://huggingface.co/pyannote/speaker-diarization-community-1"
+)
+#: Environment variable the diarization Docker images set to the directory
+#: the model was baked into at build time; when the configured `model` is a
+#: HuggingFace id and this directory holds a pipeline (`config.yaml`), the
+#: context loads from it and needs neither network nor token at runtime
+MODEL_DIR_ENV_VAR = "SCRIBEAR_DIARIZATION_MODEL_DIR"
 
-@dataclass
-class DiarizationPass:
-    """
-    Everything one pyannote pass reports about a stretch of audio
+# Re-exported for callers that imported it from here before it moved to the
+# backend-neutral module
+__all__ = ["DiarizationPass"]
 
-    Properties:
-        segments            - Speaker turns to attribute words against:
-                                the exclusive diarization (one speaker per
-                                instant) unless the context is configured
-                                `overlap_aware`, then the overlap-aware one
-        embeddings          - Raw label -> speaker embedding (pyannote's
-                                per-speaker centroid for the pass) in the
-                                embedding model's own scale: the reconciler
-                                normalises for cosine scoring and the PLDA
-                                that ships with the model needs the raw
-                                vector. A label whose centroid the pipeline
-                                could not compute is absent
-        overlap_segments    - The overlap-aware diarization, always, so a
-                                benchmark can score both conventions from
-                                one pass
-    """
-
-    segments: list[SpeakerSegment]
-    embeddings: dict[str, np.ndarray] = field(default_factory=dict)
-    overlap_segments: list[SpeakerSegment] = field(default_factory=list)
-
-
-def _usable(vector: np.ndarray) -> bool:
-    """
-    Whether an embedding carries information: pyannote pads missing
-    centroids with zeros, and a NaN row means the stage failed on it
-    """
-    norm = float(np.linalg.norm(vector))
-    return bool(np.isfinite(norm) and norm > 0.0)
+_usable = usable_embedding
 
 
 def _annotation_segments(annotation: Any) -> list[SpeakerSegment]:
@@ -79,16 +71,28 @@ class PyannoteDiarizationService:
         overlap_aware: bool = False,
         local_speakers: bool = True,
         shared_embeddings: bool = True,
+        device: str = "cpu",
     ):
         self._pipeline = pipeline
         self._num_threads = num_threads
         self._overlap_aware = overlap_aware
         self._local_speakers = local_speakers
         self._shared_embeddings = shared_embeddings
+        self._device = device
+        # What the context reports to the pool once created (device
+        # selection, model source, load time); filled by the context
+        self.runtime_info: dict[str, Any] = {}
         # Per-stage seconds of the last `diarize` call when the shared pass
         # ran it (the pipeline's own hooks time the other path). Read by the
         # benchmark harness; empty after a pipeline pass
         self.last_stage_times: dict[str, float] = {}
+
+    @property
+    def device(self) -> str:
+        """
+        The device the pipeline runs inference on ("cpu" or "cuda")
+        """
+        return self._device
 
     @property
     def num_threads(self) -> int | None:
@@ -543,8 +547,19 @@ class PyannoteDiarizationContextConfig(BaseModel):
     Configuration schema for PyannoteDiarizationContext
     """
 
-    model: str = "pyannote/speaker-diarization-community-1"
-    device: Literal["cuda"] | Literal["cpu"] = "cpu"
+    # A HuggingFace model id (downloaded once with the token, then served
+    # from the HuggingFace cache), or a local directory holding a pipeline
+    # `config.yaml` with its model folders (no token, no network). The
+    # diarization Docker images bake the default model into a directory and
+    # name it in SCRIBEAR_DIARIZATION_MODEL_DIR, which takes over for the
+    # default id without a config change (see `PyannoteDiarizationContext`).
+    model: str = DEFAULT_MODEL
+    # Inference device. "cpu" (the default; production is CPU-only), "cuda",
+    # or "auto": CUDA when torch sees a working device, otherwise CPU. A CUDA
+    # device that is missing or fails its probe falls back to the CPU with a
+    # warning in the log and on /metrics/status (`deviceFallbacks`); it never
+    # fails the worker or a session.
+    device: DevicePreference = "cpu"
     token_env_var: str = "HUGGINGFACE_ACCESS_TOKEN"
     # Torch intra-op threads for inference on this context. Capped at 1 by
     # default so diarization cannot take the cores Whisper is using: on the
@@ -598,11 +613,26 @@ pyannote_diarization_context_config_adapter = TypeAdapter(
 )
 
 
-class PyannoteDiarizationContext(
-    JobContextInterface[PyannoteDiarizationModelType]
-):
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+class PyannoteDiarizationContext(DiarizationContextInterface):
     """
     Job context definition for managing pyannote diarization pipeline lifecycle
+
+    Start-up is fail-fast with a message that names the fix: a missing
+    `pyannote.audio` install, a model that is neither baked in nor cached nor
+    downloadable (no token, terms not accepted, no network), or a pipeline
+    that does not load, each fail the worker's initialization and so the
+    service's start, instead of the first session. The one thing that never
+    fails start-up is the device: CUDA that is missing or broken falls back
+    to the CPU with a warning (`select_device`).
     """
 
     def __init__(self, context_config: Any, tags: list[str]):
@@ -612,41 +642,108 @@ class PyannoteDiarizationContext(
                 context_config
             )
         )
+        # Resolved in the main process for reporting (no GPU is touched
+        # here); the worker makes the real selection in `create` and reports
+        # what it ended up on through `runtime_info`.
+        self._resolved_device = resolve_device_preference(self._config.device)
 
     @property
-    def device(self) -> str | None:
+    def device(self) -> str:
         # Reported on /metrics/status through the provider registry's
-        # tag-to-device map, the same way the whisper context reports its own.
+        # tag-to-device map, the same way the whisper context reports its own;
+        # the registry prefers the worker's reported device once loaded.
+        return self._resolved_device
+
+    @property
+    def configured_device(self) -> DevicePreference:
         return self._config.device
 
-    def create(self, log: Logger) -> PyannoteDiarizationModelType:
-        # pylint: disable=import-outside-toplevel
-        # Only import pyannote when a diarization context is configured
-        from pyannote.audio import Pipeline
+    @property
+    def model_terms_url(self) -> str:
+        """
+        Where a deployer accepts the model's terms (the gated form)
+        """
+        return MODEL_TERMS_URL
 
-        token = os.environ.get(self._config.token_env_var)
-        if not token:
+    def resolve_model_source(self) -> tuple[str, str, str | None]:
+        """
+        Decides where the model is loaded from, without loading it
+
+        Returns:
+            (checkpoint to pass to pyannote, source kind, token env var that
+            is needed or None): source kind is "local_dir" for a directory
+            holding `config.yaml` (the configured path, or the baked model
+            directory named by SCRIBEAR_DIARIZATION_MODEL_DIR when the model
+            is the default id), "hf_cache_offline" when HF_HUB_OFFLINE is set
+            (the HuggingFace cache must already hold the model; no token
+            needed), else "huggingface" (download or cache check over the
+            network, token required)
+        """
+        model = self._config.model
+        if os.path.isdir(model):
+            return model, "local_dir", None
+        baked = os.environ.get(MODEL_DIR_ENV_VAR, "").strip()
+        if baked and model == DEFAULT_MODEL:
+            if os.path.isfile(os.path.join(baked, "config.yaml")):
+                return baked, "local_dir", None
             raise RuntimeError(
-                f"Environment variable '{self._config.token_env_var}' must be "
-                "set to load pyannote diarization model"
+                f"{MODEL_DIR_ENV_VAR}={baked!r} is set but holds no "
+                "config.yaml: the diarization image's model bake failed or "
+                "the directory was replaced; rebuild the image or unset the "
+                "variable to load from HuggingFace"
             )
+        if _truthy_env("HF_HUB_OFFLINE"):
+            return model, "hf_cache_offline", None
+        return model, "huggingface", self._config.token_env_var
 
+    def create(self, log: Logger) -> PyannoteDiarizationModelType:
+        # pylint: disable=import-outside-toplevel,too-many-locals
+        started = time.perf_counter()
+        try:
+            # Only import pyannote when a diarization context is configured
+            from pyannote.audio import Pipeline
+        except ImportError as error:
+            raise RuntimeError(
+                "pyannote.audio is not installed but a pyannote-diarization "
+                "context is configured: install the optional dependency "
+                "group (uv sync --extra pyannote-diarization), use the "
+                "transcription-service-*-diarization image, or remove the "
+                f"context and turn diarization_detector off ({error})"
+            ) from error
+
+        checkpoint, source, token_var = self.resolve_model_source()
+        token = None
+        if token_var is not None:
+            token = os.environ.get(token_var)
+            if not token:
+                raise RuntimeError(
+                    f"Environment variable '{token_var}' must be set to load "
+                    f"{self._config.model} from HuggingFace (accept the model "
+                    f"terms at {MODEL_TERMS_URL} first), or bake the model "
+                    f"into the image and point {MODEL_DIR_ENV_VAR} at it, or "
+                    "set HF_HUB_OFFLINE=1 with the model already in the "
+                    "HuggingFace cache"
+                )
+
+        selection = select_device(self._config.device, log)
         log.info(
-            f"Loading {self._config.model} diarization model on device: "
-            f"{self._config.device}"
+            f"Loading {self._config.model} diarization model from "
+            f"{source} ({checkpoint}) on device: {selection.device}"
         )
-        pipeline = Pipeline.from_pretrained(self._config.model, token=token)
+        try:
+            pipeline = Pipeline.from_pretrained(checkpoint, token=token)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            raise RuntimeError(
+                self._describe_load_failure(source, checkpoint, error)
+            ) from error
         if pipeline is None:
             raise RuntimeError(
                 f"Pipeline.from_pretrained returned nothing for "
-                f"{self._config.model}; accept the model terms on HuggingFace "
+                f"{checkpoint}; accept the model terms at {MODEL_TERMS_URL} "
                 f"and check {self._config.token_env_var}"
             )
 
-        if self._config.device == "cuda":
-            import torch
-
-            pipeline.to(torch.device("cuda"))
+        selection = self._place_pipeline(pipeline, selection, log)
 
         if self._config.segmentation_step is not None:
             applied = self._apply_segmentation_step(pipeline)
@@ -664,16 +761,101 @@ class PyannoteDiarizationContext(
 
         self._lower_scheduling_priority(log)
 
+        load_sec = time.perf_counter() - started
         log.info(
-            "Pyannote diarization model loaded successfully "
+            "Pyannote diarization model loaded successfully in "
+            f"{load_sec:.1f}s on {selection.device} "
             f"(torch threads per pass: {self._config.num_threads})"
         )
-        return PyannoteDiarizationService(
+        service = PyannoteDiarizationService(
             pipeline,
             self._config.num_threads,
             self._config.overlap_aware,
             self._config.local_speakers,
             self._config.shared_embeddings,
+            device=selection.device,
+        )
+        service.runtime_info = selection.as_runtime_info() | {
+            "model": self._config.model,
+            "model_source": source,
+            "model_checkpoint": checkpoint,
+            "model_load_sec": round(load_sec, 2),
+        }
+        return service
+
+    def runtime_info(self, context: PyannoteDiarizationModelType) -> dict:
+        return dict(getattr(context, "runtime_info", {}) or {})
+
+    @staticmethod
+    def _place_pipeline(
+        pipeline: Any, selection: DeviceSelection, log: Logger
+    ) -> DeviceSelection:
+        """
+        Moves the pipeline to the selected device. A failure moving to CUDA
+        (driver, memory) is the second place a GPU can break after the
+        probe; it falls back to the CPU like the probe does
+        """
+        if selection.device != "cuda":
+            return selection
+        # pylint: disable=import-outside-toplevel
+        import torch
+
+        try:
+            pipeline.to(torch.device("cuda"))
+            return selection
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            reason = (
+                "moving the pipeline to CUDA failed: "
+                f"{type(error).__name__}: {error}"
+            )
+            log.warning(
+                "Diarization pipeline could not be placed on CUDA; falling "
+                "back to CPU",
+                context={"reason": reason},
+            )
+            pipeline.to(torch.device("cpu"))
+            return DeviceSelection(
+                configured=selection.configured,
+                device="cpu",
+                fallback=True,
+                reason=reason,
+            )
+
+    def _describe_load_failure(
+        self, source: str, checkpoint: str, error: Exception
+    ) -> str:
+        detail = f"{type(error).__name__}: {error}"
+        if source == "local_dir":
+            missing = [
+                name
+                for name in ("config.yaml", "segmentation", "embedding")
+                if not (Path(checkpoint) / name).exists()
+            ]
+            hint = (
+                f"missing {', '.join(missing)} under {checkpoint}; "
+                if missing
+                else ""
+            )
+            return (
+                f"Could not load the diarization pipeline from the local "
+                f"directory {checkpoint}: {hint}rebuild the diarization image "
+                f"(the model is downloaded at build time) or point `model` / "
+                f"{MODEL_DIR_ENV_VAR} at a complete pipeline directory "
+                f"({detail})"
+            )
+        if source == "hf_cache_offline":
+            return (
+                f"Could not load {checkpoint} from the HuggingFace cache with "
+                "HF_HUB_OFFLINE set: the model is not cached on this host. "
+                "Download it once with a token, bake it into the image, or "
+                f"unset HF_HUB_OFFLINE ({detail})"
+            )
+        return (
+            f"Could not load {checkpoint} from HuggingFace: accept the model "
+            f"terms at {MODEL_TERMS_URL} with the account that owns the "
+            f"token in {self._config.token_env_var}, check the token and "
+            "that the host can reach huggingface.co, or bake the model into "
+            f"the image ({detail})"
         )
 
     def _apply_clustering_threshold(self, pipeline: Any) -> None:

@@ -270,3 +270,34 @@ def rebuilt_config() -> WhisperStreamingProviderConfig:
         diarization_window_sec=10.0,
         diarization_min_mint_sec=1.5,
     )
+
+
+def test_a_clock_offset_puts_the_first_window_on_the_session_timeline(log):
+    """
+    A job replacing one lost with its worker starts its clock at the audio
+    the session had already produced, so its windows and labels line up
+    with the captions instead of restarting at zero.
+    """
+    diarizer = _diarizer(
+        [SpeakerSegment(0.0, 2.0, "LOCAL_0")], {"LOCAL_0": _voice(0)}
+    )
+    config = WhisperStreamingProviderConfig(
+        whisper_context_tag="w",
+        silero_context_tag="s",
+        job_period_ms=5000,
+        max_buffer_len_sec=30,
+        local_agree_dim=2,
+        diarization_detector=True,
+        diarization_window_sec=10.0,
+        diarization_min_mint_sec=1.5,
+    )
+    job = DiarizationJob(config, clock_offset_sec=120.0, chunks_offset=240)
+
+    result = job.process_batch(log, (diarizer,), [chunk(3.0)])
+
+    assert result is not None
+    assert result.window_start == 120.0
+    assert result.window_end == 123.0
+    assert result.segments[0].start == 120.0
+    assert result.audio_received_sec == 123.0
+    assert result.chunks_received == 241

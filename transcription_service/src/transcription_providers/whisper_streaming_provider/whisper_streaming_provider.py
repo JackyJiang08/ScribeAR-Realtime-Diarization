@@ -6,9 +6,11 @@ Defines FasterWhisperStreamingProvider
 # pylint: disable=duplicate-code
 
 import time
+from collections import deque
 from dataclasses import asdict, dataclass
 
 from src.shared.logger import Logger
+from src.shared.utils.diarization_backend import DiarizationContextInterface
 from src.shared.utils.speaker_attribution import SpeakerLabelAttacher
 from src.shared.utils.speaker_reconciler import SpeakerReconcilerState
 from src.shared.utils.worker_pool import (
@@ -115,6 +117,23 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             # touches nothing upstream does not.
             self._diarization_job = None
             self._attacher: SpeakerLabelAttacher | None = None
+            # Set when the diarization job's worker died: the job is gone
+            # and a new one is registered on the next audio chunk (the pool
+            # is replacing the worker meanwhile). Earliest wall time of the
+            # next attempt, so a pool with no live diarization worker yet is
+            # asked once a second, not once per chunk.
+            self._diarization_retry_at: float | None = None
+            # The diarization job's clock as last reported (audio seconds,
+            # chunks, wall time of its newest chunk) and the wall times of
+            # the chunks this session sent, so a replacement job can start
+            # its clock where the lost one stopped (see
+            # `_diarization_clock_offset`).
+            self._diarization_clock: tuple[float, int, float | None] = (
+                0.0,
+                0,
+                None,
+            )
+            self._diarization_sent_at: deque[float] = deque(maxlen=4096)
             # Speaker memory to start the diarization job from (a reconnect
             # of a session the provider still remembers) and the newest
             # memory this session's job reported, kept for the next one.
@@ -268,6 +287,11 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             value = result.value
             if value.state is not None:
                 self._speaker_state = value.state
+            self._diarization_clock = (
+                value.audio_received_sec,
+                value.chunks_received,
+                value.newest_received_at,
+            )
             updates = self._attacher.add_coverage(
                 value.segments,
                 value.window_start,
@@ -278,6 +302,103 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
             )
             for update in updates:
                 self.emit(self.SpeakerLabelsEvent, update)
+
+        def _handle_diarization_job_lost(self, worker_id: int) -> None:
+            """
+            The diarization worker died under this session's job. Captions
+            are untouched (they run on another worker); the labels resume
+            from the speaker memory the job last reported as soon as a new
+            job can be registered, which `handle_audio_chunk` tries on every
+            chunk once a second until the pool has the worker back.
+            """
+            self._log.warning(
+                "Diarization worker exited; speaker labels pause until the "
+                "pool replaces it, captions continue",
+                context={"worker_id": worker_id},
+            )
+            self._diarization_job = None
+            self._diarization_retry_at = time.time()
+
+        def _diarization_clock_offset(self) -> tuple[float, int]:
+            """
+            Where a replacement diarization job's clock starts: the lost
+            job's last reported clock, extended by the chunks this session
+            sent after the newest chunk that clock counted, at the lost
+            job's mean chunk length. Exact for fixed-size chunks (every
+            ScribeAR client sends them), within a chunk otherwise. A first
+            registration starts at zero.
+
+            Returns:
+                (seconds of audio before the new job's first chunk, chunks
+                behind them)
+            """
+            audio_sec, chunks, newest_at = self._diarization_clock
+            if chunks <= 0:
+                return 0.0, 0
+            sent_after = (
+                sum(1 for sent in self._diarization_sent_at if sent > newest_at)
+                if newest_at is not None
+                else 0
+            )
+            mean_chunk_sec = audio_sec / chunks
+            return audio_sec + sent_after * mean_chunk_sec, chunks + sent_after
+
+        def _register_diarization_job(self) -> None:
+            """
+            Registers this session's diarization job, seeded with the newest
+            speaker memory and, after a loss, the session's audio clock, and
+            subscribes to its results and to its loss. Raises what the pool
+            raises when no live worker owns the tag.
+            """
+            assert self._attacher is not None
+            clock_offset_sec, chunks_offset = self._diarization_clock_offset()
+            job = self._provider.worker_pool.register_job(
+                self._provider.diarization_context_tags,
+                self._provider.config.diarization_period_ms,
+                DiarizationJob(
+                    self._provider.config,
+                    self._speaker_state,
+                    clock_offset_sec=clock_offset_sec,
+                    chunks_offset=chunks_offset,
+                ),
+                self._provider.provider_key + DIARIZATION_JOB_LABEL_SUFFIX,
+                session_uid=self.session_uid,
+                room_uid=self.room_uid,
+            )
+            # Subscribed before the result handler on purpose: the tests
+            # (and nothing else) read the result handler as the newest
+            # subscription on the handle.
+            job.on(job.JobLostEvent, self._handle_diarization_job_lost)
+            job.on(job.JobResultEvent, self._handle_diarization_result)
+            self._diarization_job = job
+            self._diarization_retry_at = None
+
+        def _retry_diarization_job(self) -> None:
+            """
+            Re-registers a diarization job lost with its worker, once the
+            retry time has come; a pool that still has no live diarization
+            worker postpones the next attempt by a second
+            """
+            now = time.time()
+            if (
+                self._diarization_retry_at is None
+                or now < self._diarization_retry_at
+            ):
+                return
+            try:
+                self._register_diarization_job()
+            except (RuntimeError, KeyError) as error:
+                self._diarization_retry_at = now + 1.0
+                self._log.debug(
+                    "Diarization worker not back yet; retrying in 1 s",
+                    context={"error": str(error)},
+                )
+                return
+            self._log.info(
+                "Diarization job re-registered after its worker was "
+                "replaced; speaker labels resume from the session's memory",
+                context={"worker_id": self._diarization_job.worker_id},
+            )
 
         def _ensure_job(self) -> None:
             """
@@ -325,27 +446,25 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
 
             if self._attacher is None:
                 return
-            self._diarization_job = self._provider.worker_pool.register_job(
-                self._provider.diarization_context_tags,
-                self._provider.config.diarization_period_ms,
-                DiarizationJob(self._provider.config, self._speaker_state),
-                self._provider.provider_key + DIARIZATION_JOB_LABEL_SUFFIX,
-                session_uid=self.session_uid,
-                room_uid=self.room_uid,
-            )
-            self._diarization_job.on(
-                self._diarization_job.JobResultEvent,
-                self._handle_diarization_result,
-            )
+            self._register_diarization_job()
 
         def handle_audio_chunk(self, chunk_id: str, chunk: bytes):
             self._ensure_job()
             self._job.queue_data(
                 [AudioChunkPayload(chunk_id=chunk_id, audio_bytes=chunk)]
             )
+            if self._attacher is None:
+                return
+            if self._diarization_job is None:
+                self._retry_diarization_job()
+            now = time.time()
+            # Every chunk counts toward the session's audio clock, including
+            # the ones sent while the diarization job is being replaced:
+            # they are exactly what the replacement's clock must skip.
+            self._diarization_sent_at.append(now)
             if self._diarization_job is not None:
                 self._diarization_job.queue_data(
-                    [DiarizationChunk(chunk_id, chunk, time.time())]
+                    [DiarizationChunk(chunk_id, chunk, now)]
                 )
 
         def end_session(self):
@@ -472,6 +591,19 @@ class WhisperStreamingProvider(TranscriptionProviderInterface):
                 f"tagged '{self.config.diarization_context_tag}'; add the "
                 "pyannote-diarization context to provider_config.json with "
                 "worker_ids of its own, or turn diarization_detector off"
+            )
+        tag = self.config.diarization_context_tag
+        definitions = self.worker_pool.context_defs_for_tag(tag)
+        if definitions and not any(
+            isinstance(definition, DiarizationContextInterface)
+            for definition in definitions
+        ):
+            kinds = sorted({type(d).__name__ for d in definitions})
+            raise ValueError(
+                f"diarization_context_tag '{tag}' of provider "
+                f"'{self.provider_key}' resolves to {kinds}, which cannot "
+                "diarize; point it at the pyannote-diarization context's "
+                "tag (its `tags` in provider_config.json)"
             )
         caption_workers = {
             worker.worker_id

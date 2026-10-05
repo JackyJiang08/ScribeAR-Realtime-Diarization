@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.shared.logger import Logger
+from src.shared.utils.diarization_backend import DiarizationContextInterface
 from src.shared.utils.speaker_reconciler import (
     SpeakerReconcilerState,
     SpeakerSegment,
@@ -100,6 +101,13 @@ def mock_worker_pool_fixture():
         return []
 
     pool.load_for_tags.side_effect = load_for_tags
+    # The diarization tag resolves to a diarization context, as the
+    # provider's start-up type check requires.
+    pool.context_defs_for_tag.side_effect = lambda tag: (
+        [MagicMock(spec=DiarizationContextInterface)]
+        if tag == PYANNOTE_TAG
+        else []
+    )
     pool.register_job.side_effect = lambda *args, **kwargs: MagicMock(
         worker_id=1 if isinstance(args[2], DiarizationJob) else 0
     )
@@ -350,6 +358,9 @@ def test_shared_worker_is_warned_about(mock_logger):
     """A worker running both captions and diarization is legal but warned."""
     pool = MagicMock(spec=WorkerPool)
     pool.load_for_tags.return_value = [_snapshot(0)]
+    pool.context_defs_for_tag.return_value = [
+        MagicMock(spec=DiarizationContextInterface)
+    ]
 
     WhisperStreamingProvider(DIARIZED_CONFIG, mock_logger, pool, PROVIDER_KEY)
 
@@ -463,3 +474,96 @@ def test_speaker_memory_expires_after_the_grace_and_is_never_kept_without_uid(
     )
     disabled.remember_speakers("session-1", state, 1)
     assert disabled.remembered_sessions == 0
+
+
+def test_a_tag_pointing_at_a_non_diarization_context_fails_at_startup(
+    mock_logger,
+):
+    """
+    A diarization tag that resolves to whisper's context used to fail inside
+    the first session; it fails the provider's construction now, naming the
+    context kinds it found.
+    """
+    pool = MagicMock(spec=WorkerPool)
+    pool.load_for_tags.return_value = [_snapshot(1)]
+    not_a_diarizer = MagicMock()
+    type(not_a_diarizer).__name__ = "FasterWhisperContext"
+    pool.context_defs_for_tag.return_value = [not_a_diarizer]
+
+    with pytest.raises(ValueError, match="cannot diarize"):
+        WhisperStreamingProvider(
+            DIARIZED_CONFIG, mock_logger, pool, PROVIDER_KEY
+        )
+
+
+def test_a_lost_diarization_job_is_re_registered_with_the_speaker_memory(
+    mock_logger, mock_worker_pool
+):
+    """
+    When the diarization worker dies the pool tells the job handle
+    (JobLostEvent). Captions keep flowing untouched; the next audio chunk
+    registers a new diarization job seeded with the newest speaker memory
+    the old one reported, so labels resume with the same identities. While
+    the pool has no live diarization worker, registration is retried at
+    most once a second.
+    """
+    provider = WhisperStreamingProvider(
+        DIARIZED_CONFIG, mock_logger, mock_worker_pool, PROVIDER_KEY
+    )
+    session = provider.create_session("cfg", "sess", "room", mock_logger)
+    session.handle_audio_chunk("c0", b"audio")
+    first_handle = session._diarization_job
+    state = SpeakerReconcilerState(version=3)
+    _emit_result(
+        session,
+        first_handle,
+        DiarizationResult(
+            segments=[SpeakerSegment(0.0, 4.0, "spk_0")],
+            window_start=0.0,
+            window_end=5.0,
+            lag_sec=0.3,
+            labels_minted=1,
+            state=state,
+            audio_received_sec=30.0,
+            chunks_received=60,
+            newest_received_at=time.time(),
+        ),
+    )
+    assert session._speaker_state is state
+
+    # The pool reports the worker dead: the lost handler is the first
+    # subscription made on the handle.
+    lost_callback = first_handle.on.call_args_list[0][0][1]
+    lost_callback(1)
+    assert session._diarization_job is None
+    caption_handle = session._job
+
+    # No live diarization worker yet: the retry fails and is postponed.
+    mock_worker_pool.register_job.side_effect = RuntimeError("no live worker")
+    session.handle_audio_chunk("c1", b"audio")
+    assert session._diarization_job is None
+    assert caption_handle.queue_data.call_count == 2
+    # Within the same second nothing is retried.
+    session.handle_audio_chunk("c2", b"audio")
+    assert mock_worker_pool.register_job.call_count == 3
+
+    # The worker is back: the next chunk after the retry time re-registers
+    # with the remembered speaker memory and feeds the new job.
+    mock_worker_pool.register_job.side_effect = (
+        lambda *args, **kwargs: MagicMock(worker_id=1)
+    )
+    session._diarization_retry_at = 0.0
+    session.handle_audio_chunk("c3", b"audio")
+    assert session._diarization_job is not None
+    args, _ = mock_worker_pool.register_job.call_args
+    assert args[0] == (PYANNOTE_TAG,)
+    assert isinstance(args[2], DiarizationJob)
+    assert args[2]._reconciler.state_version == state.version
+    # The new job's clock starts where the lost one stopped: 30 s reported,
+    # plus the two chunks sent after that report at the job's mean chunk
+    # length (0.5 s), so labels stay on the session's timeline.
+    assert args[2]._total_samples == int(31.0 * 16000)
+    assert args[2]._buffer_offset_samples == int(31.0 * 16000)
+    session._diarization_job.queue_data.assert_called_once()
+    # Captions never stopped.
+    assert caption_handle.queue_data.call_count == 4

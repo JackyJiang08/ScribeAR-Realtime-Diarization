@@ -143,6 +143,30 @@ class TranscriptionProviderRegistry:
             for key, provider in config.provider_config.providers.items()
         }
 
+        # What each context's worker reported about the device it ended up
+        # on: an "auto" that resolved to CUDA, or a CUDA request that fell
+        # back to the CPU. Said once here, where a deployer reads the start-up
+        # log; kept available on /metrics/status as `deviceFallbacks`.
+        self._context_tags: list[list[str]] = [
+            list(c.tags) for c in config.provider_config.contexts
+        ]
+        for context_id, tags in enumerate(self._context_tags):
+            info = self._worker_pool.context_runtime_info(context_id)
+            if not info or "device" not in info:
+                continue
+            for tag in tags:
+                self._context_device_by_tag[tag] = info["device"]
+            if info.get("device_fallback"):
+                logger.warning(
+                    "Context fell back to the CPU: configured device "
+                    f"'{info.get('configured_device')}' is not usable",
+                    context={
+                        "context_id": context_id,
+                        "tags": tags,
+                        "reason": info.get("device_fallback_reason"),
+                    },
+                )
+
         # Counts the failure mode that is otherwise invisible from the server
         # side: `transcriptionProviderId` is free text, so a typo closes the
         # websocket with a bare 1007 and looks to the client like the service
@@ -339,11 +363,56 @@ class TranscriptionProviderRegistry:
                 devices[key] = device
                 continue
             for tag in provider.context_tags:
-                tag_device = self._context_device_by_tag.get(tag)
+                tag_device = self._device_for_tag(tag)
                 if tag_device is not None:
                     devices[key] = tag_device
                     break
         return devices
+
+    def _device_for_tag(self, tag: str) -> str | None:
+        """
+        The device the context under a tag runs on: what its worker reported
+        once loaded (so an "auto" or a CUDA fallback shows the real device,
+        and a replaced worker's choice is current), else the configured value
+        """
+        reported = self._worker_pool.context_runtime_info_by_tag(tag)
+        if isinstance(reported, dict) and reported.get("device"):
+            return str(reported["device"])
+        return self._context_device_by_tag.get(tag)
+
+    @property
+    def device_fallbacks(self) -> dict[str, dict[str, Any]]:
+        """
+        Contexts running on a device other than the one configured, keyed by
+        context tag: `configured_device`, `device`, `reason`. Empty when every
+        context runs where it was asked to. Read live from the pool, so a
+        replaced worker that recovered its GPU disappears from here
+
+        Side effect free, so it is safe to call from a request handler.
+        """
+        fallbacks: dict[str, dict[str, Any]] = {}
+        for context_id, tags in enumerate(self._context_tags):
+            info = self._worker_pool.context_runtime_info(context_id)
+            if not isinstance(info, dict) or not info.get("device_fallback"):
+                continue
+            for tag in tags:
+                fallbacks[tag] = {
+                    "configured_device": info.get("configured_device"),
+                    "device": info.get("device"),
+                    "reason": info.get("device_fallback_reason"),
+                }
+        return fallbacks
+
+    @property
+    def worker_restarts(self) -> dict[str, int]:
+        """
+        Worker processes the pool has replaced after they died, by worker id
+        (as a string key for JSON), since process start
+        """
+        restarts = getattr(self._worker_pool, "worker_restarts", None)
+        if not isinstance(restarts, dict):
+            return {}
+        return {str(k): int(v) for k, v in restarts.items()}
 
     def worker_snapshots(self) -> list[WorkerSnapshot]:
         """

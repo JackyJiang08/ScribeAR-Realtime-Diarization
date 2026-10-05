@@ -86,6 +86,16 @@ class DiarizationResult:
         state           - The reconciler's speaker memory after this pass,
                             when it changed; the session keeps the newest
                             one so a reconnect can continue the labels
+        audio_received_sec - The job's clock: seconds of audio it has
+                            received in this session so far (every chunk,
+                            diarized or not), so a job registered after this
+                            one was lost with its worker can start its clock
+                            where this one stopped
+        chunks_received - Chunks behind `audio_received_sec`, so the session
+                            can extend the clock by the chunks it sent after
+                            this pass
+        newest_received_at - Wall time the newest chunk behind the clock
+                            arrived at the job
     """
 
     segments: list[SpeakerSegment]
@@ -96,6 +106,9 @@ class DiarizationResult:
     confidences: dict[str, float] = field(default_factory=dict)
     relabel: dict[str, str] = field(default_factory=dict)
     state: SpeakerReconcilerState | None = None
+    audio_received_sec: float = 0.0
+    chunks_received: int = 0
+    newest_received_at: float | None = None
 
 
 def reconciler_config_from(
@@ -146,12 +159,22 @@ class DiarizationJob(
         self,
         config: WhisperStreamingProviderConfig,
         state: SpeakerReconcilerState | None = None,
+        clock_offset_sec: float = 0.0,
+        chunks_offset: int = 0,
     ):
         """
         Args:
             config  - The provider config
             state   - Speaker memory of an earlier connection of the same
                         session to continue from (reconnect), or None
+            clock_offset_sec - Seconds of session audio that passed before
+                        this job's first chunk: zero for a new connection;
+                        for a job replacing one lost with its worker, the
+                        lost job's clock (`DiarizationResult.audio_received_sec`)
+                        extended by the chunks sent since, so labels keep
+                        the session's timeline
+            chunks_offset - Chunks behind `clock_offset_sec`, carried into
+                        `chunks_received`
         """
         self._counters = JobCounterCollector()
         self._decoder = AudioDecoder(
@@ -164,11 +187,13 @@ class DiarizationJob(
         # Absolute sample index of buffer[0], on a timeline that counts every
         # chunk this job ever received - the timeline the labels are reported
         # on.
-        self._buffer_offset_samples = 0
-        self._total_samples = 0
+        offset_samples = int(round(max(0.0, clock_offset_sec) * SAMPLE_RATE))
+        self._buffer_offset_samples = offset_samples
+        self._total_samples = offset_samples
         # End of the newest window diarized so far, absolute samples. Audio
         # purged from the buffer beyond this point was never labelled.
-        self._covered_through_samples = 0
+        self._covered_through_samples = offset_samples
+        self._chunks_received = max(0, chunks_offset)
         self._newest_received_at: float | None = None
         self._min_speakers = config.diarization_min_speakers
         self._max_speakers = config.diarization_max_speakers
@@ -221,6 +246,7 @@ class DiarizationJob(
             self._buffer.append(samples)
             self._total_samples += len(samples)
             appended += len(samples)
+            self._chunks_received += 1
             self._newest_received_at = chunk.received_at
         return appended
 
@@ -325,6 +351,9 @@ class DiarizationJob(
             confidences=dict(self._reconciler.last_confidence),
             relabel=dict(self._reconciler.last_merges),
             state=state,
+            audio_received_sec=self._total_samples / SAMPLE_RATE,
+            chunks_received=self._chunks_received,
+            newest_received_at=self._newest_received_at,
         )
 
     def _run_pass(self, log: Logger, diarizer, window: np.ndarray):
