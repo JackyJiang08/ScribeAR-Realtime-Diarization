@@ -241,7 +241,7 @@ services:
       # Not `:?`-guarded, like DEPLOYMENT_ENV below and unlike the secrets: it
       # changes what is *reported*, never what runs, and must not be able to
       # stop a stack from starting.
-      COMPOSE_FILE_VERSION: "17"
+      COMPOSE_FILE_VERSION: "18"
       LOG_LEVEL: ${ADMIN_LOG_LEVEL:-info}
       ADMIN_API_KEY: ${SESSION_MANAGER_API_KEY}
       SESSION_MANAGER_BASE_URL: http://session-manager:80
@@ -763,7 +763,7 @@ services:
       # MONITORING_ASR_DUTY_RATIO above, if set, wins over both — the existing
       # flat override. Empty means "use the sidecar default" (0.7).
       ALERT_ASR_DUTY_RATIO_CPU: ${MONITORING_ASR_DUTY_RATIO_CPU:-}
-      # Speaker diarization falling behind (the fork's diarizationBehindRule):
+      # Speaker diarization falling behind (compose.yml v18; the fork's diarizationBehindRule):
       # the share of audio no diarization pass covered, the audio needed
       # before that share is believed, and the p95 label lag in ms. Empty
       # means the sidecar defaults (0.1, 60, 10000).

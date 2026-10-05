@@ -12,10 +12,19 @@ lists every key the current `compose.yml` understands.
 
 ---
 
-## Unreleased — speaker diarization images (fork, optional)
+## Unreleased — speaker diarization images (fork, optional; `compose.yml` v18)
 
-**Nothing to do unless you want speaker labels.** No new required key; a
-stock deployment that keeps `TRANSCRIPTION_DEVICE=cpu` is unchanged.
+**Copy the new [`compose.yml`](compose.yml)** and `docker compose up -d`
+when you next deploy: the monitoring sidecar gained three optional
+environment keys for the diarization alert
+(`ALERT_DIARIZATION_UNCOVERED_RATIO`, `ALERT_DIARIZATION_MIN_AUDIO_SECONDS`,
+`ALERT_DIARIZATION_LAG_P95_MS`, read from
+`MONITORING_DIARIZATION_*` in `.env`, all empty by default). They were
+added with the Phase 2a change that moved diarization to its own worker;
+the compose-file version is bumped to 18 here so the admin console's
+deployment check reports the file honestly. Nothing else changes for a
+deployment that keeps `TRANSCRIPTION_DEVICE=cpu`, and no `.env` key is
+required.
 
 To turn diarization on, see [`DIARIZATION.md`](DIARIZATION.md):
 
